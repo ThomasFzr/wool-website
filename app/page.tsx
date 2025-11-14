@@ -19,7 +19,11 @@ export default function HomePage() {
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [showModal, setShowModal] = useState(false); // pour l'anim
+  const [showModal, setShowModal] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -62,11 +66,32 @@ export default function HomePage() {
   }
 
   function closeModal() {
-    // petite anim de fermeture
+    setZoomed(false);
+    setOffset({ x: 0, y: 0 });
+    setIsDragging(false);
+    setDragStart(null);
+
     setShowModal(false);
     setTimeout(() => {
       setOpenId(null);
     }, 150);
+  }
+
+  function startDrag(clientX: number, clientY: number) {
+    if (!zoomed) return;
+    setIsDragging(true);
+    setDragStart({ x: clientX - offset.x, y: clientY - offset.y });
+  }
+
+  function moveDrag(clientX: number, clientY: number) {
+    if (!zoomed || !isDragging || !dragStart) return;
+    const newX = clientX - dragStart.x;
+    const newY = clientY - dragStart.y;
+    setOffset({ x: newX, y: newY });
+  }
+
+  function endDrag() {
+    setIsDragging(false);
   }
 
   function nextImage() {
@@ -235,12 +260,49 @@ export default function HomePage() {
                 </div>
 
                 {/* Image principale */}
-                <div className="relative h-80 w-full overflow-hidden rounded-xl bg-slate-100">
+                <div
+                  className="relative h-[600px] w-full overflow-hidden rounded-xl bg-slate-100"
+                  // souris
+                  onMouseDown={(e) => startDrag(e.clientX, e.clientY)}
+                  onMouseMove={(e) => moveDrag(e.clientX, e.clientY)}
+                  onMouseUp={endDrag}
+                  onMouseLeave={endDrag}
+                  // tactile
+                  onTouchStart={(e) => {
+                    const t = e.touches[0];
+                    startDrag(t.clientX, t.clientY);
+                  }}
+                  onTouchMove={(e) => {
+                    const t = e.touches[0];
+                    moveDrag(t.clientX, t.clientY);
+                  }}
+                  onTouchEnd={endDrag}
+                >
                   {openImages.length > 0 ? (
                     <img
                       src={openImages[currentIndex]}
                       alt={`${openCreation.title} ${currentIndex + 1}`}
-                      className="h-full w-full object-cover"
+                      onClick={() => {
+                        // toggle zoom au clic
+                        if (!zoomed) {
+                          setZoomed(true);
+                        } else {
+                          // dézoom => reset position
+                          setZoomed(false);
+                          setOffset({ x: 0, y: 0 });
+                        }
+                      }}
+                      className={`
+        h-full w-full object-cover transition-transform duration-300
+        ${zoomed ? "cursor-grab" : "cursor-zoom-in"}
+        ${isDragging && zoomed ? "cursor-grabbing" : ""}
+      `}
+                      style={{
+                        transform: zoomed
+                          ? `scale(1.7) translate(${offset.x}px, ${offset.y}px)`
+                          : "scale(1) translate(0px, 0px)",
+                      }}
+                      draggable={false}
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
@@ -248,7 +310,7 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Navigation flèches si plusieurs images */}
+                  {/* Flèches + indicateur (inchangé) */}
                   {openImages.length > 1 && (
                     <>
                       <button
@@ -278,8 +340,8 @@ export default function HomePage() {
                         key={i}
                         onClick={() => setCurrentIndex(i)}
                         className={`h-14 w-14 shrink-0 rounded-md border ${i === currentIndex
-                            ? "border-slate-900"
-                            : "border-transparent opacity-60"
+                          ? "border-slate-900"
+                          : "border-transparent opacity-60"
                           }`}
                       >
                         <img
