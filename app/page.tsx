@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+// import Link from "next/link"; // tu peux le remettre si tu gardes un lien admin
 
 type Creation = {
   _id: string;
@@ -19,6 +19,7 @@ export default function HomePage() {
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showModal, setShowModal] = useState(false); // pour l'anim
 
   useEffect(() => {
     async function load() {
@@ -52,10 +53,20 @@ export default function HomePage() {
     setCurrentIndex(0);
     setOpenId(c._id);
     if (imgs.length === 0) setCurrentIndex(0);
+    setShowModal(true);
+  }
+
+  function reallyCloseModal() {
+    setOpenId(null);
+    setShowModal(false);
   }
 
   function closeModal() {
-    setOpenId(null);
+    // petite anim de fermeture
+    setShowModal(false);
+    setTimeout(() => {
+      setOpenId(null);
+    }, 150);
   }
 
   function nextImage() {
@@ -76,6 +87,25 @@ export default function HomePage() {
     setCurrentIndex((prev) => (prev - 1 + imgs.length) % imgs.length);
   }
 
+  // Gestion clavier: Esc / flèches
+  useEffect(() => {
+    if (!openId) return;
+
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        closeModal();
+      } else if (e.key === "ArrowRight") {
+        nextImage();
+      } else if (e.key === "ArrowLeft") {
+        prevImage();
+      }
+    }
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, currentIndex, creations]);
+
   const openCreation = openId
     ? creations.find((c) => c._id === openId) || null
     : null;
@@ -84,17 +114,21 @@ export default function HomePage() {
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-5xl px-4 py-8">
+        {/* Header */}
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               Les créations en laine de maman 🧶
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              Une petite galerie pour partager ses tricots
+              Clique sur une création pour voir toutes les photos.
             </p>
           </div>
+          {/* Bouton admin caché si tu ne veux pas qu'il soit visible */}
+          {/* <Link ...> */}
         </header>
 
+        {/* États de chargement / erreur */}
         {loading && (
           <p className="text-sm text-slate-500">Chargement des créations...</p>
         )}
@@ -105,11 +139,11 @@ export default function HomePage() {
 
         {!loading && !error && creations.length === 0 && (
           <p className="text-sm text-slate-500">
-            Aucune création pour le moment. Ajoute-en depuis l&apos;espace
-            admin.
+            Aucune création pour le moment.
           </p>
         )}
 
+        {/* Galerie */}
         {!loading && !error && creations.length > 0 && (
           <section className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {creations.map((c) => {
@@ -166,94 +200,105 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Modal */}
-      {openCreation && (
+      {/* Modal / Lightbox */}
+      {(openCreation || showModal) && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          onClick={closeModal}     // 👈 clique sur le fond -> ferme
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 transition-opacity duration-150 ${showModal ? "opacity-100" : "opacity-0"
+            }`}
+          onClick={closeModal} // clic sur le fond => ferme
         >
           <div
-            className="relative w-full max-w-2xl rounded-2xl bg-white p-4 shadow-xl"
-            onClick={(e) => e.stopPropagation()}   // 👈 empêche la fermeture sur le contenu
+            className={`relative w-full max-w-2xl rounded-2xl bg-white p-4 shadow-xl transform-gpu transition-all duration-150 ${showModal ? "opacity-100 scale-100" : "opacity-0 scale-95"
+              }`}
+            onClick={(e) => e.stopPropagation()} // clic dans le contenu => ne ferme pas
           >
-            <button
-              onClick={closeModal}
-              className="absolute right-3 top-3 rounded-full bg-black/70 px-2 py-1 text-xs text-white hover:bg-black"
-            >
-              Fermer
-            </button>
+            {openCreation && (
+              <>
 
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  {openCreation.title}
-                </h2>
-                {openCreation.description && (
-                  <p className="mt-1 text-xs text-slate-600">
-                    {openCreation.description}
+                {/* Infos titre + description + prix */}
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      {openCreation.title}
+                    </h2>
+                    {openCreation.description && (
+                      <p className="mt-1 text-xs text-slate-600">
+                        {openCreation.description}
+                      </p>
+                    )}
+                  </div>
+                  {openCreation.price != null && (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
+                      {openCreation.price} €
+                    </span>
+                  )}
+                </div>
+
+                {/* Image principale */}
+                <div className="relative h-80 w-full overflow-hidden rounded-xl bg-slate-100">
+                  {openImages.length > 0 ? (
+                    <img
+                      src={openImages[currentIndex]}
+                      alt={`${openCreation.title} ${currentIndex + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
+                      Pas d&apos;image
+                    </div>
+                  )}
+
+                  {/* Navigation flèches si plusieurs images */}
+                  {openImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={prevImage}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black"
+                      >
+                        ◀
+                      </button>
+                      <button
+                        onClick={nextImage}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black"
+                      >
+                        ▶
+                      </button>
+                      <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white">
+                        {currentIndex + 1} / {openImages.length}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Miniatures */}
+                {openImages.length > 1 && (
+                  <div className="mt-3 flex gap-2 overflow-x-auto">
+                    {openImages.map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentIndex(i)}
+                        className={`h-14 w-14 shrink-0 rounded-md border ${i === currentIndex
+                            ? "border-slate-900"
+                            : "border-transparent opacity-60"
+                          }`}
+                      >
+                        <img
+                          src={url}
+                          alt={`miniature ${i + 1}`}
+                          className="h-full w-full rounded-md object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Astuce clavier */}
+                {openImages.length > 1 && (
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Astuce&nbsp;: flèches ← → pour changer de photo, Esc pour fermer.
                   </p>
                 )}
-              </div>
-              {openCreation.price != null && (
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
-                  {openCreation.price} €
-                </span>
-              )}
-            </div>
-
-            <div className="relative h-80 w-full overflow-hidden rounded-xl bg-slate-100">
-              {openImages.length > 0 ? (
-                <img
-                  src={openImages[currentIndex]}
-                  alt={`${openCreation.title} ${currentIndex + 1}`}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
-                  Pas d&apos;image
-                </div>
-              )}
-
-              {openImages.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black"
-                  >
-                    ◀
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black"
-                  >
-                    ▶
-                  </button>
-                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white">
-                    {currentIndex + 1} / {openImages.length}
-                  </span>
-                </>
-              )}
-            </div>
-
-            {openImages.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto">
-                {openImages.map((url, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentIndex(i)}
-                    className={`h-14 w-14 shrink-0 rounded-md border ${i === currentIndex
-                        ? "border-slate-900"
-                        : "border-transparent opacity-60"
-                      }`}
-                  >
-                    <img
-                      src={url}
-                      alt={`miniature ${i + 1}`}
-                      className="h-full w-full rounded-md object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
+              </>
             )}
           </div>
         </div>
