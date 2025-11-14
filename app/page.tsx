@@ -90,11 +90,9 @@ export default function HomePage() {
               Les créations en laine de maman 🧶
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              Une petite galerie pour partager ses tricots avec ses amies.
+              Une petite galerie pour partager ses tricots
             </p>
           </div>
-          {/* tu peux enlever ce bouton si tu veux cacher /admin */}
-          {/* <Link ...> */}
         </header>
 
         {loading && (
@@ -170,8 +168,14 @@ export default function HomePage() {
 
       {/* Modal */}
       {openCreation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="relative w-full max-w-2xl rounded-2xl bg-white p-4 shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={closeModal}     // 👈 clique sur le fond -> ferme
+        >
+          <div
+            className="relative w-full max-w-2xl rounded-2xl bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}   // 👈 empêche la fermeture sur le contenu
+          >
             <button
               onClick={closeModal}
               className="absolute right-3 top-3 rounded-full bg-black/70 px-2 py-1 text-xs text-white hover:bg-black"
@@ -237,11 +241,10 @@ export default function HomePage() {
                   <button
                     key={i}
                     onClick={() => setCurrentIndex(i)}
-                    className={`h-14 w-14 shrink-0 rounded-md border ${
-                      i === currentIndex
+                    className={`h-14 w-14 shrink-0 rounded-md border ${i === currentIndex
                         ? "border-slate-900"
                         : "border-transparent opacity-60"
-                    }`}
+                      }`}
                   >
                     <img
                       src={url}
