@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type Creation = {
   _id: string;
   title: string;
-  price: number;
   description?: string;
-  imageUrl: string;
-  createdAt?: string;
+  imageUrl?: string;
+  price?: number;
 };
 
 export default function HomePage() {
@@ -33,101 +32,79 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        padding: "2rem 1rem",
-        background: "#f7fafc",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-      }}
-    >
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: 8 }}>
-          Les créations en laine de maman 🧶
-        </h1>
-        <h2><Link href="/admin">Admin</Link></h2>
-        <p style={{ color: "#4a5568", marginBottom: 24 }}>
-          Une petite galerie pour partager ses tricots avec ses amies.
-        </p>
+    <main className="min-h-screen">
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        {/* Header */}
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Les créations en laine de maman 🧶
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Une petite galerie pour partager ses tricots avec ses amies.
+            </p>
+          </div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
+          >
+            Espace admin
+          </Link>
+        </header>
 
-        {loading && <p>Chargement des créations...</p>}
-
-        {!loading && creations.length === 0 && (
-          <p>Aucune création pour le moment. Va sur /admin pour en ajouter 😊</p>
+        {/* Contenu */}
+        {loading && (
+          <p className="text-sm text-slate-500">Chargement des créations...</p>
         )}
 
-        <div
-          style={{
-            display: "grid",
-            gap: "1.5rem",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          }}
-        >
+        {!loading && creations.length === 0 && (
+          <p className="text-sm text-slate-500">
+            Aucune création pour le moment. Ajoute-en depuis l&apos;espace
+            admin.
+          </p>
+        )}
+
+        <section className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {creations.map((c) => (
             <article
               key={c._id}
-              style={{
-                background: "white",
-                borderRadius: 16,
-                padding: 16,
-                boxShadow:
-                  "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
+              className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100"
             >
-              {c.imageUrl && (
-                <div
-                  style={{
-                    width: "100%",
-                    paddingBottom: "62%",
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    marginBottom: 8,
-                    background: "#e2e8f0",
-                  }}
-                >
-                  {/* Image simple <img> pour ne pas t'embêter avec next/image au début */}
+              <div className="relative h-56 w-full overflow-hidden bg-slate-100">
+                {c.imageUrl ? (
                   <img
                     src={c.imageUrl}
                     alt={c.title}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
+                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
                   />
-                </div>
-              )}
-              <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}>
-                <h2 style={{ fontWeight: 600 }}>{c.title}</h2>
-                {c.price && (
-                  <span
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      background: "#e2e8f0",
-                      padding: "4px 8px",
-                      borderRadius: 8,
-                    }}
-                  >
-                    {c.price} €
-                  </span>
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
+                    Pas d&apos;image
+                  </div>
                 )}
               </div>
-              {c.description && (
-                <p style={{ fontSize: 14, color: "#4a5568" }}>
-                  {c.description}
-                </p>
-              )}
+
+              <div className="flex flex-1 flex-col gap-2 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    {c.title}
+                  </h2>
+                  {c.price != null && (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
+                      {c.price} €
+                    </span>
+                  )}
+                </div>
+
+                {c.description && (
+                  <p className="line-clamp-3 text-xs text-slate-600">
+                    {c.description}
+                  </p>
+                )}
+              </div>
             </article>
           ))}
-        </div>
+        </section>
       </div>
     </main>
   );

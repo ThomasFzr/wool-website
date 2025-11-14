@@ -288,108 +288,58 @@ export default function AdminPage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        padding: "2rem 1rem",
-        background: "#edf2f7",
-        fontFamily:
-          "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-      }}
-    >
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        <Link href="/">← Retour à l'accueil</Link>
+    <main className="min-h-screen">
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <div className="mb-4 flex items-center justify-between">
+          <Link
+            href="/"
+            className="text-sm text-slate-600 hover:text-slate-900"
+          >
+            ← Retour à l&apos;accueil
+          </Link>
+        </div>
 
         {/* Si pas connecté : écran de login */}
         {!isLoggedIn && (
-          <>
-            <h1
-              style={{
-                fontSize: "1.5rem",
-                fontWeight: 700,
-                marginTop: 16,
-                marginBottom: 16,
-              }}
-            >
+          <div className="mx-auto mt-8 max-w-md">
+            <h1 className="mb-4 text-2xl font-semibold tracking-tight">
               Admin – Connexion
             </h1>
             <form
               onSubmit={handleLogin}
-              style={{
-                background: "white",
-                padding: 16,
-                borderRadius: 16,
-                boxShadow:
-                  "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-                maxWidth: 400,
-              }}
+              className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100"
             >
               <input
                 type="password"
                 placeholder="Mot de passe admin"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                style={{
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid #cbd5e0",
-                }}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
               />
               <button
                 type="submit"
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 9999,
-                  border: "none",
-                  background: "black",
-                  color: "white",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="w-full rounded-full bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
               >
                 Se connecter
               </button>
               {message && (
-                <p style={{ marginTop: 8, fontSize: 14 }}>{message}</p>
+                <p className="text-sm text-slate-600">{message}</p>
               )}
             </form>
-          </>
+          </div>
         )}
 
         {/* Si connecté : interface admin */}
         {isLoggedIn && (
           <>
-            <div
-              style={{
-                marginTop: 16,
-                marginBottom: 16,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <h1
-                style={{
-                  fontSize: "1.5rem",
-                  fontWeight: 700,
-                }}
-              >
+            <div className="mb-6 flex items-center justify-between">
+              <h1 className="text-2xl font-semibold tracking-tight">
                 Admin – {editingId ? "Modifier une création" : "Ajouter une création"}
               </h1>
               <button
                 type="button"
                 onClick={handleLogout}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 9999,
-                  border: "1px solid #cbd5e0",
-                  background: "white",
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
+                className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 Se déconnecter
               </button>
@@ -398,124 +348,97 @@ export default function AdminPage() {
             {/* Formulaire */}
             <form
               onSubmit={handleSubmit}
-              style={{
-                background: "white",
-                padding: 16,
-                borderRadius: 16,
-                boxShadow:
-                  "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-                marginBottom: 24,
-              }}
+              className="mb-8 space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100"
             >
-              <input
-                placeholder="Titre"
-                value={form.title}
-                onChange={(e) =>
-                  setForm({ ...form, title: e.target.value })
-                }
-                style={{
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid #cbd5e0",
-                }}
-              />
-
-              <textarea
-                placeholder="Description"
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                rows={3}
-                style={{
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid #cbd5e0",
-                }}
-              />
-
-              {/* Upload de fichier */}
-              <div
-                style={{
-                  border: "1px dashed #cbd5e0",
-                  borderRadius: 12,
-                  padding: 12,
-                }}
-              >
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 14,
-                    marginBottom: 8,
-                    color: "#4a5568",
-                  }}
-                >
-                  Image (upload depuis ton ordinateur)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                />
-                {uploading && (
-                  <p style={{ fontSize: 12, marginTop: 4 }}>
-                    Upload en cours...
-                  </p>
-                )}
-                {form.imageUrl && (
-                  <div style={{ marginTop: 8 }}>
-                    <p style={{ fontSize: 12, color: "#4a5568" }}>
-                      Aperçu de l'image :
-                    </p>
-                    <img
-                      src={form.imageUrl}
-                      alt="Prévisualisation"
-                      style={{
-                        marginTop: 4,
-                        maxHeight: 150,
-                        borderRadius: 8,
-                        objectFit: "cover",
-                      }}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">
+                      Titre
+                    </label>
+                    <input
+                      placeholder="Ex : Snood rose poudré"
+                      value={form.title}
+                      onChange={(e) =>
+                        setForm({ ...form, title: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                     />
                   </div>
-                )}
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">
+                      Description
+                    </label>
+                    <textarea
+                      placeholder="Détails, matière, pour qui..."
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm({ ...form, description: e.target.value })
+                      }
+                      rows={4}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">
+                      Prix (en euros)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Ex : 25"
+                      value={form.price}
+                      onChange={(e) =>
+                        setForm({ ...form, price: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">
+                      Image (upload depuis ton ordinateur)
+                    </label>
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4 text-xs text-slate-600">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="block w-full text-xs text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-800"
+                      />
+                      {uploading && (
+                        <p className="mt-2 text-xs text-slate-500">
+                          Upload en cours...
+                        </p>
+                      )}
+                      {form.imageUrl && (
+                        <div className="mt-3 space-y-1">
+                          <p className="text-xs text-slate-500">
+                            Aperçu de l&apos;image :
+                          </p>
+                          <img
+                            src={form.imageUrl}
+                            alt="Prévisualisation"
+                            className="h-40 w-full rounded-lg object-cover"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <input
-                type="number"
-                placeholder="Prix"
-                value={form.price}
-                onChange={(e) =>
-                  setForm({ ...form, price: e.target.value })
-                }
-                style={{
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid #cbd5e0",
-                }}
-              />
-
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="submit"
                   disabled={uploading}
-                  style={{
-                    flex: "0 0 auto",
-                    padding: "10px 12px",
-                    borderRadius: 9999,
-                    border: "none",
-                    background: uploading ? "#4a5568" : "black",
-                    opacity: uploading ? 0.8 : 1,
-                    color: "white",
-                    fontWeight: 600,
-                    cursor: uploading ? "not-allowed" : "pointer",
-                  }}
+                  className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {uploading
-                    ? "Attends, upload..."
+                    ? "Upload en cours..."
                     : editingId
                     ? "Mettre à jour"
                     : "Enregistrer"}
@@ -525,14 +448,7 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={handleCancelEdit}
-                    style={{
-                      padding: "10px 12px",
-                      borderRadius: 9999,
-                      border: "1px solid #cbd5e0",
-                      background: "white",
-                      fontWeight: 500,
-                      cursor: "pointer",
-                    }}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                   >
                     Annuler
                   </button>
@@ -540,126 +456,69 @@ export default function AdminPage() {
               </div>
 
               {message && (
-                <p style={{ marginTop: 8, fontSize: 14 }}>{message}</p>
+                <p className="text-sm text-slate-600">{message}</p>
               )}
             </form>
 
             {/* Liste des créations */}
-            <section>
-              <h2
-                style={{
-                  fontSize: "1.1rem",
-                  fontWeight: 600,
-                  marginBottom: 8,
-                }}
-              >
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-800">
                 Créations existantes
               </h2>
-              {loadingList && <p>Chargement...</p>}
+              {loadingList && (
+                <p className="text-sm text-slate-500">Chargement...</p>
+              )}
               {!loadingList && creations.length === 0 && (
-                <p>Aucune création pour l'instant.</p>
+                <p className="text-sm text-slate-500">
+                  Aucune création pour l&apos;instant.
+                </p>
               )}
 
-              <div
-                style={{
-                  display: "grid",
-                  gap: 12,
-                }}
-              >
+              <div className="space-y-3">
                 {creations.map((c) => (
                   <div
                     key={c._id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      background: "white",
-                      padding: 12,
-                      borderRadius: 12,
-                      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
-                    }}
+                    className="flex items-center justify-between gap-4 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-100"
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
+                    <div className="flex items-center gap-3">
                       {c.imageUrl && (
                         <img
                           src={c.imageUrl}
                           alt={c.title}
-                          style={{
-                            width: 60,
-                            height: 60,
-                            borderRadius: 8,
-                            objectFit: "cover",
-                          }}
+                          className="h-14 w-14 rounded-lg object-cover"
                         />
                       )}
                       <div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
-                          <strong>{c.title}</strong>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-900">
+                            {c.title}
+                          </span>
                           {c.price != null && (
-                            <span
-                              style={{
-                                fontSize: 12,
-                                background: "#edf2f7",
-                                padding: "2px 6px",
-                                borderRadius: 8,
-                              }}
-                            >
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800">
                               {c.price} €
                             </span>
                           )}
                         </div>
                         {c.description && (
-                          <p
-                            style={{
-                              fontSize: 12,
-                              color: "#4a5568",
-                            }}
-                          >
+                          <p className="text-xs text-slate-600 line-clamp-2">
                             {c.description}
                           </p>
                         )}
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleEditClick(c)}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 9999,
-                          border: "1px solid #cbd5e0",
-                          background: "white",
-                          fontSize: 12,
-                          cursor: "pointer",
-                        }}
+                        className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                       >
                         Modifier
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(c._id)}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 9999,
-                          border: "none",
-                          background: "#e53e3e",
-                          color: "white",
-                          fontSize: 12,
-                          cursor: "pointer",
-                        }}
+                        className="rounded-full bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600"
                       >
                         Supprimer
                       </button>

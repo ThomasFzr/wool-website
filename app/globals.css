@@ -1,0 +1,42 @@
+/* Global styles for cursor hover behavior and small niceties */
+
+:root {
+  --accent: #0070f3;
+}
+
+/* Make interactive elements show pointer on hover */
+a:hover,
+button:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover {
+  cursor: pointer;
+}
+
+/* Also show pointer for image inputs and file inputs (upload widgets) */
+input[type="image"]:hover,
+input[type="file"]:hover {
+  cursor: pointer;
+}
+
+/* Optional utility class to force pointer on hover */
+.cursor-hover:hover {
+  cursor: pointer;
+}
+
+/* Nice default spacing for main content */
+html, body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+main {
+  min-height: calc(100vh - 64px);
+}
+@import "tailwindcss";
+
+body {
+  background-color: #f8fafc; /* bg-slate-50 */
+  color: #0f172a;           /* text-slate-900 */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
