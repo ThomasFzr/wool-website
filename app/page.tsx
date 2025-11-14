@@ -8,21 +8,31 @@ type Creation = {
   title: string;
   description?: string;
   imageUrl?: string;
+  images?: string[];
   price?: number;
 };
 
 export default function HomePage() {
   const [creations, setCreations] = useState<Creation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/creations");
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch("/api/creations", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Status ${res.status}`);
         const data = await res.json();
         setCreations(data);
       } catch (e) {
         console.error(e);
+        setError("Impossible de charger les créations.");
       } finally {
         setLoading(false);
       }
@@ -31,10 +41,49 @@ export default function HomePage() {
     load();
   }, []);
 
+  function getImages(c: Creation): string[] {
+    if (c.images && c.images.length > 0) return c.images;
+    if (c.imageUrl) return [c.imageUrl];
+    return [];
+  }
+
+  function openModal(c: Creation) {
+    const imgs = getImages(c);
+    setCurrentIndex(0);
+    setOpenId(c._id);
+    if (imgs.length === 0) setCurrentIndex(0);
+  }
+
+  function closeModal() {
+    setOpenId(null);
+  }
+
+  function nextImage() {
+    if (!openId) return;
+    const c = creations.find((x) => x._id === openId);
+    if (!c) return;
+    const imgs = getImages(c);
+    if (imgs.length <= 1) return;
+    setCurrentIndex((prev) => (prev + 1) % imgs.length);
+  }
+
+  function prevImage() {
+    if (!openId) return;
+    const c = creations.find((x) => x._id === openId);
+    if (!c) return;
+    const imgs = getImages(c);
+    if (imgs.length <= 1) return;
+    setCurrentIndex((prev) => (prev - 1 + imgs.length) % imgs.length);
+  }
+
+  const openCreation = openId
+    ? creations.find((c) => c._id === openId) || null
+    : null;
+  const openImages = openCreation ? getImages(openCreation) : [];
+
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-5xl px-4 py-8">
-        {/* Header */}
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
@@ -44,68 +93,168 @@ export default function HomePage() {
               Une petite galerie pour partager ses tricots avec ses amies.
             </p>
           </div>
-          <Link
-            href="/admin"
-            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
-          >
-            Espace admin
-          </Link>
+          {/* tu peux enlever ce bouton si tu veux cacher /admin */}
+          {/* <Link ...> */}
         </header>
 
-        {/* Contenu */}
         {loading && (
           <p className="text-sm text-slate-500">Chargement des créations...</p>
         )}
 
-        {!loading && creations.length === 0 && (
+        {!loading && error && (
+          <p className="text-sm text-red-500">{error}</p>
+        )}
+
+        {!loading && !error && creations.length === 0 && (
           <p className="text-sm text-slate-500">
             Aucune création pour le moment. Ajoute-en depuis l&apos;espace
             admin.
           </p>
         )}
 
-        <section className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {creations.map((c) => (
-            <article
-              key={c._id}
-              className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100"
-            >
-              <div className="relative h-56 w-full overflow-hidden bg-slate-100">
-                {c.imageUrl ? (
-                  <img
-                    src={c.imageUrl}
-                    alt={c.title}
-                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
-                    Pas d&apos;image
+        {!loading && !error && creations.length > 0 && (
+          <section className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {creations.map((c) => {
+              const imgs = getImages(c);
+              const cover = imgs[0];
+
+              return (
+                <article
+                  key={c._id}
+                  className="flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
+                  onClick={() => openModal(c)}
+                >
+                  <div className="relative h-56 w-full overflow-hidden bg-slate-100">
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt={c.title}
+                        className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
+                        Pas d&apos;image
+                      </div>
+                    )}
+                    {imgs.length > 1 && (
+                      <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
+                        {imgs.length} photos
+                      </span>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <div className="flex flex-1 flex-col gap-2 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    {c.title}
-                  </h2>
-                  {c.price != null && (
-                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
-                      {c.price} €
-                    </span>
-                  )}
-                </div>
+                  <div className="flex flex-1 flex-col gap-2 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="text-sm font-semibold text-slate-900">
+                        {c.title}
+                      </h2>
+                      {c.price != null && (
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
+                          {c.price} €
+                        </span>
+                      )}
+                    </div>
 
-                {c.description && (
-                  <p className="line-clamp-3 text-xs text-slate-600">
-                    {c.description}
+                    {c.description && (
+                      <p className="line-clamp-3 text-xs text-slate-600">
+                        {c.description}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+        )}
+      </div>
+
+      {/* Modal */}
+      {openCreation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white p-4 shadow-xl">
+            <button
+              onClick={closeModal}
+              className="absolute right-3 top-3 rounded-full bg-black/70 px-2 py-1 text-xs text-white hover:bg-black"
+            >
+              Fermer
+            </button>
+
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  {openCreation.title}
+                </h2>
+                {openCreation.description && (
+                  <p className="mt-1 text-xs text-slate-600">
+                    {openCreation.description}
                   </p>
                 )}
               </div>
-            </article>
-          ))}
-        </section>
-      </div>
+              {openCreation.price != null && (
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
+                  {openCreation.price} €
+                </span>
+              )}
+            </div>
+
+            <div className="relative h-80 w-full overflow-hidden rounded-xl bg-slate-100">
+              {openImages.length > 0 ? (
+                <img
+                  src={openImages[currentIndex]}
+                  alt={`${openCreation.title} ${currentIndex + 1}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
+                  Pas d&apos;image
+                </div>
+              )}
+
+              {openImages.length > 1 && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black"
+                  >
+                    ▶
+                  </button>
+                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white">
+                    {currentIndex + 1} / {openImages.length}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {openImages.length > 1 && (
+              <div className="mt-3 flex gap-2 overflow-x-auto">
+                {openImages.map((url, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentIndex(i)}
+                    className={`h-14 w-14 shrink-0 rounded-md border ${
+                      i === currentIndex
+                        ? "border-slate-900"
+                        : "border-transparent opacity-60"
+                    }`}
+                  >
+                    <img
+                      src={url}
+                      alt={`miniature ${i + 1}`}
+                      className="h-full w-full rounded-md object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -28,6 +28,7 @@ export async function PATCH(
     if (body.title !== undefined) update.title = body.title;
     if (body.description !== undefined) update.description = body.description;
     if (body.imageUrl !== undefined) update.imageUrl = body.imageUrl;
+    if (body.images !== undefined) update.images = body.images;
     if (body.price !== undefined) update.price = body.price;
 
     const creation = await Creation.findByIdAndUpdate(id, update, {

@@ -1,4 +1,4 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 
@@ -22,14 +22,23 @@ export async function POST(req: NextRequest) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const body = await req.json();
     await connectToDatabase();
+    const body = await req.json();
+
+    // Sécurise le tableau d'images
+    const images: string[] =
+      Array.isArray(body.images) && body.images.length
+        ? body.images
+        : body.imageUrl
+        ? [body.imageUrl]
+        : [];
 
     const creation = await Creation.create({
       title: body.title,
       description: body.description,
-      imageUrl: body.imageUrl,
-      price: Number(body.price),
+      imageUrl: body.imageUrl ?? images[0] ?? undefined,
+      images,                 // 👈 on enregistre bien le tableau
+      price: body.price,
     });
 
     return NextResponse.json(creation, { status: 201 });

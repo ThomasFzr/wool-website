@@ -16,6 +16,7 @@ type Creation = {
   title: string;
   description?: string;
   imageUrl?: string;
+  images?: string[];
   price?: number;
 };
 
@@ -30,6 +31,7 @@ export default function AdminPage() {
     title: "",
     description: "",
     imageUrl: "",
+    images: [] as string[],
     price: "",
   });
 
@@ -127,6 +129,7 @@ export default function AdminPage() {
       title: "",
       description: "",
       imageUrl: "",
+      images: [],
       price: "",
     });
     setMessage("Déconnecté.");
@@ -136,47 +139,47 @@ export default function AdminPage() {
   }
 
   async function handleImageChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      alert(
-        "Cloudinary n'est pas configuré (variables d'environnement manquantes)."
-      );
+      alert("Cloudinary n'est pas configuré.");
       return;
     }
 
     try {
       setUploading(true);
-      setMessage("Upload de l'image en cours...");
+      setMessage("Upload des images en cours...");
 
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", UPLOAD_PRESET);
+      const uploadedUrls: string[] = [];
 
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-        {
-          method: "POST",
-          body: formData,
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", UPLOAD_PRESET);
+
+        const res = await fetch(
+          `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+          { method: "POST", body: formData }
+        );
+
+        if (!res.ok) {
+          throw new Error("Erreur Cloudinary");
         }
-      );
 
-      if (!res.ok) {
-        throw new Error("Erreur Cloudinary");
+        const data = await res.json();
+        uploadedUrls.push(data.secure_url);
       }
-
-      const data = await res.json();
 
       setForm((f) => ({
         ...f,
-        imageUrl: data.secure_url,
+        images: [...f.images, ...uploadedUrls], // 👈 on ajoute
       }));
 
-      setMessage("Image uploadée ✔️");
+      setMessage("Images uploadées ✔️");
     } catch (err) {
       console.error(err);
-      setMessage("Erreur lors de l'upload de l'image.");
+      setMessage("Erreur lors de l'upload des images.");
     } finally {
       setUploading(false);
     }
@@ -194,7 +197,8 @@ export default function AdminPage() {
     const payload = {
       title: form.title,
       description: form.description || undefined,
-      imageUrl: form.imageUrl || undefined,
+      imageUrl: form.images[0] || undefined,
+      images: form.images, 
       price: form.price ? Number(form.price) : undefined,
     };
 
@@ -235,7 +239,7 @@ export default function AdminPage() {
       ...f,
       title: c.title ?? "",
       description: c.description ?? "",
-      imageUrl: c.imageUrl ?? "",
+      images: c.images ?? (c.imageUrl ? [c.imageUrl] : []),
       price: c.price != null ? String(c.price) : "",
     }));
     setMessage(null);
@@ -406,6 +410,7 @@ export default function AdminPage() {
                       <input
                         type="file"
                         accept="image/*"
+                        multiple
                         onChange={handleImageChange}
                         className="block w-full text-xs text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-800"
                       />
@@ -414,16 +419,22 @@ export default function AdminPage() {
                           Upload en cours...
                         </p>
                       )}
-                      {form.imageUrl && (
+                      {form.images.length > 0 && (
                         <div className="mt-3 space-y-1">
                           <p className="text-xs text-slate-500">
-                            Aperçu de l&apos;image :
+                            Aperçu des images :
                           </p>
-                          <img
-                            src={form.imageUrl}
-                            alt="Prévisualisation"
-                            className="h-40 w-full rounded-lg object-cover"
-                          />
+                          <div className="flex flex-wrap gap-2">
+                            {form.images.map((url, i) => (
+                              <div key={i} className="relative">
+                                <img
+                                  src={url}
+                                  alt={`Prévisualisation ${i + 1}`}
+                                  className="h-20 w-20 rounded-lg object-cover"
+                                />
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -440,8 +451,8 @@ export default function AdminPage() {
                   {uploading
                     ? "Upload en cours..."
                     : editingId
-                    ? "Mettre à jour"
-                    : "Enregistrer"}
+                      ? "Mettre à jour"
+                      : "Enregistrer"}
                 </button>
 
                 {editingId && (
