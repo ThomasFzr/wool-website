@@ -20,18 +20,48 @@ type Creation = {
 };
 
 export default function AdminPage() {
+  // Auth
+  const [adminPassword, setAdminPassword] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginPassword, setLoginPassword] = useState("");
+
+  // Formulaire d’édition / création
   const [form, setForm] = useState({
     title: "",
     description: "",
     imageUrl: "",
     price: "",
-    password: "",
   });
+
   const [message, setMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Liste des créations
   const [creations, setCreations] = useState<Creation[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(false);
+
+  // Auto-login si un mdp est déjà en localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem("adminPassword");
+    if (!saved) return;
+
+    (async () => {
+      const ok = await tryLogin(saved, false);
+      if (ok) {
+        setAdminPassword(saved);
+        setIsLoggedIn(true);
+      }
+    })();
+  }, []);
+
+  // Charger les créations uniquement si connecté
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadCreations();
+    }
+  }, [isLoggedIn]);
 
   async function loadCreations() {
     try {
@@ -46,9 +76,64 @@ export default function AdminPage() {
     }
   }
 
-  useEffect(() => {
-    loadCreations();
-  }, []);
+  async function tryLogin(password: string, showErrors = true) {
+    try {
+      const res = await fetch("/api/admin-login", {
+        method: "POST",
+        headers: {
+          "x-admin-password": password,
+        },
+      });
+
+      if (!res.ok) {
+        if (showErrors) {
+          setMessage("Mot de passe incorrect.");
+        }
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error(err);
+      if (showErrors) {
+        setMessage("Erreur réseau pendant le login.");
+      }
+      return false;
+    }
+  }
+
+  async function handleLogin(e: FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+
+    const ok = await tryLogin(loginPassword, true);
+    if (!ok) return;
+
+    setAdminPassword(loginPassword);
+    setIsLoggedIn(true);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("adminPassword", loginPassword);
+    }
+
+    setLoginPassword("");
+    setMessage("Connecté ✔️");
+  }
+
+  function handleLogout() {
+    setIsLoggedIn(false);
+    setAdminPassword("");
+    setEditingId(null);
+    setForm({
+      title: "",
+      description: "",
+      imageUrl: "",
+      price: "",
+    });
+    setMessage("Déconnecté.");
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("adminPassword");
+    }
+  }
 
   async function handleImageChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -101,6 +186,11 @@ export default function AdminPage() {
     e.preventDefault();
     setMessage(null);
 
+    if (!adminPassword) {
+      setMessage("Tu n'es pas connecté.");
+      return;
+    }
+
     const payload = {
       title: form.title,
       description: form.description || undefined,
@@ -117,7 +207,7 @@ export default function AdminPage() {
       method,
       headers: {
         "Content-Type": "application/json",
-        "x-admin-password": form.password,
+        "x-admin-password": adminPassword,
       },
       body: JSON.stringify(payload),
     });
@@ -152,8 +242,8 @@ export default function AdminPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!form.password) {
-      alert("Entre d'abord le mot de passe admin.");
+    if (!adminPassword) {
+      alert("Tu n'es pas connecté.");
       return;
     }
     const ok = confirm("Supprimer cette création ?");
@@ -162,7 +252,7 @@ export default function AdminPage() {
     const res = await fetch(`/api/creations/${id}`, {
       method: "DELETE",
       headers: {
-        "x-admin-password": form.password,
+        "x-admin-password": adminPassword,
       },
     });
 
@@ -209,282 +299,377 @@ export default function AdminPage() {
     >
       <div style={{ maxWidth: 900, margin: "0 auto" }}>
         <Link href="/">← Retour à l'accueil</Link>
-        <h1
-          style={{
-            fontSize: "1.5rem",
-            fontWeight: 700,
-            marginBottom: 16,
-          }}
-        >
-          Admin – {editingId ? "Modifier une création" : "Ajouter une création"}
-        </h1>
 
-        {/* Formulaire */}
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            background: "white",
-            padding: 16,
-            borderRadius: 16,
-            boxShadow:
-              "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          <input
-            type="password"
-            placeholder="Mot de passe admin"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #cbd5e0",
-            }}
-          />
-
-          <input
-            placeholder="Titre"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #cbd5e0",
-            }}
-          />
-
-          <textarea
-            placeholder="Description"
-            value={form.description}
-            onChange={(e) =>
-              setForm({ ...form, description: e.target.value })
-            }
-            rows={3}
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #cbd5e0",
-            }}
-          />
-
-          {/* Upload de fichier */}
-          <div
-            style={{
-              border: "1px dashed #cbd5e0",
-              borderRadius: 12,
-              padding: 12,
-            }}
-          >
-            <label
+        {/* Si pas connecté : écran de login */}
+        {!isLoggedIn && (
+          <>
+            <h1
               style={{
-                display: "block",
-                fontSize: 14,
-                marginBottom: 8,
-                color: "#4a5568",
+                fontSize: "1.5rem",
+                fontWeight: 700,
+                marginTop: 16,
+                marginBottom: 16,
               }}
             >
-              Image (upload depuis ton ordinateur)
-            </label>
-            <input type="file" accept="image/*" onChange={handleImageChange} />
-            {uploading && (
-              <p style={{ fontSize: 12, marginTop: 4 }}>
-                Upload en cours...
-              </p>
-            )}
-            {form.imageUrl && (
-              <div style={{ marginTop: 8 }}>
-                <p style={{ fontSize: 12, color: "#4a5568" }}>
-                  Aperçu de l'image :
-                </p>
-                <img
-                  src={form.imageUrl}
-                  alt="Prévisualisation"
-                  style={{
-                    marginTop: 4,
-                    maxHeight: 150,
-                    borderRadius: 8,
-                    objectFit: "cover",
-                  }}
-                />
-              </div>
-            )}
-          </div>
-
-          <input
-            type="number"
-            placeholder="Prix"
-            value={form.price}
-            onChange={(e) => setForm({ ...form, price: e.target.value })}
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #cbd5e0",
-            }}
-          />
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="submit"
-              disabled={uploading}
+              Admin – Connexion
+            </h1>
+            <form
+              onSubmit={handleLogin}
               style={{
-                flex: "0 0 auto",
-                padding: "10px 12px",
-                borderRadius: 9999,
-                border: "none",
-                background: uploading ? "#4a5568" : "black",
-                opacity: uploading ? 0.8 : 1,
-                color: "white",
-                fontWeight: 600,
-                cursor: uploading ? "not-allowed" : "pointer",
+                background: "white",
+                padding: 16,
+                borderRadius: 16,
+                boxShadow:
+                  "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                maxWidth: 400,
               }}
             >
-              {uploading
-                ? "Attends, upload..."
-                : editingId
-                ? "Mettre à jour"
-                : "Enregistrer"}
-            </button>
-
-            {editingId && (
+              <input
+                type="password"
+                placeholder="Mot de passe admin"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e0",
+                }}
+              />
               <button
-                type="button"
-                onClick={handleCancelEdit}
+                type="submit"
                 style={{
                   padding: "10px 12px",
                   borderRadius: 9999,
-                  border: "1px solid #cbd5e0",
-                  background: "white",
-                  fontWeight: 500,
+                  border: "none",
+                  background: "black",
+                  color: "white",
+                  fontWeight: 600,
                   cursor: "pointer",
                 }}
               >
-                Annuler
+                Se connecter
               </button>
-            )}
-          </div>
+              {message && (
+                <p style={{ marginTop: 8, fontSize: 14 }}>{message}</p>
+              )}
+            </form>
+          </>
+        )}
 
-          {message && (
-            <p style={{ marginTop: 8, fontSize: 14 }}>{message}</p>
-          )}
-        </form>
-
-        {/* Liste des créations */}
-        <section>
-          <h2
-            style={{
-              fontSize: "1.1rem",
-              fontWeight: 600,
-              marginBottom: 8,
-            }}
-          >
-            Créations existantes
-          </h2>
-          {loadingList && <p>Chargement...</p>}
-          {!loadingList && creations.length === 0 && (
-            <p>Aucune création pour l'instant.</p>
-          )}
-
-          <div
-            style={{
-              display: "grid",
-              gap: 12,
-            }}
-          >
-            {creations.map((c) => (
-              <div
-                key={c._id}
+        {/* Si connecté : interface admin */}
+        {isLoggedIn && (
+          <>
+            <div
+              style={{
+                marginTop: 16,
+                marginBottom: 16,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h1
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: "white",
-                  padding: 12,
-                  borderRadius: 12,
-                  boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {c.imageUrl && (
+                Admin – {editingId ? "Modifier une création" : "Ajouter une création"}
+              </h1>
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 9999,
+                  border: "1px solid #cbd5e0",
+                  background: "white",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Se déconnecter
+              </button>
+            </div>
+
+            {/* Formulaire */}
+            <form
+              onSubmit={handleSubmit}
+              style={{
+                background: "white",
+                padding: 16,
+                borderRadius: 16,
+                boxShadow:
+                  "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                marginBottom: 24,
+              }}
+            >
+              <input
+                placeholder="Titre"
+                value={form.title}
+                onChange={(e) =>
+                  setForm({ ...form, title: e.target.value })
+                }
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e0",
+                }}
+              />
+
+              <textarea
+                placeholder="Description"
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                rows={3}
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e0",
+                }}
+              />
+
+              {/* Upload de fichier */}
+              <div
+                style={{
+                  border: "1px dashed #cbd5e0",
+                  borderRadius: 12,
+                  padding: 12,
+                }}
+              >
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 14,
+                    marginBottom: 8,
+                    color: "#4a5568",
+                  }}
+                >
+                  Image (upload depuis ton ordinateur)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                />
+                {uploading && (
+                  <p style={{ fontSize: 12, marginTop: 4 }}>
+                    Upload en cours...
+                  </p>
+                )}
+                {form.imageUrl && (
+                  <div style={{ marginTop: 8 }}>
+                    <p style={{ fontSize: 12, color: "#4a5568" }}>
+                      Aperçu de l'image :
+                    </p>
                     <img
-                      src={c.imageUrl}
-                      alt={c.title}
+                      src={form.imageUrl}
+                      alt="Prévisualisation"
                       style={{
-                        width: 60,
-                        height: 60,
+                        marginTop: 4,
+                        maxHeight: 150,
                         borderRadius: 8,
                         objectFit: "cover",
                       }}
                     />
-                  )}
-                  <div>
+                  </div>
+                )}
+              </div>
+
+              <input
+                type="number"
+                placeholder="Prix"
+                value={form.price}
+                onChange={(e) =>
+                  setForm({ ...form, price: e.target.value })
+                }
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e0",
+                }}
+              />
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  style={{
+                    flex: "0 0 auto",
+                    padding: "10px 12px",
+                    borderRadius: 9999,
+                    border: "none",
+                    background: uploading ? "#4a5568" : "black",
+                    opacity: uploading ? 0.8 : 1,
+                    color: "white",
+                    fontWeight: 600,
+                    cursor: uploading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {uploading
+                    ? "Attends, upload..."
+                    : editingId
+                    ? "Mettre à jour"
+                    : "Enregistrer"}
+                </button>
+
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 9999,
+                      border: "1px solid #cbd5e0",
+                      background: "white",
+                      fontWeight: 500,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Annuler
+                  </button>
+                )}
+              </div>
+
+              {message && (
+                <p style={{ marginTop: 8, fontSize: 14 }}>{message}</p>
+              )}
+            </form>
+
+            {/* Liste des créations */}
+            <section>
+              <h2
+                style={{
+                  fontSize: "1.1rem",
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                Créations existantes
+              </h2>
+              {loadingList && <p>Chargement...</p>}
+              {!loadingList && creations.length === 0 && (
+                <p>Aucune création pour l'instant.</p>
+              )}
+
+              <div
+                style={{
+                  display: "grid",
+                  gap: 12,
+                }}
+              >
+                {creations.map((c) => (
+                  <div
+                    key={c._id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "white",
+                      padding: 12,
+                      borderRadius: 12,
+                      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+                    }}
+                  >
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 8,
+                        gap: 12,
                       }}
                     >
-                      <strong>{c.title}</strong>
-                      {c.price != null && (
-                        <span
+                      {c.imageUrl && (
+                        <img
+                          src={c.imageUrl}
+                          alt={c.title}
                           style={{
-                            fontSize: 12,
-                            background: "#edf2f7",
-                            padding: "2px 6px",
+                            width: 60,
+                            height: 60,
                             borderRadius: 8,
+                            objectFit: "cover",
+                          }}
+                        />
+                      )}
+                      <div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
-                          {c.price} €
-                        </span>
-                      )}
+                          <strong>{c.title}</strong>
+                          {c.price != null && (
+                            <span
+                              style={{
+                                fontSize: 12,
+                                background: "#edf2f7",
+                                padding: "2px 6px",
+                                borderRadius: 8,
+                              }}
+                            >
+                              {c.price} €
+                            </span>
+                          )}
+                        </div>
+                        {c.description && (
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#4a5568",
+                            }}
+                          >
+                            {c.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {c.description && (
-                      <p style={{ fontSize: 12, color: "#4a5568" }}>
-                        {c.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
 
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => handleEditClick(c)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 9999,
-                      border: "1px solid #cbd5e0",
-                      background: "white",
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(c._id)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 9999,
-                      border: "none",
-                      background: "#e53e3e",
-                      color: "white",
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Supprimer
-                  </button>
-                </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => handleEditClick(c)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 9999,
+                          border: "1px solid #cbd5e0",
+                          background: "white",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(c._id)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 9999,
+                          border: "none",
+                          background: "#e53e3e",
+                          color: "white",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          </>
+        )}
       </div>
     </main>
   );
