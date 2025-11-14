@@ -239,7 +239,6 @@ export default function HomePage() {
           >
             {openCreation && (
               <>
-
                 {/* Infos titre + description + prix */}
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div>
@@ -360,6 +359,15 @@ export default function HomePage() {
                     Astuce&nbsp;: flèches ← → pour changer de photo, Esc pour fermer.
                   </p>
                 )}
+
+                {/* Bouton fermer (mobile seulement) - en bas au centre */}
+                <button
+                  onClick={closeModal}
+                  className="mt-4 flex h-12 w-full items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 sm:hidden"
+                  aria-label="Fermer"
+                >
+                  Fermer
+                </button>
               </>
             )}
           </div>
