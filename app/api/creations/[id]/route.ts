@@ -14,12 +14,13 @@ async function checkAuth(req: NextRequest) {
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const ok = await checkAuth(req);
     if (!ok) return new NextResponse("Unauthorized", { status: 401 });
 
+    const { id } = await params;
     await connectToDatabase();
     const body = await req.json();
 
@@ -29,7 +30,7 @@ export async function PATCH(
     if (body.imageUrl !== undefined) update.imageUrl = body.imageUrl;
     if (body.price !== undefined) update.price = body.price;
 
-    const creation = await Creation.findByIdAndUpdate(params.id, update, {
+    const creation = await Creation.findByIdAndUpdate(id, update, {
       new: true,
     });
 
@@ -46,14 +47,16 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const ok = await checkAuth(req);
     if (!ok) return new NextResponse("Unauthorized", { status: 401 });
 
+    const { id } = await params;
     await connectToDatabase();
-    const deleted = await Creation.findByIdAndDelete(params.id);
+
+    const deleted = await Creation.findByIdAndDelete(id);
 
     if (!deleted) {
       return new NextResponse("Not found", { status: 404 });
