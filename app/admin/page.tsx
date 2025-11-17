@@ -43,6 +43,8 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(false);
 
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
   // Auto-login si un mdp est déjà en localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -298,6 +300,32 @@ export default function AdminPage() {
     }));
   }
 
+  function handleDragStart(index: number) {
+    setDragIndex(index);
+  }
+
+  function handleDragOver(
+    e: React.DragEvent<HTMLDivElement>,
+    index: number
+  ) {
+    e.preventDefault(); // important pour autoriser le drop
+
+    if (dragIndex === null || dragIndex === index) return;
+
+    setForm((f) => {
+      const arr = [...f.images];
+      const [moved] = arr.splice(dragIndex, 1);
+      arr.splice(index, 0, moved);
+      return { ...f, images: arr };
+    });
+
+    setDragIndex(index); // on continue à suivre la nouvelle position
+  }
+
+  function handleDragEnd() {
+    setDragIndex(null);
+  }
+
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-5xl px-4 py-8">
@@ -441,22 +469,32 @@ export default function AdminPage() {
                             {form.images.map((url, i) => (
                               <div
                                 key={i}
+                                draggable
+                                onDragStart={() => handleDragStart(i)}
+                                onDragOver={(e) => handleDragOver(e, i)}
+                                onDragEnd={handleDragEnd}
                                 style={{
                                   position: "relative",
                                   width: 80,
                                   height: 80,
                                   borderRadius: 8,
                                   overflow: "hidden",
+                                  border:
+                                    dragIndex === i
+                                      ? "2px dashed #4f46e5" // petit highlight pendant le drag
+                                      : "1px solid #e2e8f0",
+                                  boxSizing: "border-box",
                                 }}
                               >
                                 {/* Bouton supprimer */}
                                 <button
                                   onClick={() => removeImage(i)}
+                                  type="button"
                                   style={{
                                     position: "absolute",
                                     top: -6,
                                     right: -6,
-                                    background: "#ef4444", // rouge
+                                    background: "#ef4444",
                                     color: "white",
                                     borderRadius: "50%",
                                     width: 20,
@@ -482,11 +520,17 @@ export default function AdminPage() {
                                     height: "100%",
                                     objectFit: "cover",
                                     borderRadius: 8,
+                                    userSelect: "none",
+                                    pointerEvents: "none", // le drag se fait depuis le conteneur
                                   }}
                                 />
                               </div>
                             ))}
                           </div>
+
+                          <p style={{ marginTop: 4, fontSize: 11, color: "#718096" }}>
+                            Astuce : glisse les images pour les réordonner.
+                          </p>
                         </div>
                       )}
                     </div>
