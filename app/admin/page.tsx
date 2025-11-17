@@ -198,7 +198,7 @@ export default function AdminPage() {
       title: form.title,
       description: form.description || undefined,
       imageUrl: form.images[0] || undefined,
-      images: form.images, 
+      images: form.images,
       price: form.price ? Number(form.price) : undefined,
     };
 
@@ -289,6 +289,13 @@ export default function AdminPage() {
       price: "",
     }));
     setMessage(null);
+  }
+
+  function removeImage(index: number) {
+    setForm((f) => ({
+      ...f,
+      images: f.images.filter((_, i) => i !== index),
+    }));
   }
 
   return (
@@ -420,17 +427,62 @@ export default function AdminPage() {
                         </p>
                       )}
                       {form.images.length > 0 && (
-                        <div className="mt-3 space-y-1">
-                          <p className="text-xs text-slate-500">
-                            Aperçu des images :
-                          </p>
-                          <div className="flex flex-wrap gap-2">
+                        <div style={{ marginTop: 8 }}>
+                          <p style={{ fontSize: 12, color: "#4a5568" }}>Aperçu des images :</p>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 12,
+                              marginTop: 8,
+                            }}
+                          >
                             {form.images.map((url, i) => (
-                              <div key={i} className="relative">
+                              <div
+                                key={i}
+                                style={{
+                                  position: "relative",
+                                  width: 80,
+                                  height: 80,
+                                  borderRadius: 8,
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {/* Bouton supprimer */}
+                                <button
+                                  onClick={() => removeImage(i)}
+                                  style={{
+                                    position: "absolute",
+                                    top: -6,
+                                    right: -6,
+                                    background: "#ef4444", // rouge
+                                    color: "white",
+                                    borderRadius: "50%",
+                                    width: 20,
+                                    height: 20,
+                                    fontSize: 12,
+                                    fontWeight: "bold",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                                  }}
+                                >
+                                  ✕
+                                </button>
+
                                 <img
                                   src={url}
-                                  alt={`Prévisualisation ${i + 1}`}
-                                  className="h-20 w-20 rounded-lg object-cover"
+                                  alt=""
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    borderRadius: 8,
+                                  }}
                                 />
                               </div>
                             ))}
