@@ -239,22 +239,24 @@ export default function HomePage() {
           >
             {openCreation && (
               <>
-                {/* Infos titre + description + prix */}
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">
-                      {openCreation.title}
-                    </h2>
-                    {openCreation.description && (
-                      <p className="mt-1 text-xs text-slate-600">
-                        {openCreation.description}
-                      </p>
-                    )}
-                  </div>
-                  {openCreation.price != null && (
-                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
-                      {openCreation.price} €
-                    </span>
+                {/* Bouton fermer (mobile seulement) - croix en haut à droite */}
+                <button
+                  onClick={closeModal}
+                  className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black sm:hidden"
+                  aria-label="Fermer"
+                >
+                  ✕
+                </button>
+
+                {/* Infos titre + description */}
+                <div className="mb-3">
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    {openCreation.title}
+                  </h2>
+                  {openCreation.description && (
+                    <p className="mt-1 text-xs text-slate-600">
+                      {openCreation.description}
+                    </p>
                   )}
                 </div>
 
@@ -331,25 +333,41 @@ export default function HomePage() {
                   )}
                 </div>
 
-                {/* Miniatures */}
+                {/* Miniatures et prix */}
                 {openImages.length > 1 && (
-                  <div className="mt-3 flex gap-2 overflow-x-auto">
-                    {openImages.map((url, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setCurrentIndex(i)}
-                        className={`h-14 w-14 shrink-0 rounded-md border ${i === currentIndex
-                          ? "border-slate-900"
-                          : "border-transparent opacity-60"
-                          }`}
-                      >
-                        <img
-                          src={url}
-                          alt={`miniature ${i + 1}`}
-                          className="h-full w-full rounded-md object-cover"
-                        />
-                      </button>
-                    ))}
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="flex gap-2 overflow-x-auto flex-1">
+                      {openImages.map((url, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setCurrentIndex(i)}
+                          className={`h-14 w-14 shrink-0 rounded-md border ${i === currentIndex
+                            ? "border-slate-900"
+                            : "border-transparent opacity-60"
+                            }`}
+                        >
+                          <img
+                            src={url}
+                            alt={`miniature ${i + 1}`}
+                            className="h-full w-full rounded-md object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    {openCreation.price != null && (
+                      <span className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shrink-0">
+                        {openCreation.price} €
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Prix seul si pas de miniatures */}
+                {openImages.length <= 1 && openCreation.price != null && (
+                  <div className="mt-3 flex justify-end">
+                    <span className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+                      {openCreation.price} €
+                    </span>
                   </div>
                 )}
 
@@ -359,15 +377,6 @@ export default function HomePage() {
                     Astuce&nbsp;: flèches ← → pour changer de photo, Esc pour fermer.
                   </p>
                 )}
-
-                {/* Bouton fermer (mobile seulement) - en bas au centre */}
-                <button
-                  onClick={closeModal}
-                  className="mt-4 flex h-12 w-full items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 sm:hidden"
-                  aria-label="Fermer"
-                >
-                  Fermer
-                </button>
               </>
             )}
           </div>
