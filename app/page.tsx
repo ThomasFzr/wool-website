@@ -260,7 +260,7 @@ export default function HomePage() {
 
                 {/* Image principale */}
                 <div
-                  className="relative h-[600px] w-full overflow-hidden rounded-xl bg-slate-100"
+                  className="relative h-[500px] w-full overflow-hidden rounded-xl bg-slate-100"
                   // souris
                   onMouseDown={(e) => startDrag(e.clientX, e.clientY)}
                   onMouseMove={(e) => moveDrag(e.clientX, e.clientY)}
