@@ -30,10 +30,13 @@ export async function PATCH(
     if (body.imageUrl !== undefined) update.imageUrl = body.imageUrl;
     if (body.images !== undefined) update.images = body.images;
     if (body.price !== undefined) update.price = body.price;
+    if (body.color !== undefined) update.color = body.color;
 
     const creation = await Creation.findByIdAndUpdate(id, update, {
       new: true,
     });
+
+    console.log("BODY CREATION", body);
 
     if (!creation) {
       return new NextResponse("Not found", { status: 404 });

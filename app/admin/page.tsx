@@ -18,6 +18,7 @@ type Creation = {
   imageUrl?: string;
   images?: string[];
   price?: number;
+  color?: string;
 };
 
 export default function AdminPage() {
@@ -33,6 +34,7 @@ export default function AdminPage() {
     imageUrl: "",
     images: [] as string[],
     price: "",
+    color: "",
   });
 
   const [message, setMessage] = useState<string | null>(null);
@@ -186,6 +188,7 @@ export default function AdminPage() {
       imageUrl: "",
       images: [],
       price: "",
+      color: "",
     });
     setMessage("Déconnecté.");
     if (typeof window !== "undefined") {
@@ -255,6 +258,7 @@ export default function AdminPage() {
       imageUrl: form.images[0] || undefined,
       images: form.images,
       price: form.price ? Number(form.price) : undefined,
+      color: form.color || undefined,
     };
 
     const url = editingId
@@ -283,6 +287,7 @@ export default function AdminPage() {
       description: "",
       imageUrl: "",
       price: "",
+      color: "",
     }));
     setEditingId(null);
     loadCreations();
@@ -296,6 +301,7 @@ export default function AdminPage() {
       description: c.description ?? "",
       images: c.images ?? (c.imageUrl ? [c.imageUrl] : []),
       price: c.price != null ? String(c.price) : "",
+      color: c.color ?? "",
     }));
     setMessage(null);
   }
@@ -550,6 +556,21 @@ export default function AdminPage() {
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                     />
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">
+                      Couleur
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex : Rose poudré, Bleu marine..."
+                      value={form.color}
+                      onChange={(e) =>
+                        setForm({ ...form, color: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -719,6 +740,11 @@ export default function AdminPage() {
                           {c.price != null && (
                             <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800">
                               {c.price} €
+                            </span>
+                          )}
+                           {c.color != null && (
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800">
+                              {c.color}
                             </span>
                           )}
                         </div>

@@ -7,6 +7,7 @@ const schema = new Schema(
     imageUrl: String,
     images: [String],
     price: Number,
+    color: String,
   },
   { timestamps: true }
 );

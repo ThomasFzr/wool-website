@@ -30,15 +30,17 @@ export async function POST(req: NextRequest) {
       Array.isArray(body.images) && body.images.length
         ? body.images
         : body.imageUrl
-        ? [body.imageUrl]
-        : [];
+          ? [body.imageUrl]
+          : [];
 
     const creation = await Creation.create({
       title: body.title,
       description: body.description,
       imageUrl: body.imageUrl ?? images[0] ?? undefined,
-      images,                 // 👈 on enregistre bien le tableau
+      images,
       price: body.price,
+      color: body.color,
+
     });
 
     return NextResponse.json(creation, { status: 201 });

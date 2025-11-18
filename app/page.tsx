@@ -10,6 +10,7 @@ type Creation = {
   imageUrl?: string;
   images?: string[];
   price?: number;
+  color?: string; // new
 };
 
 type Settings = {
@@ -31,6 +32,7 @@ export default function HomePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -166,6 +168,19 @@ export default function HomePage() {
     : null;
   const openImages = openCreation ? getImages(openCreation) : [];
 
+  const availableColors = Array.from(
+    new Set(
+      creations
+        .map((c) => c.color?.trim())
+        .filter((c): c is string => Boolean(c))
+    )
+  );
+
+  const filteredCreations =
+    selectedColor && selectedColor !== "all"
+      ? creations.filter((c) => c.color === selectedColor)
+      : creations;
+
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-5xl px-4 py-8">
@@ -196,10 +211,42 @@ export default function HomePage() {
           </p>
         )}
 
+        {/* Filtres couleur */}
+        {!loading && !error && availableColors.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-slate-600">Filtrer par couleur :</span>
+            <button
+              type="button"
+              onClick={() => setSelectedColor(null)}
+              className={`rounded-full border px-3 py-1 ${
+                !selectedColor
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Toutes
+            </button>
+            {availableColors.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => setSelectedColor(color)}
+                className={`rounded-full border px-3 py-1 ${
+                  selectedColor === color
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-200 bg-white text-slate-700"
+                }`}
+              >
+                {color}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Galerie */}
-        {!loading && !error && creations.length > 0 && (
+        {!loading && !error && filteredCreations.length > 0 && (
           <section className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {creations.map((c) => {
+            {filteredCreations.map((c) => {
               const imgs = getImages(c);
               const cover = imgs[0];
 
@@ -233,11 +280,18 @@ export default function HomePage() {
                       <h2 className="text-sm font-semibold text-slate-900">
                         {c.title}
                       </h2>
-                      {c.price != null && (
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
-                          {c.price} €
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {c.color && (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-700">
+                            {c.color}
+                          </span>
+                        )}
+                        {c.price != null && (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
+                            {c.price} €
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {c.description && (
@@ -250,6 +304,13 @@ export default function HomePage() {
               );
             })}
           </section>
+        )}
+
+        {/* Message si aucun résultat après filtre */}
+        {!loading && !error && creations.length > 0 && filteredCreations.length === 0 && (
+          <p className="mt-4 text-sm text-slate-500">
+            Aucune création ne correspond à cette couleur pour le moment.
+          </p>
         )}
       </div>
 
