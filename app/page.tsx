@@ -218,11 +218,10 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => setSelectedColor(null)}
-              className={`rounded-full border px-3 py-1 ${
-                !selectedColor
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-700"
-              }`}
+              className={`rounded-full border px-3 py-1 ${!selectedColor
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-200 bg-white text-slate-700"
+                }`}
             >
               Toutes
             </button>
@@ -231,11 +230,10 @@ export default function HomePage() {
                 key={color}
                 type="button"
                 onClick={() => setSelectedColor(color)}
-                className={`rounded-full border px-3 py-1 ${
-                  selectedColor === color
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-200 bg-white text-slate-700"
-                }`}
+                className={`rounded-full border px-3 py-1 ${selectedColor === color
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-200 bg-white text-slate-700"
+                  }`}
               >
                 {color}
               </button>
@@ -281,11 +279,6 @@ export default function HomePage() {
                         {c.title}
                       </h2>
                       <div className="flex items-center gap-2">
-                        {c.color && (
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-700">
-                            {c.color}
-                          </span>
-                        )}
                         {c.price != null && (
                           <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
                             {c.price} €
