@@ -45,6 +45,12 @@ export default function AdminPage() {
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
+  const [settings, setSettings] = useState({
+    title: "",
+    subtitle: "",
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+
   // Auto-login si un mdp est déjà en localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -58,6 +64,24 @@ export default function AdminPage() {
         setIsLoggedIn(true);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/settings", { cache: "no-store" });
+        if (!res.ok) return;
+        const s = await res.json();
+        setSettings({
+          title: s.title ?? "Les créations en laine de maman 🧶",
+          subtitle:
+            s.subtitle ?? "Clique sur une création pour voir toutes les photos.",
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadSettings();
   }, []);
 
   // Charger les créations uniquement si connecté
@@ -102,6 +126,35 @@ export default function AdminPage() {
         setMessage("Erreur réseau pendant le login.");
       }
       return false;
+    }
+  }
+
+  async function handleSaveSettings(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSavingSettings(true);
+      setMessage(null);
+
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword, // même mdp que pour les créations
+        },
+        body: JSON.stringify(settings),
+      });
+
+      if (!res.ok) {
+        setMessage("Impossible d'enregistrer le texte (mot de passe ?).");
+        return;
+      }
+
+      setMessage("Texte de la page d'accueil enregistré ✔️");
+    } catch (err) {
+      console.error(err);
+      setMessage("Erreur serveur lors de l'enregistrement.");
+    } finally {
+      setSavingSettings(false);
     }
   }
 
@@ -383,7 +436,70 @@ export default function AdminPage() {
                 Se déconnecter
               </button>
             </div>
+            {/* Bloc : texte de la page d'accueil */}
+            <form
+              onSubmit={handleSaveSettings}
+              style={{
+                background: "white",
+                padding: 16,
+                borderRadius: 16,
+                boxShadow:
+                  "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                marginBottom: 24,
+              }}
+            >
+              <h2 style={{ fontSize: 16, fontWeight: 600 }}>
+                Texte de la page d&apos;accueil
+              </h2>
 
+              <input
+                placeholder="Titre"
+                value={settings.title}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, title: e.target.value }))
+                }
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e0",
+                }}
+              />
+
+              <input
+                placeholder="Sous-titre"
+                value={settings.subtitle}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, subtitle: e.target.value }))
+                }
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e0",
+                }}
+              />
+
+              <button
+                type="submit"
+                disabled={savingSettings || !adminPassword}
+                style={{
+                  alignSelf: "flex-start",
+                  marginTop: 4,
+                  padding: "8px 12px",
+                  borderRadius: 9999,
+                  border: "none",
+                  background: savingSettings ? "#4a5568" : "black",
+                  opacity: savingSettings ? 0.8 : 1,
+                  color: "white",
+                  fontWeight: 600,
+                  cursor: savingSettings ? "not-allowed" : "pointer",
+                }}
+              >
+                {savingSettings ? "Enregistrement..." : "Enregistrer le texte"}
+              </button>
+            </form>
             {/* Formulaire */}
             <form
               onSubmit={handleSubmit}

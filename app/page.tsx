@@ -12,6 +12,13 @@ type Creation = {
   price?: number;
 };
 
+type Settings = { title: string; subtitle: string };
+
+const DEFAULT_SETTINGS: Settings = {
+  title: "Les créations en laine de maman 🧶",
+  subtitle: "Clique sur une création pour voir toutes les photos.",
+};
+
 export default function HomePage() {
   const [creations, setCreations] = useState<Creation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +31,7 @@ export default function HomePage() {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     async function load() {
@@ -31,13 +39,28 @@ export default function HomePage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch("/api/creations", { cache: "no-store" });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data = await res.json();
-        setCreations(data);
+        const [creationsRes, settingsRes] = await Promise.all([
+          fetch("/api/creations", { cache: "no-store" }),
+          fetch("/api/settings", { cache: "no-store" }),
+        ]);
+
+        if (!creationsRes.ok) throw new Error(`Status ${creationsRes.status}`);
+        const creationsData = await creationsRes.json();
+        setCreations(creationsData);
+
+        if (settingsRes.ok) {
+          const s = await settingsRes.json();
+          setSettings({
+            title: s.title ?? DEFAULT_SETTINGS.title,
+            subtitle: s.subtitle ?? DEFAULT_SETTINGS.subtitle,
+          });
+        } else {
+          setSettings(DEFAULT_SETTINGS);
+        }
       } catch (e) {
         console.error(e);
         setError("Impossible de charger les créations.");
+        setSettings(DEFAULT_SETTINGS);
       } finally {
         setLoading(false);
       }
@@ -143,10 +166,10 @@ export default function HomePage() {
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Les créations en laine de maman 🧶
+              {settings.title}
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              Clique sur une création pour voir toutes les photos.
+              {settings.subtitle}
             </p>
           </div>
           {/* Bouton admin caché si tu ne veux pas qu'il soit visible */}
