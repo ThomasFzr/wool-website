@@ -355,7 +355,7 @@ export default function HomePage() {
 
                 {/* Astuce clavier */}
                 {openImages.length > 1 && (
-                  <p className="mt-2 text-[11px] text-slate-500">
+                  <p className="mt-2 text-[11px] text-slate-500 sm:block hidden">
                     Astuce&nbsp;: flèches ← → pour changer de photo, Esc pour fermer.
                   </p>
                 )}
