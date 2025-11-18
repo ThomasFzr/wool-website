@@ -288,7 +288,7 @@ export default function HomePage() {
                     </div>
 
                     {c.description && (
-                      <p className="line-clamp-3 text-xs text-slate-600">
+                      <p className="line-clamp-3 whitespace-pre-line text-xs text-slate-600">
                         {c.description}
                       </p>
                     )}

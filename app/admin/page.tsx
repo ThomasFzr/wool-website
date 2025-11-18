@@ -749,7 +749,7 @@ export default function AdminPage() {
                           )}
                         </div>
                         {c.description && (
-                          <p className="text-xs text-slate-600 line-clamp-2">
+                          <p className="text-xs text-slate-600 whitespace-pre-line line-clamp-2">
                             {c.description}
                           </p>
                         )}
