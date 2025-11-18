@@ -6,6 +6,7 @@ import {
   useState,
   ChangeEvent,
   useEffect,
+  useRef,
 } from "react";
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -52,6 +53,7 @@ export default function AdminPage() {
     subtitle: "",
   });
   const [savingSettings, setSavingSettings] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
 
   // Auto-login si un mdp est déjà en localStorage
   useEffect(() => {
@@ -304,6 +306,14 @@ export default function AdminPage() {
       color: c.color ?? "",
     }));
     setMessage(null);
+
+    if (formRef.current) {
+      const top = formRef.current.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({
+        top: top - 45,
+        behavior: "smooth",
+      });
+    }
   }
 
   async function handleDelete(id: string) {
@@ -511,7 +521,7 @@ export default function AdminPage() {
               onSubmit={handleSubmit}
               className="mb-8 space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100"
             >
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2" ref={formRef}>
                 <div className="space-y-3">
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-slate-700">
@@ -742,7 +752,7 @@ export default function AdminPage() {
                               {c.price} €
                             </span>
                           )}
-                           {c.color != null && (
+                          {c.color != null && (
                             <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800">
                               {c.color}
                             </span>
