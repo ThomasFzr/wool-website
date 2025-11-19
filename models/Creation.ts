@@ -8,6 +8,12 @@ const schema = new Schema(
     images: [String],
     price: Number,
     color: String,
+
+    reserved: { type: Boolean, default: false },
+    reservedName: String,
+    reservedContact: String,
+    reservedMessage: String,
+    reservedAt: Date,
   },
   { timestamps: true }
 );

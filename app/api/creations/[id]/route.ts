@@ -31,6 +31,12 @@ export async function PATCH(
     if (body.images !== undefined) update.images = body.images;
     if (body.price !== undefined) update.price = body.price;
     if (body.color !== undefined) update.color = body.color;
+    
+    if (body.reserved !== undefined) update.reserved = body.reserved;
+    if (body.reservedName !== undefined) update.reservedName = body.reservedName;
+    if (body.reservedContact !== undefined) update.reservedContact = body.reservedContact;
+    if (body.reservedMessage !== undefined) update.reservedMessage = body.reservedMessage;
+    if (body.reservedAt !== undefined) update.reservedAt = body.reservedAt;
 
     const creation = await Creation.findByIdAndUpdate(id, update, {
       new: true,

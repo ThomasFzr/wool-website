@@ -10,7 +10,9 @@ type Creation = {
   imageUrl?: string;
   images?: string[];
   price?: number;
-  color?: string; // new
+  color?: string;
+  reserved?: boolean;
+
 };
 
 type Settings = {
@@ -33,6 +35,15 @@ export default function HomePage() {
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+
+  //Reservation states
+  const [reserveOpen, setReserveOpen] = useState(false);
+  const [reserveName, setReserveName] = useState("");
+  const [reserveContact, setReserveContact] = useState("");
+  const [reserveMessage, setReserveMessage] = useState("");
+  const [reserveStatus, setReserveStatus] = useState<string | null>(null);
+  const [reserveLoading, setReserveLoading] = useState(false);
+  const [justReserved, setJustReserved] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -88,6 +99,9 @@ export default function HomePage() {
     const imgs = getImages(c);
     setCurrentIndex(0);
     setOpenId(c._id);
+    setJustReserved(false);
+    setReserveOpen(false);
+    setReserveStatus(null);
     if (imgs.length === 0) setCurrentIndex(0);
     setShowModal(true);
   }
@@ -107,6 +121,67 @@ export default function HomePage() {
     setTimeout(() => {
       setOpenId(null);
     }, 150);
+  }
+
+  async function handleReserve() {
+    if (!openCreation) return;
+    setReserveStatus(null);
+
+    if (!reserveName || !reserveContact) {
+      setReserveStatus("Merci de renseigner votre nom et un moyen de contact.");
+      return;
+    }
+
+    try {
+      setReserveLoading(true);
+      const res = await fetch(`/api/creations/${openCreation._id}/reserve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: reserveName,
+          contact: reserveContact,
+          message: reserveMessage || undefined,
+        }),
+      });
+
+      if (res.status === 409) {
+        setReserveStatus("Cet article vient déjà d'être réservé.");
+        return;
+      }
+      if (!res.ok) {
+        setReserveStatus("Erreur lors de la réservation, réessayez plus tard.");
+        return;
+      }
+
+      // Mise à jour locale : marquer l'article comme réservé
+      setCreations((prev) =>
+        prev.map((c) =>
+          c._id === openCreation._id
+            ? { ...c, reserved: true }
+            : c
+        )
+      );
+
+      setReserveStatus("Réservation enregistrée ✔️ Nous vous contacterons.");
+
+      // Message de succès (vert)
+      setJustReserved(true);
+
+      // Fermer le formulaire
+      setReserveOpen(false);
+
+      // Reset des champs
+      setReserveName("");
+      setReserveContact("");
+      setReserveMessage("");
+
+      setReserveLoading(false);
+    } catch (e) {
+      console.error(e);
+      setReserveStatus("Erreur réseau, réessayez plus tard.");
+    } finally {
+      setReserveLoading(false);
+    }
   }
 
   function startDrag(clientX: number, clientY: number) {
@@ -262,6 +337,11 @@ export default function HomePage() {
                   className="flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
                   onClick={() => openModal(c)}
                 >
+                  {c.reserved && (
+                    <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                      Réservé
+                    </span>
+                  )}
                   <div className="relative h-56 w-full overflow-hidden bg-slate-100">
                     {cover ? (
                       <img
@@ -401,6 +481,8 @@ export default function HomePage() {
                     </div>
                   )}
 
+
+
                   {/* Flèches + indicateur (inchangé) */}
                   {openImages.length > 1 && (
                     <>
@@ -423,6 +505,91 @@ export default function HomePage() {
                   )}
                 </div>
 
+                {/* ——————————————————————————————— */}
+                {/*        BLOC RÉSERVATION         */}
+                {/* ——————————————————————————————— */}
+
+                <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-700">
+
+                  {/* ✔ Case 1 : Message VERT juste après réservation */}
+                  {justReserved && (
+                    <p className="font-medium text-green-600">
+                      Article bien réservé ✔️
+                    </p>
+                  )}
+
+                  {/* ✔ Case 2 : Article déjà réservé (BDD) */}
+                  {!reserveOpen && !justReserved && openCreation.reserved && (
+                    <p className="font-medium text-red-600">
+                      Cet article est déjà réservé.
+                    </p>
+                  )}
+
+                  {/* ✔ Case 3 : Bouton “Réserver cet article” */}
+                  {!openCreation.reserved && !justReserved && !reserveOpen && (
+                    <button
+                      onClick={() => setReserveOpen(true)}
+                      className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                    >
+                      Réserver cet article
+                    </button>
+                  )}
+
+                  {/* ✔ Case 4 : Formulaire de réservation */}
+                  {!justReserved && !openCreation.reserved && reserveOpen && (
+                    <div className="space-y-2">
+                      <div className="flex flex-col gap-1 sm:flex-row">
+                        <input
+                          placeholder="Votre nom"
+                          value={reserveName}
+                          onChange={(e) => setReserveName(e.target.value)}
+                          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                        />
+                        <input
+                          placeholder="Email ou téléphone"
+                          value={reserveContact}
+                          onChange={(e) => setReserveContact(e.target.value)}
+                          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                        />
+                      </div>
+
+                      <textarea
+                        placeholder="Message (facultatif)"
+                        value={reserveMessage}
+                        onChange={(e) => setReserveMessage(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                      />
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleReserve}
+                          disabled={reserveLoading}
+                          className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                        >
+                          {reserveLoading ? "Enregistrement..." : "Envoyer la demande"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReserveOpen(false);
+                            setReserveStatus(null);
+                          }}
+                          className="text-[11px] text-slate-500 hover:underline"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+
+                      {reserveStatus && (
+                        <p className="text-[11px] text-slate-600">
+                          {reserveStatus}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {/* Miniatures et prix */}
                 {openImages.length > 1 && (
                   <div className="mt-3 flex items-center justify-between gap-3">
