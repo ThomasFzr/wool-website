@@ -504,135 +504,117 @@ export default function HomePage() {
                     </>
                   )}
                 </div>
+                {/* ——————————————————————————————— */}
+                {/*   MINIATURES au-dessus du bloc prix/réservation */}
+                {/* ——————————————————————————————— */}
+                {openImages.length > 1 && (
+                  <div className="mt-3 flex items-center gap-2 overflow-x-auto">
+                    {openImages.map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentIndex(i)}
+                        className={`h-14 w-14 shrink-0 rounded-md border ${i === currentIndex ? "border-slate-900" : "border-transparent opacity-60"
+                          }`}
+                      >
+                        <img
+                          src={url}
+                          alt={`miniature ${i + 1}`}
+                          className="h-full w-full rounded-md object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* ——————————————————————————————— */}
-                {/*        BLOC RÉSERVATION         */}
+                {/*   LIGNE : bouton réserver (gauche) + prix (droite) */}
                 {/* ——————————————————————————————— */}
-
-                <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-700">
-
-                  {/* ✔ Case 1 : Message VERT juste après réservation */}
-                  {justReserved && (
-                    <p className="font-medium text-green-600">
+                <div className="mt-4 flex items-center justify-between">
+                  {/* ✔ Case 1 : Message vert si juste réservé */}
+                  {justReserved ? (
+                    <p className="text-sm font-medium text-green-600">
                       Article bien réservé ✔️
                     </p>
-                  )}
-
-                  {/* ✔ Case 2 : Article déjà réservé (BDD) */}
-                  {!reserveOpen && !justReserved && openCreation.reserved && (
-                    <p className="font-medium text-red-600">
+                  ) : openCreation.reserved ? (
+                    /* ✔ Case 2 : Article déjà réservé */
+                    <p className="text-sm font-medium text-red-600">
                       Cet article est déjà réservé.
                     </p>
-                  )}
-
-                  {/* ✔ Case 3 : Bouton “Réserver cet article” */}
-                  {!openCreation.reserved && !justReserved && !reserveOpen && (
+                  ) : !reserveOpen ? (
+                    /* ✔ Case 3 : Bouton réserver */
                     <button
                       onClick={() => setReserveOpen(true)}
                       className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
                     >
                       Réserver cet article
                     </button>
+                  ) : (
+                    /* ✔ Case 4 : Rien ici, car le formulaire arrive juste en dessous */
+                    <span className="text-xs text-slate-500">Remplissez le formulaire</span>
                   )}
 
-                  {/* ✔ Case 4 : Formulaire de réservation */}
-                  {!justReserved && !openCreation.reserved && reserveOpen && (
-                    <div className="space-y-2">
-                      <div className="flex flex-col gap-1 sm:flex-row">
-                        <input
-                          placeholder="Votre nom"
-                          value={reserveName}
-                          onChange={(e) => setReserveName(e.target.value)}
-                          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                        />
-                        <input
-                          placeholder="Email ou téléphone"
-                          value={reserveContact}
-                          onChange={(e) => setReserveContact(e.target.value)}
-                          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                        />
-                      </div>
-
-                      <textarea
-                        placeholder="Message (facultatif)"
-                        value={reserveMessage}
-                        onChange={(e) => setReserveMessage(e.target.value)}
-                        rows={2}
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                      />
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleReserve}
-                          disabled={reserveLoading}
-                          className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
-                        >
-                          {reserveLoading ? "Enregistrement..." : "Envoyer la demande"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReserveOpen(false);
-                            setReserveStatus(null);
-                          }}
-                          className="text-[11px] text-slate-500 hover:underline"
-                        >
-                          Annuler
-                        </button>
-                      </div>
-
-                      {reserveStatus && (
-                        <p className="text-[11px] text-slate-600">
-                          {reserveStatus}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {/* Miniatures et prix */}
-                {openImages.length > 1 && (
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="flex gap-2 overflow-x-auto flex-1">
-                      {openImages.map((url, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setCurrentIndex(i)}
-                          className={`h-14 w-14 shrink-0 rounded-md border ${i === currentIndex
-                            ? "border-slate-900"
-                            : "border-transparent opacity-60"
-                            }`}
-                        >
-                          <img
-                            src={url}
-                            alt={`miniature ${i + 1}`}
-                            className="h-full w-full rounded-md object-cover"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                    {openCreation.price != null && (
-                      <span className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shrink-0">
-                        {openCreation.price} €
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Prix seul si pas de miniatures */}
-                {openImages.length <= 1 && openCreation.price != null && (
-                  <div className="mt-3 flex justify-end">
+                  {/* Prix à droite */}
+                  {openCreation.price != null && (
                     <span className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
                       {openCreation.price} €
                     </span>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {/* Astuce clavier */}
-                {openImages.length > 1 && (
-                  <p className="mt-2 text-[11px] text-slate-500 sm:block hidden">
-                    Astuce&nbsp;: flèches ← → pour changer de photo, Esc pour fermer.
-                  </p>
+                {/* ——————————————————————————————— */}
+                {/* FORMULAIRE de réservation (en-dessous) */}
+                {/* ——————————————————————————————— */}
+                {!justReserved && !openCreation.reserved && reserveOpen && (
+                  <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-700">
+
+                    <div className="flex flex-col gap-1 sm:flex-row">
+                      <input
+                        placeholder="Votre nom"
+                        value={reserveName}
+                        onChange={(e) => setReserveName(e.target.value)}
+                        className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                      />
+                      <input
+                        placeholder="Email ou téléphone"
+                        value={reserveContact}
+                        onChange={(e) => setReserveContact(e.target.value)}
+                        className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                      />
+                    </div>
+
+                    <textarea
+                      placeholder="Message (facultatif)"
+                      value={reserveMessage}
+                      onChange={(e) => setReserveMessage(e.target.value)}
+                      rows={2}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleReserve}
+                        disabled={reserveLoading}
+                        className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                      >
+                        {reserveLoading ? "Enregistrement..." : "Envoyer la demande"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReserveOpen(false);
+                          setReserveStatus(null);
+                        }}
+                        className="text-[11px] text-slate-500 hover:underline"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+
+                    {reserveStatus && (
+                      <p className="text-[11px] text-slate-600">{reserveStatus}</p>
+                    )}
+                  </div>
                 )}
               </>
             )}
