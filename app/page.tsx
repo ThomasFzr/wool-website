@@ -334,7 +334,7 @@ export default function HomePage() {
               return (
                 <article
                   key={c._id}
-                  className="flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
+                  className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
                   onClick={() => openModal(c)}
                 >
                   {c.reserved && (
