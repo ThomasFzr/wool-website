@@ -7,7 +7,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["system-ui", "ui-sans-serif", "sans-serif"],
+        sans: ["'Clash Display'", "system-ui", "ui-sans-serif", "sans-serif"],
       },
     },
   },

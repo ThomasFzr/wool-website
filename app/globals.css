@@ -1,5 +1,13 @@
 /* Global styles for cursor hover behavior and small niceties */
 
+@font-face {
+  font-family: 'Clash Display';
+  src: url('/fonts/ClashDisplay-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --accent: #0070f3;
 }
@@ -38,5 +46,5 @@ main {
 body {
   background-color: #f8fafc; /* bg-slate-50 */
   color: #0f172a;           /* text-slate-900 */
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Clash Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
