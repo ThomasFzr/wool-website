@@ -55,6 +55,18 @@ export default function AdminPage() {
   const [savingSettings, setSavingSettings] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
+  const colorOptions = Array.from(
+    new Set(
+      creations
+        .map((c) => c.color?.trim())
+        .filter((c): c is string => Boolean(c))
+    )
+  ).sort((a, b) => {
+    if (a.toLowerCase() === "multicolore") return 1;
+    if (b.toLowerCase() === "multicolore") return -1;
+    return a.localeCompare(b);
+  });
+
   // Auto-login si un mdp est déjà en localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -572,14 +584,17 @@ export default function AdminPage() {
                       Couleur
                     </label>
                     <input
-                      type="text"
+                      list="color-options"                       // 👈 important
                       placeholder="Ex : Rose poudré, Bleu marine..."
                       value={form.color}
-                      onChange={(e) =>
-                        setForm({ ...form, color: e.target.value })
-                      }
+                      onChange={(e) => setForm({ ...form, color: e.target.value })}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                     />
+                    <datalist id="color-options">
+                      {colorOptions.map((color) => (
+                        <option key={color} value={color} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
 

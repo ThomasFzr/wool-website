@@ -168,13 +168,21 @@ export default function HomePage() {
     : null;
   const openImages = openCreation ? getImages(openCreation) : [];
 
-  const availableColors = Array.from(
+  const rawColors = Array.from(
     new Set(
       creations
         .map((c) => c.color?.trim())
         .filter((c): c is string => Boolean(c))
     )
   );
+
+  const sortedColors = rawColors.sort((a, b) => {
+    if (a.toLowerCase() === "multicolore") return 1;
+    if (b.toLowerCase() === "multicolore") return -1;
+    return a.localeCompare(b);
+  });
+
+  const availableColors = [...sortedColors];
 
   const filteredCreations =
     selectedColor && selectedColor !== "all"
