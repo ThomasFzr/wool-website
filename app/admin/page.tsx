@@ -55,6 +55,9 @@ export default function AdminPage() {
   const [savingSettings, setSavingSettings] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
+  // 🔴 nombre de réservations en attente
+  const [pendingReservations, setPendingReservations] = useState(0);
+
   const colorOptions = Array.from(
     new Set(
       creations
@@ -104,8 +107,21 @@ export default function AdminPage() {
   useEffect(() => {
     if (isLoggedIn) {
       loadCreations();
+      loadPendingReservations();
     }
   }, [isLoggedIn]);
+
+  // recharge le nombre de réservations quand on revient sur l’admin
+  async function loadPendingReservations() {
+    try {
+      const res = await fetch("/api/admin/reservations/count");
+      if (!res.ok) return;
+      const data = await res.json();
+      setPendingReservations(data.pending || 0);
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   async function loadCreations() {
     try {
@@ -145,7 +161,7 @@ export default function AdminPage() {
     }
   }
 
-  async function handleSaveSettings(e: React.FormEvent) {
+  async function handleSaveSettings(e: FormEvent) {
     e.preventDefault();
     try {
       setSavingSettings(true);
@@ -245,7 +261,7 @@ export default function AdminPage() {
 
       setForm((f) => ({
         ...f,
-        images: [...f.images, ...uploadedUrls], // 👈 on ajoute
+        images: [...f.images, ...uploadedUrls],
       }));
 
       setMessage("Images uploadées ✔️");
@@ -389,7 +405,7 @@ export default function AdminPage() {
     e: React.DragEvent<HTMLDivElement>,
     index: number
   ) {
-    e.preventDefault(); // important pour autoriser le drop
+    e.preventDefault();
 
     if (dragIndex === null || dragIndex === index) return;
 
@@ -400,7 +416,7 @@ export default function AdminPage() {
       return { ...f, images: arr };
     });
 
-    setDragIndex(index); // on continue à suivre la nouvelle position
+    setDragIndex(index);
   }
 
   function handleDragEnd() {
@@ -452,7 +468,7 @@ export default function AdminPage() {
         {/* Si connecté : interface admin */}
         {isLoggedIn && (
           <>
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between">
               <h1 className="text-2xl font-semibold tracking-tight">
                 Admin – {editingId ? "Modifier une création" : "Ajouter une création"}
               </h1>
@@ -464,6 +480,23 @@ export default function AdminPage() {
                 Se déconnecter
               </button>
             </div>
+
+            {/* Lien vers les réservations avec pastille */}
+            <div className="mb-6">
+              <Link
+                href="/admin/reservations"
+                className="relative inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                onClick={loadPendingReservations}
+              >
+                <span>Voir les réservations</span>
+                {pendingReservations > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                    {pendingReservations}
+                  </span>
+                )}
+              </Link>
+            </div>
+
             {/* Bloc : texte de la page d'accueil */}
             <form
               onSubmit={handleSaveSettings}
@@ -528,7 +561,8 @@ export default function AdminPage() {
                 {savingSettings ? "Enregistrement..." : "Enregistrer le texte"}
               </button>
             </form>
-            {/* Formulaire */}
+
+            {/* Formulaire de création */}
             <form
               onSubmit={handleSubmit}
               className="mb-8 space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100"
@@ -584,7 +618,7 @@ export default function AdminPage() {
                       Couleur
                     </label>
                     <input
-                      list="color-options"                       // 👈 important
+                      list="color-options"
                       placeholder="Ex : Rose poudré, Bleu marine..."
                       value={form.color}
                       onChange={(e) => setForm({ ...form, color: e.target.value })}
@@ -618,7 +652,9 @@ export default function AdminPage() {
                       )}
                       {form.images.length > 0 && (
                         <div style={{ marginTop: 8 }}>
-                          <p style={{ fontSize: 12, color: "#4a5568" }}>Aperçu des images :</p>
+                          <p style={{ fontSize: 12, color: "#4a5568" }}>
+                            Aperçu des images :
+                          </p>
 
                           <div
                             style={{
@@ -643,12 +679,11 @@ export default function AdminPage() {
                                   overflow: "hidden",
                                   border:
                                     dragIndex === i
-                                      ? "2px dashed #4f46e5" // petit highlight pendant le drag
+                                      ? "2px dashed #4f46e5"
                                       : "1px solid #e2e8f0",
                                   boxSizing: "border-box",
                                 }}
                               >
-                                {/* Bouton supprimer */}
                                 <button
                                   onClick={() => removeImage(i)}
                                   type="button"
@@ -683,7 +718,7 @@ export default function AdminPage() {
                                     objectFit: "cover",
                                     borderRadius: 8,
                                     userSelect: "none",
-                                    pointerEvents: "none", // le drag se fait depuis le conteneur
+                                    pointerEvents: "none",
                                   }}
                                 />
                               </div>

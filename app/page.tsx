@@ -270,10 +270,10 @@ export default function HomePage() {
         {/* Header */}
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-5xl font-bold tracking-tight">
               {settings?.title}
             </h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-2xl text-slate-600">
               {settings?.subtitle}
             </p>
           </div>
