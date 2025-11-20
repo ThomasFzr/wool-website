@@ -14,6 +14,9 @@ const schema = new Schema(
     reservedContact: String,
     reservedMessage: String,
     reservedAt: Date,
+
+    sold: { type: Boolean, default: false },
+
   },
   { timestamps: true }
 );

@@ -12,6 +12,7 @@ type Creation = {
   price?: number;
   color?: string;
   reserved?: boolean;
+  sold?: boolean;
 
 };
 
@@ -337,11 +338,15 @@ export default function HomePage() {
                   className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
                   onClick={() => openModal(c)}
                 >
-                  {c.reserved && (
+                  {c.sold ? (
+                    <span className="absolute left-2 top-2 z-10 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                      Vendu
+                    </span>
+                  ) : c.reserved ? (
                     <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
                       Réservé
                     </span>
-                  )}
+                  ) : null}
                   <div className="relative h-56 w-full overflow-hidden bg-slate-100">
                     {cover ? (
                       <img

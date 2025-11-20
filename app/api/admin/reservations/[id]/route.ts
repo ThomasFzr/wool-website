@@ -19,6 +19,16 @@ export async function PATCH(req: Request, { params }: any) {
     if (!reservation)
       return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // ✅ Si on passe en "validated", on marque l'article comme vendu
+    if (body.status === "validated" && reservation.creationId) {
+      await Creation.findByIdAndUpdate(reservation.creationId, {
+        $set: {
+          sold: true,
+          reserved: false, // il n'est plus juste réservé, il est vendu
+        },
+      });
+    }
+
     return NextResponse.json(reservation);
   } catch (err) {
     console.error(err);
@@ -33,17 +43,19 @@ export async function DELETE(
   try {
     await connectToDatabase();
 
-    // 1) Récupérer la réservation
     const reservation = await Reservation.findById(params.id);
 
     if (!reservation) {
       return new NextResponse("Reservation not found", { status: 404 });
     }
 
-    // 2) Si elle avait une création liée, la libérer
+    // Si la réservation concernait un article, on libère l'article
     if (reservation.creationId) {
+      // Cas le plus logique : on supprime surtout des réservations "pending"
       await Creation.findByIdAndUpdate(reservation.creationId, {
-        $set: { reserved: false },
+        $set: {
+          reserved: false,
+        },
         $unset: {
           reservedName: "",
           reservedContact: "",
@@ -51,9 +63,10 @@ export async function DELETE(
           reservedAt: "",
         },
       });
+      // on NE touche PAS à `sold` ici → si un jour tu supprimes une résa "validated",
+      // l'article reste vendu. À toi de voir comment tu l'utilises.
     }
 
-    // 3) Supprimer la réservation
     await Reservation.findByIdAndDelete(params.id);
 
     return new NextResponse(null, { status: 204 });
