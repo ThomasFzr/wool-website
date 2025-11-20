@@ -3,9 +3,8 @@ import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 
-type RouteParams = { params: { id: string } };
 
-export async function POST(req: NextRequest, { params }: RouteParams) {
+export async function POST(req: NextRequest, { params }: any) {
   try {
     await connectToDatabase();
 
