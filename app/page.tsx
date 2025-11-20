@@ -46,6 +46,9 @@ export default function HomePage() {
   const [reserveLoading, setReserveLoading] = useState(false);
   const [justReserved, setJustReserved] = useState(false);
 
+  const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
+  const [swipeDeltaX, setSwipeDeltaX] = useState(0);
+
   useEffect(() => {
     async function load() {
       try {
@@ -437,46 +440,99 @@ export default function HomePage() {
 
                 {/* Image principale */}
                 <div
-                  className="relative h-[500px] w-full overflow-hidden rounded-xl bg-slate-100"
-                  // souris
-                  onMouseDown={(e) => startDrag(e.clientX, e.clientY)}
-                  onMouseMove={(e) => moveDrag(e.clientX, e.clientY)}
-                  onMouseUp={endDrag}
-                  onMouseLeave={endDrag}
-                  // tactile
+                  className="relative h-[500px] w-full overflow-hidden rounded-xl bg-slate-100 touch-pan-y"
+                  // DESKTOP DRAG (only when zoomed)
+                  onMouseDown={(e) => {
+                    if (!zoomed) return;
+                    setIsDragging(true);
+                    setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+                  }}
+                  onMouseMove={(e) => {
+                    if (!zoomed || !isDragging || !dragStart) return;
+                    const newX = e.clientX - dragStart.x;
+                    const newY = e.clientY - dragStart.y;
+                    setOffset({ x: newX, y: newY });
+                  }}
+                  onMouseUp={() => setIsDragging(false)}
+                  onMouseLeave={() => setIsDragging(false)}
+
+                  // MOBILE: double‑tap zoom + swipe
                   onTouchStart={(e) => {
                     const t = e.touches[0];
-                    startDrag(t.clientX, t.clientY);
+
+                    const now = Date.now();
+                    if ((window as any).lastTap && now - (window as any).lastTap < 280) {
+                      // DOUBLE TAP → TOGGLE ZOOM
+                      if (!zoomed) {
+                        setZoomed(true);
+                      } else {
+                        setZoomed(false);
+                        setOffset({ x: 0, y: 0 });
+                      }
+                      (window as any).lastTap = 0;
+                      return;
+                    }
+                    (window as any).lastTap = now;
+
+                    // start swipe
+                    if (!zoomed) {
+                      setSwipeStartX(t.clientX);
+                    }
+
+                    // start drag if zoomed
+                    if (zoomed) {
+                      setIsDragging(true);
+                      setDragStart({ x: t.clientX - offset.x, y: t.clientY - offset.y });
+                    }
                   }}
                   onTouchMove={(e) => {
                     const t = e.touches[0];
-                    moveDrag(t.clientX, t.clientY);
+
+                    // DRAG MODE
+                    if (zoomed && isDragging && dragStart) {
+                      const newX = t.clientX - dragStart.x;
+                      const newY = t.clientY - dragStart.y;
+                      setOffset({ x: newX, y: newY });
+                      return;
+                    }
+
+                    // SWIPE MODE (only if NOT zoomed)
+                    if (!zoomed && swipeStartX !== null) {
+                      const delta = t.clientX - swipeStartX;
+                      setSwipeDeltaX(delta);
+                    }
                   }}
-                  onTouchEnd={endDrag}
+                  onTouchEnd={() => {
+                    if (!zoomed) {
+                      if (swipeDeltaX > 60) prevImage();
+                      if (swipeDeltaX < -60) nextImage();
+                    }
+                    setSwipeStartX(null);
+                    setSwipeDeltaX(0);
+                    setIsDragging(false);
+                  }}
                 >
                   {openImages.length > 0 ? (
                     <img
                       src={openImages[currentIndex]}
                       alt={`${openCreation.title} ${currentIndex + 1}`}
                       onClick={() => {
-                        // toggle zoom au clic
+                        // CLICK (desktop) → zoom toggle
                         if (!zoomed) {
                           setZoomed(true);
                         } else {
-                          // dézoom => reset position
                           setZoomed(false);
                           setOffset({ x: 0, y: 0 });
                         }
                       }}
                       className={`
-        h-full w-full object-contain transition-transform duration-300
-        ${zoomed ? "cursor-grab" : "cursor-zoom-in"}
-        ${isDragging && zoomed ? "cursor-grabbing" : ""}
+        h-full w-full object-contain transition-transform duration-300 select-none
+        ${zoomed ? "cursor-zoom-out" : "cursor-zoom-in"}
       `}
                       style={{
                         transform: zoomed
                           ? `scale(1.7) translate(${offset.x}px, ${offset.y}px)`
-                          : "scale(1) translate(0px, 0px)",
+                          : `translateX(${swipeDeltaX}px) scale(1)`,
                       }}
                       draggable={false}
                     />
@@ -486,9 +542,7 @@ export default function HomePage() {
                     </div>
                   )}
 
-
-
-                  {/* Flèches + indicateur (inchangé) */}
+                  {/* Flèches + indicateur */}
                   {openImages.length > 1 && (
                     <>
                       <button
