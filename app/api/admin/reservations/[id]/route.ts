@@ -3,8 +3,6 @@ import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 
-type RouteParams = { params: { id: string } };
-
 export async function PATCH(req: Request, { params }: any) {
   try {
     await connectToDatabase();
@@ -38,7 +36,7 @@ export async function PATCH(req: Request, { params }: any) {
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: RouteParams
+  { params }: any
 ) {
   try {
     await connectToDatabase();
