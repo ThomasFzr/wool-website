@@ -37,6 +37,11 @@ export default function HomePage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
+  // Pinch-to-zoom state
+  const [scale, setScale] = useState(1);
+  const [pinchStartDistance, setPinchStartDistance] = useState<number | null>(null);
+  const [pinchStartScale, setPinchStartScale] = useState(1);
+
   //Reservation states
   const [reserveOpen, setReserveOpen] = useState(false);
   const [reserveName, setReserveName] = useState("");
@@ -455,18 +460,34 @@ export default function HomePage() {
                   }}
                   onMouseUp={() => setIsDragging(false)}
                   onMouseLeave={() => setIsDragging(false)}
-
-                  // MOBILE: double‑tap zoom + swipe
+                  // MOBILE: double-tap zoom + swipe + pinch zoom
                   onTouchStart={(e) => {
-                    const t = e.touches[0];
+                    const touches = e.touches;
+
+                    // PINCH START (two fingers)
+                    if (touches.length === 2) {
+                      const dx = touches[0].clientX - touches[1].clientX;
+                      const dy = touches[0].clientY - touches[1].clientY;
+                      const dist = Math.sqrt(dx * dx + dy * dy);
+                      setPinchStartDistance(dist);
+                      setPinchStartScale(scale || 1);
+                      setZoomed(true);
+                      setSwipeStartX(null);
+                      setSwipeDeltaX(0);
+                      return;
+                    }
+
+                    const t = touches[0];
 
                     const now = Date.now();
                     if ((window as any).lastTap && now - (window as any).lastTap < 280) {
                       // DOUBLE TAP → TOGGLE ZOOM
                       if (!zoomed) {
                         setZoomed(true);
+                        setScale(1.7);
                       } else {
                         setZoomed(false);
+                        setScale(1);
                         setOffset({ x: 0, y: 0 });
                       }
                       (window as any).lastTap = 0;
@@ -479,17 +500,30 @@ export default function HomePage() {
                       setSwipeStartX(t.clientX);
                     }
 
-                    // start drag if zoomed
+                    // start drag if zoomed (one finger)
                     if (zoomed) {
                       setIsDragging(true);
                       setDragStart({ x: t.clientX - offset.x, y: t.clientY - offset.y });
                     }
                   }}
                   onTouchMove={(e) => {
-                    const t = e.touches[0];
+                    const touches = e.touches;
 
-                    // DRAG MODE
-                    if (zoomed && isDragging && dragStart) {
+                    // PINCH MOVE
+                    if (touches.length === 2 && pinchStartDistance !== null) {
+                      const dx = touches[0].clientX - touches[1].clientX;
+                      const dy = touches[0].clientY - touches[1].clientY;
+                      const dist = Math.sqrt(dx * dx + dy * dy);
+                      const factor = dist / pinchStartDistance;
+                      const newScale = Math.min(3, Math.max(1, pinchStartScale * factor));
+                      setScale(newScale);
+                      setZoomed(newScale > 1.02);
+                      return;
+                    }
+
+                    // DRAG MODE (one finger, zoomed)
+                    if (zoomed && isDragging && dragStart && touches.length === 1) {
+                      const t = touches[0];
                       const newX = t.clientX - dragStart.x;
                       const newY = t.clientY - dragStart.y;
                       setOffset({ x: newX, y: newY });
@@ -497,12 +531,21 @@ export default function HomePage() {
                     }
 
                     // SWIPE MODE (only if NOT zoomed)
-                    if (!zoomed && swipeStartX !== null) {
+                    if (!zoomed && swipeStartX !== null && touches.length === 1) {
+                      const t = touches[0];
                       const delta = t.clientX - swipeStartX;
                       setSwipeDeltaX(delta);
                     }
                   }}
-                  onTouchEnd={() => {
+                  onTouchEnd={(e) => {
+                    // Fin d'un pinch → on arrête juste le pinch/drag
+                    if (pinchStartDistance !== null) {
+                      setPinchStartDistance(null);
+                      setIsDragging(false);
+                      return;
+                    }
+
+                    // Swipe (si pas zoomé)
                     if (!zoomed) {
                       if (swipeDeltaX > 60) prevImage();
                       if (swipeDeltaX < -60) nextImage();
@@ -520,8 +563,10 @@ export default function HomePage() {
                         // CLICK (desktop) → zoom toggle
                         if (!zoomed) {
                           setZoomed(true);
+                          setScale(1.7);
                         } else {
                           setZoomed(false);
+                          setScale(1);
                           setOffset({ x: 0, y: 0 });
                         }
                       }}
@@ -531,7 +576,7 @@ export default function HomePage() {
       `}
                       style={{
                         transform: zoomed
-                          ? `scale(1.7) translate(${offset.x}px, ${offset.y}px)`
+                          ? `scale(${scale}) translate(${offset.x}px, ${offset.y}px)`
                           : `translateX(${swipeDeltaX}px) scale(1)`,
                       }}
                       draggable={false}
