@@ -35,7 +35,7 @@ export async function GET(req: Request) {
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit)
-            .populate("creationId", "title price images");
+            .populate("creationId");
 
         return NextResponse.json({
             reservations,

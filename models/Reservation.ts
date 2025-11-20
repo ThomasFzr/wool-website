@@ -1,8 +1,12 @@
 import mongoose, { Schema } from "mongoose";
 
-const reservationSchema = new Schema(
+const ReservationSchema = new Schema(
   {
-    creationId: { type: Schema.Types.ObjectId, ref: "Creation", required: true },
+    creationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Creation",
+      required: true,
+    },
     name: { type: String, required: true },
     contact: { type: String, required: true },
     message: String,
@@ -16,4 +20,4 @@ const reservationSchema = new Schema(
 );
 
 export default mongoose.models.Reservation ||
-  mongoose.model("Reservation", reservationSchema);
+  mongoose.model("Reservation", ReservationSchema);
