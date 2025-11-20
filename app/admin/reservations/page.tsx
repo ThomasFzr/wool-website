@@ -99,7 +99,6 @@ export default function AdminReservations() {
                     <option value="">Tous les statuts</option>
                     <option value="pending">En attente</option>
                     <option value="validated">Validé</option>
-                    <option value="cancelled">Annulé</option>
                 </select>
             </div>
 
