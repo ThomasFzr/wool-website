@@ -408,7 +408,7 @@ export default function HomePage() {
           onClick={closeModal} // clic sur le fond => ferme
         >
           <div
-            className={`relative w-full max-w-2xl max-h-[85vh] sm:max-h-screen overflow-y-auto rounded-2xl bg-white p-4 shadow-xl transform-gpu transition-all duration-150 ${showModal ? "opacity-100 scale-100" : "opacity-0 scale-95"
+            className={`relative w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl transform-gpu transition-all duration-150 ${showModal ? "opacity-100 scale-100" : "opacity-0 scale-95"
               }`}
             onClick={(e) => e.stopPropagation()} // clic dans le contenu => ne ferme pas
           >
