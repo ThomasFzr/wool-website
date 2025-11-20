@@ -437,7 +437,7 @@ export default function HomePage() {
                     {openCreation.title}
                   </h2>
                   {openCreation.description && (
-                    <p className="mt-1 text-xs text-slate-600">
+                    <p className="mt-1 whitespace-pre-line text-xs text-slate-600">
                       {openCreation.description}
                     </p>
                   )}
