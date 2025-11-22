@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
+import router from "next/router";
 
 type Creation = {
   _id: string;
@@ -23,7 +24,9 @@ type Settings = {
 
 
 export default function HomePage() {
-  const { data: session } = useSession();
+  // Authentication session
+  const { data: session, status } = useSession();
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const [creations, setCreations] = useState<Creation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +58,18 @@ export default function HomePage() {
 
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [swipeDeltaX, setSwipeDeltaX] = useState(0);
+
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -287,6 +302,68 @@ export default function HomePage() {
             <p className="mt-2 text-2xl text-slate-600">
               {settings?.subtitle}
             </p>
+          </div>
+
+          <div className="relative" ref={menuRef}>
+            {/* Bouton avatar */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!session) {
+                  // 🔥 Si pas connecté → ouverture directe de la page de connexion
+                  signIn();
+                } else {
+                  // 🔥 Si connecté → on ouvre/ferme le menu
+                  setAccountMenuOpen((o) => !o);
+                }
+              }}
+              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              {/* ROND AVATAR */}
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-[13px] font-semibold text-white">
+                {session
+                  ? (session.user?.name?.[0]?.toUpperCase() ??
+                    session.user?.email?.[0]?.toUpperCase() ??
+                    "👤")
+                  : "👤"}
+              </span>
+
+              {/* TEXTE À CÔTÉ DU ROND */}
+              <span className="hidden sm:inline">
+                {session ? "Mon compte" : "Se connecter"}
+              </span>
+            </button>
+
+            {/* Menu déroulant (uniquement si connecté) */}
+            {session && accountMenuOpen && (
+              <div className="absolute right-0 z-10 mt-2 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg animate-fadeIn">
+
+                <a
+                  href="/account"
+                  className="w-full block px-4 py-2 text-left text-sm hover:bg-slate-100"
+                  onClick={() => setAccountMenuOpen(false)}
+                >
+                  Mon compte
+                </a>
+
+                <a
+                  href="/orders"
+                  className="w-full block px-4 py-2 text-left text-sm hover:bg-slate-100"
+                  onClick={() => setAccountMenuOpen(false)}
+                >
+                  Mes commandes
+                </a>
+
+                <div className="border-t border-slate-200" />
+
+                <button
+                  onClick={() => signOut()}
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                >
+                  Se déconnecter
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

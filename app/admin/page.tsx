@@ -490,7 +490,7 @@ export default function AdminPage() {
               >
                 <span>Voir les réservations</span>
                 {pendingReservations > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
                     {pendingReservations}
                   </span>
                 )}
