@@ -1,23 +1,29 @@
 import mongoose, { Schema } from "mongoose";
 
-const ReservationSchema = new Schema(
+const schema = new Schema(
   {
     creationId: {
       type: Schema.Types.ObjectId,
       ref: "Creation",
-      required: true,
     },
-    name: { type: String, required: true },
-    contact: { type: String, required: true },
+    name: String,
+    contact: String,
+
+    userEmail: String,
+
     message: String,
+
     status: {
       type: String,
       enum: ["pending", "validated", "cancelled"],
       default: "pending",
     },
+
+    // ✅ nouvelle raison d’annulation côté client
+    cancelReason: String,
   },
   { timestamps: true }
 );
 
 export default mongoose.models.Reservation ||
-  mongoose.model("Reservation", ReservationSchema);
+  mongoose.model("Reservation", schema);

@@ -347,7 +347,7 @@ export default function HomePage() {
                 </a>
 
                 <a
-                  href="/orders"
+                  href="/account/orders"
                   className="w-full block px-4 py-2 text-left text-sm hover:bg-slate-100"
                   onClick={() => setAccountMenuOpen(false)}
                 >

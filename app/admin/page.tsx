@@ -138,7 +138,7 @@ export default function AdminPage() {
 
   async function tryLogin(password: string, showErrors = true) {
     try {
-      const res = await fetch("/api/admin-login", {
+      const res = await fetch("/api/admin/admin-login", {
         method: "POST",
         headers: {
           "x-admin-password": password,
