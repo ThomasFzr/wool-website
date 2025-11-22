@@ -223,8 +223,8 @@ export default function AdminReservations() {
                                             {selected.creationId.title}
                                         </p>
                                         {selected.creationId.price != null && (
-                                            <span className="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-800">
-                                                {selected.creationId.price} €
+                                            <span className="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-800 whitespace-nowrap">
+                                                {selected.creationId.price}&nbsp;€
                                             </span>
                                         )}
                                     </div>
