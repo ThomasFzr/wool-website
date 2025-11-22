@@ -57,11 +57,6 @@ export default function OrdersPage() {
   }, [status]);
 
   async function handleCancelReservation(id: string) {
-    if (!cancelReason.trim()) {
-      setInfo("Merci d'indiquer une raison d'annulation.");
-      return;
-    }
-
     try {
       setCancelLoading(true);
       setInfo(null);
@@ -69,7 +64,10 @@ export default function OrdersPage() {
       const res = await fetch(`/api/account/reservations/${id}/cancel`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: cancelReason }),
+        body: JSON.stringify({
+          // message facultatif
+          reason: cancelReason.trim() || undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -135,7 +133,6 @@ export default function OrdersPage() {
             creation?.images?.[0] || creation?.imageUrl || undefined;
 
           const canCancel = r.status === "pending";
-
           const isThisCancelling = cancelId === r._id;
 
           return (
@@ -209,7 +206,7 @@ export default function OrdersPage() {
                 </div>
               </div>
 
-              {/* Bloc d'annulation pour les réservations non validées */}
+              {/* Bloc d'annulation pour les réservations en attente */}
               {canCancel && (
                 <div className="mt-3 border-t border-slate-200 pt-3">
                   {!isThisCancelling ? (
@@ -227,7 +224,7 @@ export default function OrdersPage() {
                   ) : (
                     <div className="space-y-2">
                       <textarea
-                        placeholder="Pourquoi souhaitez-vous annuler ?"
+                        placeholder="Pourquoi souhaitez-vous annuler ? (facultatif)"
                         value={cancelReason}
                         onChange={(e) => setCancelReason(e.target.value)}
                         rows={2}
