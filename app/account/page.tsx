@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { redirect } from "next/navigation";
+import { LogoutButton } from "@/components/LogoutButton"; // 👈 importe le bouton
 
 export default async function AccountPage() {
   const session = await getServerSession(authOptions);
@@ -10,12 +11,8 @@ export default async function AccountPage() {
     redirect("/api/auth/signin?callbackUrl=/account");
   }
 
-  // Log pour debug si tu veux
-  console.log("SESSION SERVER:", JSON.stringify(session, null, 2));
-
   const user = session.user;
-  const provider =
-    (user as any).provider ?? "credentials"; // 👈 récupéré depuis session.user
+  const provider = (user as any).provider ?? "credentials";
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -78,6 +75,7 @@ export default async function AccountPage() {
           </p>
         </section>
 
+        {/* Boutons */}
         <section className="mt-6 flex gap-3">
           <a
             href="/account/orders"
@@ -85,6 +83,9 @@ export default async function AccountPage() {
           >
             Voir mes commandes
           </a>
+
+          {/* 🔥 Bouton déconnexion client */}
+          <LogoutButton />
         </section>
       </div>
     </main>
