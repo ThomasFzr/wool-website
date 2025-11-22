@@ -5,9 +5,7 @@ import Creation from "@/models/Creation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 
-type RouteParams = { params: { id: string } };
-
-export async function PATCH(req: NextRequest, { params }: RouteParams) {
+export async function PATCH(req: NextRequest, { params }: any) {
   try {
     await connectToDatabase();
 

@@ -6,11 +6,7 @@ import Reservation from "@/models/Reservation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 
-type RouteParams = {
-  params: { id: string };
-};
-
-export async function POST(req: NextRequest, { params }: RouteParams) {
+export async function POST(req: NextRequest, { params }: any) {
   try {
     // 🔐 Vérifier si utilisateur loggé
     const session = await getServerSession(authOptions);
