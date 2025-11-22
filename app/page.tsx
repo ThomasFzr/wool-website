@@ -47,11 +47,6 @@ export default function HomePage() {
   const [pinchStartScale, setPinchStartScale] = useState(1);
 
   //Reservation states
-  const [reserveOpen, setReserveOpen] = useState(false);
-  const [reserveName, setReserveName] = useState("");
-  const [reserveContact, setReserveContact] = useState("");
-  const [reserveMessage, setReserveMessage] = useState("");
-  const [reserveStatus, setReserveStatus] = useState<string | null>(null);
   const [reserveLoading, setReserveLoading] = useState(false);
   const [justReserved, setJustReserved] = useState(false);
 
@@ -121,16 +116,10 @@ export default function HomePage() {
   }
 
   function openModal(c: Creation) {
-    if (session?.user) {
-      setReserveName(session.user.name || "");
-      setReserveContact(session.user.email || "");
-    }
     const imgs = getImages(c);
     setCurrentIndex(0);
     setOpenId(c._id);
     setJustReserved(false);
-    setReserveOpen(false);
-    setReserveStatus(null);
     if (imgs.length === 0) setCurrentIndex(0);
     setShowModal(true);
   }
@@ -153,11 +142,13 @@ export default function HomePage() {
   }
 
   async function handleReserve() {
-    if (!openCreation) return;
-    setReserveStatus(null);
+    if (!openCreation || !session?.user) return;
 
-    if (!reserveName || !reserveContact) {
-      setReserveStatus("Merci de renseigner votre nom et un moyen de contact.");
+    const name = session.user.name || "";
+    const contact = session.user.email || "";
+
+    if (!name || !contact) {
+      alert("Impossible de récupérer vos informations. Veuillez vous reconnecter.");
       return;
     }
 
@@ -167,18 +158,19 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: reserveName,
-          contact: reserveContact,
-          message: reserveMessage || undefined,
+          name,
+          contact,
         }),
       });
 
       if (res.status === 409) {
-        setReserveStatus("Cet article vient déjà d'être réservé.");
+        alert("Cet article vient déjà d'être réservé.");
+        setReserveLoading(false);
         return;
       }
       if (!res.ok) {
-        setReserveStatus("Erreur lors de la réservation, réessayez plus tard.");
+        alert("Erreur lors de la réservation, réessayez plus tard.");
+        setReserveLoading(false);
         return;
       }
 
@@ -191,23 +183,11 @@ export default function HomePage() {
         )
       );
 
-      setReserveStatus("Réservation enregistrée ✔️ Nous vous contacterons.");
-
-      // Message de succès (vert)
+      // Message de succès
       setJustReserved(true);
-
-      // Fermer le formulaire
-      setReserveOpen(false);
-
-      // Reset des champs
-      setReserveName("");
-      setReserveContact("");
-      setReserveMessage("");
-
-      setReserveLoading(false);
     } catch (e) {
       console.error(e);
-      setReserveStatus("Erreur réseau, réessayez plus tard.");
+      alert("Erreur réseau, réessayez plus tard.");
     } finally {
       setReserveLoading(false);
     }
@@ -729,7 +709,7 @@ export default function HomePage() {
                     // ✅ Article dispo mais user non connecté
                     <button
                       onClick={() => signIn()}
-                      className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
+                      className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
                     >
                       Se connecter pour réserver
                     </button>
@@ -738,17 +718,15 @@ export default function HomePage() {
                     <p className="text-sm font-medium text-green-600">
                       Article bien réservé ✔️
                     </p>
-                  ) : !reserveOpen ? (
-                    // ✅ User connecté, article dispo, formulaire fermé
-                    <button
-                      onClick={() => setReserveOpen(true)}
-                      className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-                    >
-                      Réserver cet article
-                    </button>
                   ) : (
-                    // ✅ Formulaire ouvert
-                    <span className="text-xs text-slate-500">Remplissez le formulaire</span>
+                    // ✅ User connecté, article dispo : bouton de réservation directe
+                    <button
+                      onClick={handleReserve}
+                      disabled={reserveLoading}
+                      className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {reserveLoading ? "Réservation..." : "Réserver cet article"}
+                    </button>
                   )}
 
                   {openCreation.price != null && (
@@ -757,63 +735,6 @@ export default function HomePage() {
                     </span>
                   )}
                 </div>
-
-                {/* ——————————————————————————————— */}
-                {/* FORMULAIRE de réservation (en-dessous) */}
-                {/* ——————————————————————————————— */}
-                {!justReserved && !openCreation.reserved && reserveOpen && (
-                  <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-700">
-
-                    <div className="flex flex-col gap-1 sm:flex-row">
-                      <input
-                        placeholder="Votre nom"
-                        value={reserveName}
-                        onChange={(e) => setReserveName(e.target.value)}
-                        className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                      />
-                      <input
-                        placeholder="Email"
-                        readOnly={!!session?.user?.email}
-                        value={reserveContact}
-                        onChange={(e) => setReserveContact(e.target.value)}
-                        className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                      />
-                    </div>
-
-                    <textarea
-                      placeholder="Message (facultatif)"
-                      value={reserveMessage}
-                      onChange={(e) => setReserveMessage(e.target.value)}
-                      rows={2}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                    />
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleReserve}
-                        disabled={reserveLoading}
-                        className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
-                      >
-                        {reserveLoading ? "Enregistrement..." : "Envoyer la demande"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReserveOpen(false);
-                          setReserveStatus(null);
-                        }}
-                        className="text-[11px] text-slate-500 hover:underline"
-                      >
-                        Annuler
-                      </button>
-                    </div>
-
-                    {reserveStatus && (
-                      <p className="text-[11px] text-slate-600">{reserveStatus}</p>
-                    )}
-                  </div>
-                )}
               </>
             )}
           </div>
