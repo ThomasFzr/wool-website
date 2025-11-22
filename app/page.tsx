@@ -693,33 +693,33 @@ export default function HomePage() {
                 )}
 
                 {/* Ligne bouton réserver + prix */}
+                {/* Ligne bouton réserver + prix */}
                 <div className="mt-4 flex items-center justify-between">
-                  {/* Priorité : état de l'article */}
-                  {openCreation.sold ? (
-                    // ✅ Cas vendu
+                  {/* 1️⃣ Priorité : l'utilisateur vient de réserver */}
+                  {justReserved ? (
+                    <p className="text-sm font-medium text-green-600">
+                      Article bien réservé ✔️
+                    </p>
+                  ) : openCreation.sold ? (
+                    // 2️⃣ Cas vendu
                     <p className="text-sm font-medium text-slate-700">
                       Cet article est déjà vendu.
                     </p>
                   ) : openCreation.reserved ? (
-                    // ✅ Cas déjà réservé
+                    // 3️⃣ Cas déjà réservé (par quelqu'un d'autre, ou après reload)
                     <p className="text-sm font-medium text-red-600">
                       Cet article est déjà réservé.
                     </p>
                   ) : !session ? (
-                    // ✅ Article dispo mais user non connecté
+                    // 4️⃣ Article dispo mais user non connecté
                     <button
                       onClick={() => signIn()}
                       className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
                     >
                       Se connecter pour réserver
                     </button>
-                  ) : justReserved ? (
-                    // ✅ Article que l'utilisateur vient de réserver
-                    <p className="text-sm font-medium text-green-600">
-                      Article bien réservé ✔️
-                    </p>
                   ) : (
-                    // ✅ User connecté, article dispo : bouton de réservation directe
+                    // 5️⃣ User connecté, article dispo : bouton de réservation directe
                     <button
                       onClick={handleReserve}
                       disabled={reserveLoading}
