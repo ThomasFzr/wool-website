@@ -277,17 +277,17 @@ export default function HomePage() {
     <main className="min-h-screen">
       <div className="mx-auto max-w-5xl px-4 py-8">
         {/* Header */}
-        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-5xl font-bold tracking-tight">
+        <header className="mb-8 flex flex-row items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
               {settings?.title}
             </h1>
-            <p className="mt-2 text-2xl text-slate-600">
+            <p className="mt-2 text-xl sm:text-2xl text-slate-600">
               {settings?.subtitle}
             </p>
           </div>
 
-          <div className="relative" ref={menuRef}>
+          <div className="relative shrink-0" ref={menuRef}>
             {/* Bouton avatar */}
             <button
               type="button"
@@ -312,7 +312,7 @@ export default function HomePage() {
               </span>
 
               {/* TEXTE À CÔTÉ DU ROND */}
-              <span className="hidden sm:inline">
+              <span className="hidden md:inline">
                 {session ? "Mon compte" : "Se connecter"}
               </span>
             </button>
