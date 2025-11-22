@@ -42,8 +42,6 @@ export async function PATCH(
       new: true,
     });
 
-    console.log("BODY CREATION", body);
-
     if (!creation) {
       return new NextResponse("Not found", { status: 404 });
     }

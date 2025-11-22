@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
-
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
-
 import { sendEmail } from "@/lib/sendEmail";
 
-export async function POST(req: NextRequest, { params }: any) {
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function POST(req: NextRequest, context: RouteContext) {
   try {
     // 🔐 Vérifier si utilisateur loggé
     const session = await getServerSession(authOptions);
@@ -19,7 +21,10 @@ export async function POST(req: NextRequest, { params }: any) {
 
     await connectToDatabase();
 
-    const creationId = params.id;
+    // ✅ NOUVEAU : params asynchrone
+    const { id } = await context.params;
+    const creationId = id;
+
     const { name, contact, message } = await req.json();
 
     const creation = await Creation.findById(creationId);
@@ -27,8 +32,7 @@ export async function POST(req: NextRequest, { params }: any) {
       return new NextResponse("Création introuvable", { status: 404 });
     }
 
-    // Déjà réservé / vendu ?
-    if (creation.reserved || creation.sold) {
+    if (creation.reserved) {
       return new NextResponse("Déjà réservé", { status: 409 });
     }
 
@@ -47,6 +51,7 @@ export async function POST(req: NextRequest, { params }: any) {
     creation.reservedMessage = message;
     creation.reservedAt = new Date();
     await creation.save();
+
 
     const productImage =
       (Array.isArray(creation.images) && creation.images.length > 0
@@ -74,24 +79,21 @@ export async function POST(req: NextRequest, { params }: any) {
           </p>
 
           <div style="margin-top:16px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
-            ${
-              productImage
-                ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                : ""
-            }
+            ${productImage
+          ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+          : ""
+        }
             <div style="font-size:13px;flex:1;">
               <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-              ${
-                creation.color
-                  ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                  : ""
-              }
+              ${creation.color
+          ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+          : ""
+        }
               <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
-              ${
-                message
-                  ? `<p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">Votre message :<br/>${message}</p>`
-                  : ""
-              }
+              ${message
+          ? `<p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">Votre message :<br/>${message}</p>`
+          : ""
+        }
             </div>
           </div>
 
@@ -125,27 +127,24 @@ export async function POST(req: NextRequest, { params }: any) {
             </p>
 
             <div style="margin-top:12px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
-              ${
-                productImage
-                  ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                  : ""
-              }
+              ${productImage
+            ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+            : ""
+          }
               <div style="font-size:13px;flex:1;">
                 <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                ${
-                  creation.color
-                    ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                    : ""
-                }
+                ${creation.color
+            ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+            : ""
+          }
                 <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
                 <p style="margin:0 0 4px 0;font-size:12px;color:#6b7280;">
                   Réservation créée le : ${new Date(reservation.createdAt).toLocaleString("fr-FR")}
                 </p>
-                ${
-                  message
-                    ? `<p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">Message de l'acheteur :<br/>${message}</p>`
-                    : ""
-                }
+                ${message
+            ? `<p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">Message de l'acheteur :<br/>${message}</p>`
+            : ""
+          }
               </div>
             </div>
 

@@ -4,14 +4,19 @@ import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 import { sendEmail } from "@/lib/sendEmail";
 
-export async function PATCH(req: Request, { params }: any) {
+type AdminRouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+
+export async function PATCH(req: Request, context: AdminRouteContext) {
   try {
     await connectToDatabase();
     const body = await req.json();
 
-    // 🧠 On récupère la réservation + l'article lié
+    const { id } = await context.params; // ✅ ici
     const reservation = await Reservation.findByIdAndUpdate(
-      params.id,
+      id,
       body,
       { new: true }
     ).populate("creationId");
@@ -56,18 +61,16 @@ export async function PATCH(req: Request, { params }: any) {
             </p>
 
             <div style="margin-top:16px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
-              ${
-                productImage
-                  ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                  : ""
-              }
+              ${productImage
+            ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+            : ""
+          }
               <div style="font-size:13px;flex:1;">
                 <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                ${
-                  creation.color
-                    ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                    : ""
-                }
+                ${creation.color
+            ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+            : ""
+          }
                 <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
               </div>
             </div>
@@ -99,18 +102,16 @@ export async function PATCH(req: Request, { params }: any) {
               </p>
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
-                ${
-                  productImage
-                    ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                    : ""
-                }
+                ${productImage
+              ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+              : ""
+            }
                 <div style="font-size:13px;flex:1;">
                   <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                  ${
-                    creation.color
-                      ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                      : ""
-                  }
+                  ${creation.color
+              ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+              : ""
+            }
                   <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
                 </div>
               </div>
@@ -158,18 +159,16 @@ export async function PATCH(req: Request, { params }: any) {
             </p>
 
             <div style="margin-top:16px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
-              ${
-                productImage
-                  ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                  : ""
-              }
+              ${productImage
+            ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+            : ""
+          }
               <div style="font-size:13px;flex:1;">
                 <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                ${
-                  creation.color
-                    ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                    : ""
-                }
+                ${creation.color
+            ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+            : ""
+          }
                 <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
               </div>
             </div>
@@ -189,7 +188,7 @@ export async function PATCH(req: Request, { params }: any) {
 
       // 📧 Email au vendeur
       if (process.env.SELLER_EMAIL) {
-        await sendEmail({
+                await sendEmail({
           to: process.env.SELLER_EMAIL,
           subject: `❌ Réservation annulée : ${creation.title}`,
           html: `
@@ -201,18 +200,16 @@ export async function PATCH(req: Request, { params }: any) {
               </p>
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
-                ${
-                  productImage
-                    ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                    : ""
-                }
+                ${productImage
+              ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+              : ""
+            }
                 <div style="font-size:13px;flex:1;">
                   <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                  ${
-                    creation.color
-                      ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                      : ""
-                  }
+                  ${creation.color
+              ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+              : ""
+            }
                   <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
                 </div>
               </div>
@@ -237,12 +234,14 @@ export async function PATCH(req: Request, { params }: any) {
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: any
+  context: AdminRouteContext
 ) {
   try {
     await connectToDatabase();
 
-    const reservation = await Reservation.findById(params.id);
+    const { id } = await context.params; // ✅ ici aussi
+
+    const reservation = await Reservation.findById(id);
 
     if (!reservation) {
       return new NextResponse("Reservation not found", { status: 404 });
@@ -262,7 +261,7 @@ export async function DELETE(
       });
     }
 
-    await Reservation.findByIdAndDelete(params.id);
+    await Reservation.findByIdAndDelete(id);
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {
