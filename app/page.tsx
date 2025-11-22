@@ -497,10 +497,10 @@ export default function HomePage() {
           >
             {openCreation && (
               <>
-                {/* Bouton fermer (mobile seulement) - croix en haut à droite */}
+                {/* Bouton fermer - croix en haut à droite */}
                 <button
                   onClick={closeModal}
-                  className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black sm:hidden"
+                  className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
                   aria-label="Fermer"
                 >
                   ✕
