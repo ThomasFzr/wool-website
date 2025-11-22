@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
-import router from "next/router";
 
 type Creation = {
   _id: string;
@@ -122,6 +121,10 @@ export default function HomePage() {
   }
 
   function openModal(c: Creation) {
+    if (session?.user) {
+      setReserveName(session.user.name || "");
+      setReserveContact(session.user.email || "");
+    }
     const imgs = getImages(c);
     setCurrentIndex(0);
     setOpenId(c._id);
@@ -759,7 +762,8 @@ export default function HomePage() {
                         className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                       />
                       <input
-                        placeholder="Email ou téléphone"
+                        placeholder="Email"
+                        readOnly={!!session?.user?.email}
                         value={reserveContact}
                         onChange={(e) => setReserveContact(e.target.value)}
                         className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
