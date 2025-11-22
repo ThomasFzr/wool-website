@@ -80,10 +80,10 @@ export default async function AccountPage() {
 
         <section className="mt-6 flex gap-3">
           <a
-            href="/orders"
+            href="/account/orders"
             className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
           >
-            Voir mes réservations
+            Voir mes commandes
           </a>
         </section>
       </div>

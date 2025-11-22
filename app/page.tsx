@@ -713,6 +713,7 @@ export default function HomePage() {
                 )}
 
                 {/* Ligne bouton réserver + prix */}
+                {/* Ligne bouton réserver + prix */}
                 <div className="mt-4 flex items-center justify-between">
                   {/* Si pas loggué */}
                   {!session ? (
@@ -722,6 +723,11 @@ export default function HomePage() {
                     >
                       Se connecter pour réserver
                     </button>
+                  ) : openCreation.sold ? (
+                    // ✅ Cas vendu
+                    <p className="text-sm font-medium text-slate-700">
+                      Cet article est déjà vendu.
+                    </p>
                   ) : justReserved ? (
                     <p className="text-sm font-medium text-green-600">
                       Article bien réservé ✔️
