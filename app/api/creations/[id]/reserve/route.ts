@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, { params }: any) {
     const priceLabel =
       creation.price != null ? `${creation.price} €` : "Prix sur demande";
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://maman-laine.example.com";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wool-website.vercel.app";
 
     /* ---------------------------
        📧 EMAIL À L'ACHETEUR (beau HTML)
