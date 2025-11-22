@@ -10,6 +10,7 @@ type Reservation = {
     message?: string;
     status: "pending" | "validated" | "cancelled";
     createdAt: string;
+    cancelReason?: string;
     creationId?: {
         _id: string;
         title: string;
@@ -125,10 +126,10 @@ export default function AdminReservations() {
 
                         <span
                             className={`mt-2 sm:mt-0 text-xs font-semibold px-2 py-1 rounded-full ${r.status === "pending"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : r.status === "validated"
-                                        ? "bg-green-100 text-green-700"
-                                        : "bg-red-100 text-red-700"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : r.status === "validated"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700"
                                 }`}
                         >
                             {r.status}
@@ -177,6 +178,18 @@ export default function AdminReservations() {
                             {selected.message}
                         </p>
                     )}
+                    {selected.status === "cancelled" && (
+                        <div className="mt-4 rounded-lg bg-red-50 p-3">
+                            <p className="text-xs font-semibold uppercase text-red-700">
+                                Raison de l&apos;annulation
+                            </p>
+                            <p className="mt-1 text-sm text-red-800">
+                                {selected.cancelReason && selected.cancelReason.trim().length > 0
+                                    ? selected.cancelReason
+                                    : "Aucune raison précisée."}
+                            </p>
+                        </div>
+                    )}
 
                     {/* ARTICLE COMPLET */}
                     {selected.creationId && (
@@ -191,7 +204,7 @@ export default function AdminReservations() {
                                     <img
                                         src={selected.creationId.images?.[0] ?? selected.creationId.imageUrl!}
                                         alt={selected.creationId.title}
-                                        className="h-20 w-20 rounded-md object-cover flex-shrink-0"
+                                        className="h-20 w-20 rounded-md object-cover shrink-0"
                                     />
                                 )}
 
@@ -225,21 +238,24 @@ export default function AdminReservations() {
                         </div>
                     )}
 
-                    <div className="mt-6 flex gap-2">
-                        <button
-                            onClick={() => updateStatus(selected._id, "validated")}
-                            className="px-3 py-2 bg-green-600 text-white rounded"
-                        >
-                            Valider
-                        </button>
+                    {/* Boutons actions admin */}
+                    {selected.status === "pending" && (
+                        <div className="mt-6 flex gap-2">
+                            <button
+                                onClick={() => updateStatus(selected._id, "validated")}
+                                className="px-3 py-2 bg-green-600 text-white rounded"
+                            >
+                                Valider
+                            </button>
 
-                        <button
-                            onClick={() => deleteReservation(selected._id)}
-                            className="px-3 py-2 bg-red-600 text-white rounded"
-                        >
-                            Annuler
-                        </button>
-                    </div>
+                            <button
+                                onClick={() => deleteReservation(selected._id)}
+                                className="px-3 py-2 bg-red-600 text-white rounded"
+                            >
+                                Annuler
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </main>

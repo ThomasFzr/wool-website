@@ -1,48 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 
-export async function PATCH(req: NextRequest, { params }: any) {
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
-    await connectToDatabase();
+    // 👇 Nouveauté Next 15 : params est async
+    const { id } = await context.params;
 
+    // 🔐 Vérifier la session
     const session = await getServerSession(authOptions);
     if (!session || !session.user?.email) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    await connectToDatabase();
 
     const { reason } = await req.json();
 
-    const reservation = await Reservation.findById(params.id);
+    // On récupère la réservation de l'utilisateur courant
+    const reservation = await Reservation.findOne({
+      _id: id,
+      userId: (session.user as any).id, // tu as déjà stocké userId dans la réservation
+    }).populate("creationId");
 
     if (!reservation) {
-      return new NextResponse("Reservation not found", { status: 404 });
+      return NextResponse.json(
+        { error: "Reservation not found" },
+        { status: 404 }
+      );
     }
 
-    // ✅ sécurité : la réservation doit appartenir à l’utilisateur
-    if (reservation.userEmail !== session.user.email) {
-      return new NextResponse("Forbidden", { status: 403 });
-    }
-
-    // Si déjà validée, on refuse l’annulation
+    // Si déjà validée côté admin → on ne laisse plus annuler
     if (reservation.status === "validated") {
-      return new NextResponse(
-        "Cette réservation est déjà validée et ne peut plus être annulée.",
+      return NextResponse.json(
+        { error: "Cette commande est déjà validée, impossible de l'annuler." },
         { status: 400 }
       );
     }
 
-    // ✅ on passe en "cancelled" et on stocke la raison
+    // 📝 On marque la réservation comme annulée + raison
     reservation.status = "cancelled";
-    reservation.cancelReason = reason || "";
+    (reservation as any).cancelReason = reason ?? "";
     await reservation.save();
 
-    // ✅ on libère l’article pour qu’il puisse être réservé à nouveau
-    if (reservation.creationId) {
-      await Creation.findByIdAndUpdate(reservation.creationId, {
+    // 🔓 Si la création n'est pas vendue, on la libère pour quelqu'un d'autre
+    const creation: any = reservation.creationId;
+    if (creation && !creation.sold) {
+      await Creation.findByIdAndUpdate(creation._id, {
         $set: { reserved: false },
         $unset: {
           reservedName: "",
@@ -53,9 +64,9 @@ export async function PATCH(req: NextRequest, { params }: any) {
       });
     }
 
-    return NextResponse.json(reservation);
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err);
-    return new NextResponse("Server error", { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
