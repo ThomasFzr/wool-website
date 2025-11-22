@@ -99,7 +99,8 @@ export default function AdminReservations() {
                 >
                     <option value="">Tous les statuts</option>
                     <option value="pending">En attente</option>
-                    <option value="validated">Validé</option>
+                    <option value="validated">Validée</option>
+                    <option value="cancelled">Annulée</option>
                 </select>
             </div>
 
@@ -132,7 +133,7 @@ export default function AdminReservations() {
                                     : "bg-red-100 text-red-700"
                                 }`}
                         >
-                            {r.status}
+                            {r.status === "pending" ? "En attente" : r.status === "validated" ? "Validée" : "Annulée"}
                         </span>
                     </div>
                 ))}
@@ -254,6 +255,22 @@ export default function AdminReservations() {
                             >
                                 Annuler
                             </button>
+                        </div>
+                    )}
+
+                    {selected.status === "validated" && (
+                        <div className="mt-6">
+                            <span className="text-xs font-semibold px-3 py-2 bg-green-100 text-green-700 rounded-full">
+                                ✔️ Validée
+                            </span>
+                        </div>
+                    )}
+
+                    {selected.status === "cancelled" && (
+                        <div className="mt-6">
+                            <span className="text-xs font-semibold px-3 py-2 bg-red-100 text-red-700 rounded-full">
+                                ✕ Annulée
+                            </span>
                         </div>
                     )}
                 </div>
