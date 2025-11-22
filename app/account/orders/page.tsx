@@ -134,7 +134,7 @@ export default function OrdersPage() {
           const image =
             creation?.images?.[0] || creation?.imageUrl || undefined;
 
-          const canCancel = r.status !== "validated";
+          const canCancel = r.status === "pending";
 
           const isThisCancelling = cancelId === r._id;
 
