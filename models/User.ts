@@ -6,6 +6,7 @@ import mongoose, { Schema, model, models, type Document, type Model } from "mong
 export interface IUser {
   name?: string | null;
   email: string;
+  provider: string;
   password?: string | null;
 }
 
@@ -21,6 +22,7 @@ const userSchema = new Schema<IUserDocument>(
   {
     name: { type: String },
     email: { type: String, required: true, unique: true },
+    provider: { type: String, required: true },
     password: { type: String }, // utilisée avec Credentials
   },
   { timestamps: true }

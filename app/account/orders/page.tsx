@@ -148,7 +148,7 @@ export default function OrdersPage() {
                   <img
                     src={image}
                     alt={creation?.title ?? "Article réservé"}
-                    className="h-20 w-20 rounded-md object-cover flex-shrink-0"
+                    className="h-20 w-20 rounded-md object-cover shrink-0"
                   />
                 )}
 

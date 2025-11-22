@@ -10,7 +10,12 @@ export default async function AccountPage() {
     redirect("/api/auth/signin?callbackUrl=/account");
   }
 
+  // Log pour debug si tu veux
+  console.log("SESSION SERVER:", JSON.stringify(session, null, 2));
+
   const user = session.user;
+  const provider =
+    (user as any).provider ?? "credentials"; // 👈 récupéré depuis session.user
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -24,30 +29,46 @@ export default async function AccountPage() {
           </a>
         </div>
 
-        <h1 className="text-2xl font-semibold tracking-tight mb-6">
+        <h1 className="mb-6 text-2xl font-semibold tracking-tight">
           Mon compte
         </h1>
 
         {/* Carte utilisateur */}
-        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100 flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white">
-            {user.name?.[0]?.toUpperCase() ??
+        <section className="flex items-center gap-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white overflow-hidden">
+            {user.image ? (
+              <img
+                src={user.image}
+                alt="Avatar"
+                className="h-14 w-14 rounded-full object-cover"
+              />
+            ) : (
+              user.name?.[0]?.toUpperCase() ??
               user.email?.[0]?.toUpperCase() ??
-              "👤"}
+              "👤"
+            )}
           </div>
 
           <div className="flex-1 space-y-1">
             <p className="text-sm font-semibold text-slate-900">
               {user.name ?? "Utilisateur"}
             </p>
+
             {user.email && (
               <p className="text-sm text-slate-600">{user.email}</p>
             )}
+
+            <p className="text-xs text-slate-500">
+              Connexion via{" "}
+              <span className="font-medium text-slate-700">
+                {provider === "google" ? "Google" : "Email / mot de passe"}
+              </span>
+            </p>
           </div>
         </section>
 
         {/* Infos supplémentaires */}
-        <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100 space-y-3">
+        <section className="mt-6 space-y-3 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
           <h2 className="text-sm font-semibold text-slate-900">
             Informations du compte
           </h2>

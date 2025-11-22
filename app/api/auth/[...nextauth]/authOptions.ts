@@ -44,17 +44,17 @@ import User, { IUserDocument } from "@/models/User"; export const authOptions: N
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.userId = (user as any).id;
+    async jwt({ token, account, user }) {
+      if (account) {
+        (token as any).provider = account.provider;
       }
       return token;
     },
     async session({ session, token }) {
-      if (token?.userId) {
-        (session.user as any).id = token.userId;
+      if ((token as any)?.provider) {
+        (session.user as any).provider = (token as any).provider;
       }
       return session;
-    },
+    }
   },
 };

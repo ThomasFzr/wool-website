@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -10,7 +10,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get("error"); // ex: OAuthSignin, etc.
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -48,6 +51,13 @@ export default function LoginPage() {
         <h1 className="text-xl font-semibold mb-4">
           {mode === "login" ? "Se connecter" : "Créer un compte"}
         </h1>
+
+        {/* Message d'erreur OAuth (Google) éventuel */}
+        {oauthError && !message && (
+          <p className="mb-3 text-xs text-red-600">
+            Une erreur est survenue lors de la connexion avec Google. Réessaie.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {mode === "register" && (
@@ -96,7 +106,11 @@ export default function LoginPage() {
 
         <div className="mt-4 border-t pt-4">
           <button
-            onClick={() => signIn("google")}
+            onClick={() =>
+              signIn("google", {
+                callbackUrl: "/", // 👈 redirige vers la home une fois loggué
+              })
+            }
             className="w-full rounded-full border px-3 py-2 text-sm"
           >
             Continuer avec Google
