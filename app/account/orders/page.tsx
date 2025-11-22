@@ -96,7 +96,7 @@ export default function OrdersPage() {
     return (
       <main className="p-8 max-w-3xl mx-auto">
         <p className="text-sm text-slate-600">
-          Vous devez être connecté pour voir vos commandes.
+          Vous devez être connecté pour voir vos réservations.
         </p>
       </main>
     );

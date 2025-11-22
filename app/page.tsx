@@ -274,7 +274,49 @@ export default function HomePage() {
       : creations;
 
   return (
-    <main className="min-h-screen">
+    <main className="relative min-h-screen overflow-hidden">
+      {/* 🧶 FOND ANIMÉ AVEC PELOTES & AIGUILLES */}
+      <div className="pointer-events-none absolute inset-0 -z-10 opacity-15">
+        <div className="flex h-full w-[300%] animate-knit-scroll">
+          {/* Dupliqué pour créer un défilement continu */}
+          <div className="flex h-full w-1/3">
+            <img
+              src="/images/bg-yarn-1.png"
+              alt="Pelotes de laine"
+              className="h-full w-1/2 object-cover"
+            />
+            <img
+              src="/images/bg-yarn-1.png"
+              alt="Aiguilles à tricoter"
+              className="h-full w-1/2 object-cover"
+            />
+          </div>
+          <div className="flex h-full w-1/3">
+            <img
+              src="/images/bg-yarn-1.png"
+              alt="Tricot"
+              className="h-full w-1/2 object-cover"
+            />
+            <img
+              src="/images/bg-yarn-1.png"
+              alt="Pelotes de laine"
+              className="h-full w-1/2 object-cover"
+            />
+          </div>
+          <div className="flex h-full w-1/3">
+            <img
+              src="/images/bg-yarn-1.png"
+              alt="Aiguilles à tricoter"
+              className="h-full w-1/2 object-cover"
+            />
+            <img
+              src="/images/bg-yarn-1.png"
+              alt="Tricot"
+              className="h-full w-1/2 object-cover"
+            />
+          </div>
+        </div>
+      </div>
       <div className="mx-auto max-w-5xl px-4 py-8">
         {/* Header */}
         <header className="mb-8 flex flex-row items-start justify-between gap-4">
@@ -334,7 +376,7 @@ export default function HomePage() {
                   className="w-full block px-4 py-2 text-left text-sm hover:bg-slate-100"
                   onClick={() => setAccountMenuOpen(false)}
                 >
-                  Mes commandes
+                  Mes réservations
                 </a>
 
                 <div className="border-t border-slate-200" />
