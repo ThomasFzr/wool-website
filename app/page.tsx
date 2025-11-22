@@ -228,6 +228,19 @@ export default function HomePage() {
     setCurrentIndex((prev) => (prev - 1 + imgs.length) % imgs.length);
   }
 
+  // Désactiver le scroll de la page quand la modale est ouverte
+  useEffect(() => {
+    if (showModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [showModal]);
+
   // Gestion clavier: Esc / flèches
   useEffect(() => {
     if (!openId) return;
