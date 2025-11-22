@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-// import Link from "next/link"; // tu peux le remettre si tu gardes un lien admin
+import { useSession, signIn, signOut } from "next-auth/react";
 
 type Creation = {
   _id: string;
@@ -23,6 +23,8 @@ type Settings = {
 
 
 export default function HomePage() {
+  const { data: session } = useSession();
+
   const [creations, setCreations] = useState<Creation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -630,22 +632,25 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* ——————————————————————————————— */}
-                {/*   LIGNE : bouton réserver (gauche) + prix (droite) */}
-                {/* ——————————————————————————————— */}
+                {/* Ligne bouton réserver + prix */}
                 <div className="mt-4 flex items-center justify-between">
-                  {/* ✔ Case 1 : Message vert si juste réservé */}
-                  {justReserved ? (
+                  {/* Si pas loggué */}
+                  {!session ? (
+                    <button
+                      onClick={() => signIn()}
+                      className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
+                    >
+                      Se connecter pour réserver
+                    </button>
+                  ) : justReserved ? (
                     <p className="text-sm font-medium text-green-600">
                       Article bien réservé ✔️
                     </p>
                   ) : openCreation.reserved ? (
-                    /* ✔ Case 2 : Article déjà réservé */
                     <p className="text-sm font-medium text-red-600">
                       Cet article est déjà réservé.
                     </p>
                   ) : !reserveOpen ? (
-                    /* ✔ Case 3 : Bouton réserver */
                     <button
                       onClick={() => setReserveOpen(true)}
                       className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
@@ -653,11 +658,9 @@ export default function HomePage() {
                       Réserver cet article
                     </button>
                   ) : (
-                    /* ✔ Case 4 : Rien ici, car le formulaire arrive juste en dessous */
                     <span className="text-xs text-slate-500">Remplissez le formulaire</span>
                   )}
 
-                  {/* Prix à droite */}
                   {openCreation.price != null && (
                     <span className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
                       {openCreation.price} €

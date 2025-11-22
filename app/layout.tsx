@@ -1,4 +1,6 @@
 import "./globals.css";
+import AuthSessionProvider from "@/components/AuthSessionProvider";
+
 
 export default function RootLayout({
   children,
@@ -8,7 +10,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="font-sans bg-slate-50 text-slate-900">
-        {children}
+        <AuthSessionProvider>{children}</AuthSessionProvider>
       </body>
     </html>
   );
