@@ -257,7 +257,7 @@ export default function AdminReservations() {
                             </button>
 
                             <button
-                                onClick={() => deleteReservation(selected._id)}
+                                onClick={() => updateStatus(selected._id, "cancelled")}
                                 className="px-3 py-2 bg-red-600 text-white rounded"
                             >
                                 Annuler
