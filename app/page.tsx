@@ -713,30 +713,33 @@ export default function HomePage() {
                 )}
 
                 {/* Ligne bouton réserver + prix */}
-                {/* Ligne bouton réserver + prix */}
                 <div className="mt-4 flex items-center justify-between">
-                  {/* Si pas loggué */}
-                  {!session ? (
+                  {/* Priorité : état de l'article */}
+                  {openCreation.sold ? (
+                    // ✅ Cas vendu
+                    <p className="text-sm font-medium text-slate-700">
+                      Cet article est déjà vendu.
+                    </p>
+                  ) : openCreation.reserved ? (
+                    // ✅ Cas déjà réservé
+                    <p className="text-sm font-medium text-red-600">
+                      Cet article est déjà réservé.
+                    </p>
+                  ) : !session ? (
+                    // ✅ Article dispo mais user non connecté
                     <button
                       onClick={() => signIn()}
                       className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
                     >
                       Se connecter pour réserver
                     </button>
-                  ) : openCreation.sold ? (
-                    // ✅ Cas vendu
-                    <p className="text-sm font-medium text-slate-700">
-                      Cet article est déjà vendu.
-                    </p>
                   ) : justReserved ? (
+                    // ✅ Article que l'utilisateur vient de réserver
                     <p className="text-sm font-medium text-green-600">
                       Article bien réservé ✔️
                     </p>
-                  ) : openCreation.reserved ? (
-                    <p className="text-sm font-medium text-red-600">
-                      Cet article est déjà réservé.
-                    </p>
                   ) : !reserveOpen ? (
+                    // ✅ User connecté, article dispo, formulaire fermé
                     <button
                       onClick={() => setReserveOpen(true)}
                       className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
@@ -744,6 +747,7 @@ export default function HomePage() {
                       Réserver cet article
                     </button>
                   ) : (
+                    // ✅ Formulaire ouvert
                     <span className="text-xs text-slate-500">Remplissez le formulaire</span>
                   )}
 
