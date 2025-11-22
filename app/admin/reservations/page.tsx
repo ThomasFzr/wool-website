@@ -164,13 +164,20 @@ export default function AdminReservations() {
 
             {/* Sidebar détails */}
             {selected && (
-                <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl p-6 border-l z-50 overflow-y-auto">
-                    <button
-                        className="mb-4 text-sm text-slate-600 hover:underline"
+                <>
+                    {/* Fond semi-transparent pour fermer au clic */}
+                    <div 
+                        className="fixed inset-0 bg-black/20 z-40"
                         onClick={() => setSelected(null)}
-                    >
-                        ← Retour
-                    </button>
+                    />
+                    
+                    <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl p-6 border-l z-50 overflow-y-auto">
+                        <button
+                            className="mb-4 text-sm text-slate-600 hover:underline"
+                            onClick={() => setSelected(null)}
+                        >
+                            ← Retour
+                        </button>
 
                     <h2 className="text-lg font-bold mb-2">{selected.name}</h2>
                     <p className="text-sm text-slate-600">{selected.contact}</p>
@@ -196,7 +203,7 @@ export default function AdminReservations() {
                     {selected.creationId && (
                         <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
                             <p className="text-xs uppercase font-semibold text-slate-500">
-                                Article réservé
+                                Article
                             </p>
 
                             <div className="flex gap-3">
@@ -274,6 +281,7 @@ export default function AdminReservations() {
                         </div>
                     )}
                 </div>
+                </>
             )}
         </main>
     );
