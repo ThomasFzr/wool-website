@@ -54,13 +54,6 @@ export default async function AccountPage() {
             {user.email && (
               <p className="text-sm text-slate-600">{user.email}</p>
             )}
-
-            <p className="text-xs text-slate-500">
-              Connexion via{" "}
-              <span className="font-medium text-slate-700">
-                {provider === "google" ? "Google" : "Email / mot de passe"}
-              </span>
-            </p>
           </div>
         </section>
 
