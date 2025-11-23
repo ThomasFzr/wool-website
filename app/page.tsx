@@ -53,6 +53,8 @@ export default function HomePage() {
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [swipeDeltaX, setSwipeDeltaX] = useState(0);
 
+  const [pendingReservations, setPendingReservations] = useState(0);
+
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -108,6 +110,25 @@ export default function HomePage() {
 
     load();
   }, []);
+
+  // Charger le nombre de réservations en attente si admin
+  useEffect(() => {
+    async function loadPendingReservations() {
+      if (session?.user?.role === "admin") {
+        try {
+          const res = await fetch("/api/admin/reservations/count");
+          if (res.ok) {
+            const data = await res.json();
+            setPendingReservations(data.pending || 0);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    }
+
+    loadPendingReservations();
+  }, [session]);
 
   function getImages(c: Creation): string[] {
     if (c.images && c.images.length > 0) return c.images;
@@ -330,8 +351,13 @@ export default function HomePage() {
               </span>
 
               {/* TEXTE À CÔTÉ DU ROND */}
-              <span className="hidden md:inline">
-                {session ? "Mon compte" : "Se connecter"}
+              <span className="hidden md:flex items-center gap-1.5">
+                <span>{session ? "Mon compte" : "Se connecter"}</span>
+                {session?.user?.role === "admin" && pendingReservations > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                    {pendingReservations}
+                  </span>
+                )}
               </span>
             </button>
 
@@ -354,6 +380,24 @@ export default function HomePage() {
                 >
                   Mes réservations
                 </a>
+
+                {session.user?.role === "admin" && (
+                  <>
+                    <div className="border-t border-slate-200" />
+                    <a
+                      href="/admin"
+                      className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium text-slate-900 hover:bg-slate-100"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <span>Administration</span>
+                      {pendingReservations > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                          {pendingReservations}
+                        </span>
+                      )}
+                    </a>
+                  </>
+                )}
 
                 <div className="border-t border-slate-200" />
 
