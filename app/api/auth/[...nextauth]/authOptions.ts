@@ -4,7 +4,10 @@ import Google from "next-auth/providers/google";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "@/lib/mongodb";
 import bcrypt from "bcryptjs";
-import User, { IUserDocument } from "@/models/User"; export const authOptions: NextAuthOptions = {
+import User, { IUserDocument } from "@/models/User";
+import { connectToDatabase } from "@/lib/db";
+
+export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   session: {
     strategy: "jwt",
@@ -24,6 +27,7 @@ import User, { IUserDocument } from "@/models/User"; export const authOptions: N
       async authorize(credentials) {
         if (!credentials?.email || !credentials.password) return null;
 
+        await connectToDatabase();
         const user = await User.findOne({ email: credentials.email })
           .lean<IUserDocument | null>();
 
@@ -36,6 +40,7 @@ import User, { IUserDocument } from "@/models/User"; export const authOptions: N
           id: user._id.toString(),
           email: user.email,
           name: user.name ?? undefined,
+          role: user.role,
         };
       }
     }),
@@ -44,16 +49,42 @@ import User, { IUserDocument } from "@/models/User"; export const authOptions: N
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, account, user }) {
-      if (account) {
-        (token as any).provider = account.provider;
+    async jwt({ token, account, user, trigger }) {
+      // Lors de la connexion initiale
+      if (user) {
+        token.userId = user.id;
+        token.role = user.role ?? "user";
       }
+      
+      if (account) {
+        token.provider = account.provider;
+        
+        // Si connexion via Google, récupérer le rôle depuis la DB
+        if (account.provider === "google" && user?.email) {
+          await connectToDatabase();
+          const dbUser = await User.findOne({ email: user.email }).lean<IUserDocument | null>();
+          if (dbUser) {
+            token.role = dbUser.role;
+            token.userId = dbUser._id.toString();
+          }
+        }
+      }
+      
       return token;
     },
     async session({ session, token }) {
-      if ((token as any)?.provider) {
-        (session.user as any).provider = (token as any).provider;
+      if (token?.provider) {
+        session.provider = token.provider;
       }
+      if (token?.userId) {
+        session.user.id = token.userId as string;
+      }
+      if (token?.role) {
+        session.user.role = token.role as "user" | "admin";
+      } else {
+        session.user.role = "user";
+      }
+      
       return session;
     }
   },

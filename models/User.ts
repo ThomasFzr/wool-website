@@ -8,6 +8,7 @@ export interface IUser {
   email: string;
   provider: string;
   password?: string | null;
+  role: "user" | "admin";
 }
 
 //
@@ -24,6 +25,7 @@ const userSchema = new Schema<IUserDocument>(
     email: { type: String, required: true, unique: true },
     provider: { type: String, required: true },
     password: { type: String }, // utilisée avec Credentials
+    role: { type: String, enum: ["user", "admin"], default: "user" },
   },
   { timestamps: true }
 );

@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import "@/models/Creation";
+import { checkAdminAuth } from "@/lib/auth";
 
 export async function GET(req: Request) {
     try {
+        const session = await checkAdminAuth();
+        if (!session) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
         await connectToDatabase();
 
         const { searchParams } = new URL(req.url);

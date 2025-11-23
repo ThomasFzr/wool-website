@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 import { sendEmail } from "@/lib/sendEmail";
+import { checkAdminAuth } from "@/lib/auth";
 
 type AdminRouteContext = {
   params: Promise<{ id: string }>;
@@ -11,6 +12,11 @@ type AdminRouteContext = {
 
 export async function PATCH(req: Request, context: AdminRouteContext) {
   try {
+    const session = await checkAdminAuth();
+    if (!session) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     await connectToDatabase();
     const body = await req.json();
 
@@ -237,6 +243,11 @@ export async function DELETE(
   context: AdminRouteContext
 ) {
   try {
+    const session = await checkAdminAuth();
+    if (!session) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     await connectToDatabase();
 
     const { id } = await context.params; // ✅ ici aussi

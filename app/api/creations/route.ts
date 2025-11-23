@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
+import { checkAdminAuth } from "@/lib/auth";
 
 export async function GET() {
   try {
@@ -15,10 +16,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    const headerPassword = req.headers.get("x-admin-password");
-
-    if (!adminPassword || headerPassword !== adminPassword) {
+    const session = await checkAdminAuth();
+    if (!session) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 

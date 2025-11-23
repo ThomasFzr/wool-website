@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
+import { checkAdminAuth } from "@/lib/auth";
 
 async function checkAuth(req: NextRequest) {
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const headerPassword = req.headers.get("x-admin-password");
-
-  if (!adminPassword || headerPassword !== adminPassword) {
-    return false;
-  }
-  return true;
+  const session = await checkAdminAuth();
+  return session !== null;
 }
 
 export async function PATCH(
