@@ -6,16 +6,13 @@ import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 import { sendEmail } from "@/lib/sendEmail";
 
-type RouteContext = {
-  params: Promise<{ id: string }>;
-};
-
-export async function PATCH(req: NextRequest, context: RouteContext) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    // 👇 Nouveauté Next 15 : params est async
-    const { id } = await context.params;
+    const { id } = await params;
 
-    // 🔐 Vérifier la session
     const session = await getServerSession(authOptions);
     if (!session || !session.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,11 +22,8 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
     const { reason } = await req.json();
 
-    // On récupère la réservation de l'utilisateur courant
-    const reservation = await Reservation.findOne({
-      _id: id,
-      userId: (session.user as any).id, // tu as déjà stocké userId dans la réservation
-    }).populate("creationId");
+    // 1️⃣ On récupère la réservation par ID
+    const reservation = await Reservation.findById(id).populate("creationId");
 
     if (!reservation) {
       return NextResponse.json(
@@ -38,7 +32,20 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    // Si déjà validée côté admin → on ne laisse plus annuler
+    // 2️⃣ Vérif qu'elle appartient bien à l'utilisateur connecté
+    const sessionUserId = (session.user as any).id;
+    const sameUserId =
+      reservation.userId &&
+      reservation.userId.toString() === String(sessionUserId);
+
+    const sameEmail = reservation.contact === session.user.email;
+
+    if (!sameUserId && !sameEmail) {
+      // l'utilisateur essaie d'annuler la réservation de quelqu'un d'autre
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // 3️⃣ Si déjà validée → on ne laisse plus annuler
     if (reservation.status === "validated") {
       return NextResponse.json(
         { error: "Cette commande est déjà validée, impossible de l'annuler." },
@@ -46,12 +53,12 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    // 📝 On marque la réservation comme annulée + raison (facultative)
+    // 4️⃣ On annule + raison
     reservation.status = "cancelled";
     (reservation as any).cancelReason = reason ?? "";
     await reservation.save();
 
-    // 🔓 Si la création n'est pas vendue, on la libère pour quelqu'un d'autre
+    // 5️⃣ On libère la création si elle n'est pas vendue
     const creation: any = reservation.creationId;
     if (creation && !creation.sold) {
       await Creation.findByIdAndUpdate(creation._id, {
@@ -65,25 +72,20 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       });
     }
 
-    // -----------------------------
-    //  📧 EMAILS D'ANNULATION
-    // -----------------------------
+    // 6️⃣ Emails (inchangé, j’utilise ta logique)
     if (creation) {
-      const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL;
-
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
       const productImage =
         (Array.isArray(creation.images) && creation.images.length > 0
           ? creation.images[0]
           : creation.imageUrl) ?? null;
-
       const priceLabel =
         creation.price != null ? `${creation.price} €` : "Prix sur demande";
 
       const displayedReason =
         (reason && reason.trim().length > 0) ||
-        ((reservation as any).cancelReason &&
-          (reservation as any).cancelReason.trim().length > 0)
+          ((reservation as any).cancelReason &&
+            (reservation as any).cancelReason.trim().length > 0)
           ? (reason || (reservation as any).cancelReason)
           : "Aucune raison précisée.";
 
@@ -101,18 +103,16 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
             </p>
 
             <div style="margin-top:16px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
-              ${
-                productImage
-                  ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                  : ""
-              }
+              ${productImage
+            ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+            : ""
+          }
               <div style="font-size:13px;flex:1;">
                 <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                ${
-                  creation.color
-                    ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                    : ""
-                }
+                ${creation.color
+            ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+            : ""
+          }
                 <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
               </div>
             </div>
@@ -149,18 +149,16 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
               </p>
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
-                ${
-                  productImage
-                    ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                    : ""
-                }
+                ${productImage
+              ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+              : ""
+            }
                 <div style="font-size:13px;flex:1;">
                   <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                  ${
-                    creation.color
-                      ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                      : ""
-                  }
+                  ${creation.color
+              ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+              : ""
+            }
                   <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
                 </div>
               </div>
