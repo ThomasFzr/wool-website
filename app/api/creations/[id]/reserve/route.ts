@@ -61,14 +61,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const priceLabel =
       creation.price != null ? `${creation.price} €` : "Prix sur demande";
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wool-website.vercel.app";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
     /* ---------------------------
        📧 EMAIL À L'ACHETEUR (beau HTML)
     ----------------------------*/
     await sendEmail({
       to: contact,
-      subject: "✅ Votre réservation chez Maman-Laine est enregistrée",
+      subject: "✅ Votre réservation chez MailleMum est enregistrée",
       html: `
       <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
         <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">

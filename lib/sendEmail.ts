@@ -2,19 +2,39 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function sendEmail({ to, subject, html }: {
+export async function sendEmail({
+  to,
+  subject,
+  html,
+}: {
   to: string;
   subject: string;
   html: string;
 }) {
+
   try {
-    await resend.emails.send({
-      from: "Maman-Laine <onboarding@resend.dev>",
+    const result = await resend.emails.send({
+      from: process.env.EMAIL_FROM || "",
       to,
       subject,
       html,
     });
-  } catch (err) {
-    console.error("Erreur email :", err);
+
+
+    const id = (result as any)?.data?.id;
+    const error = (result as any)?.error;
+
+    if (error) {
+      console.error("[sendEmail] RESEND ERROR", error);
+    }
+
+    return result;
+  } catch (err: any) {
+    console.error("[sendEmail] ERROR", {
+      to,
+      subject,
+      err: err?.message || err,
+    });
+    throw err;
   }
 }

@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     // -----------------------------
     if (creation) {
       const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "https://wool-website.vercel.app";
+        process.env.NEXT_PUBLIC_APP_URL;
 
       const productImage =
         (Array.isArray(creation.images) && creation.images.length > 0
