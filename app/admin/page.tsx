@@ -92,12 +92,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (status === "loading") return;
     
-    if (status === "unauthenticated") {
-      router.push("/login?callbackUrl=/admin");
-      return;
-    }
-
-    if (session?.user?.role !== "admin") {
+    if (status === "unauthenticated" || session?.user?.role !== "admin") {
       router.push("/");
       return;
     }
