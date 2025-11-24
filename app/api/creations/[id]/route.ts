@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
+import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
 
@@ -139,7 +140,10 @@ export async function DELETE(
       }
     }
 
-    // 3) Enfin, supprimer la création de la base
+    // 3) Supprimer toutes les réservations liées à cette création
+    await Reservation.deleteMany({ creationId: id });
+
+    // 4) Enfin, supprimer la création de la base
     await Creation.findByIdAndDelete(id);
 
     return new NextResponse(null, { status: 204 });
