@@ -44,6 +44,8 @@ function AdminCreationsContent() {
   const [touchStartIndex, setTouchStartIndex] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [listDragIndex, setListDragIndex] = useState<number | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
   
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -321,6 +323,54 @@ function AdminCreationsContent() {
     setDragIndex(null);
   }
 
+  // Gestion du drag & drop pour la liste des créations
+  function handleListDragStart(index: number) {
+    setListDragIndex(index);
+  }
+
+  function handleListDragOver(e: React.DragEvent<HTMLDivElement>, index: number) {
+    e.preventDefault();
+    if (listDragIndex === null || listDragIndex === index) return;
+
+    setCreations((prev) => {
+      const newList = [...prev];
+      const [movedItem] = newList.splice(listDragIndex, 1);
+      newList.splice(index, 0, movedItem);
+      return newList;
+    });
+
+    setListDragIndex(index);
+  }
+
+  function handleListDragEnd() {
+    setListDragIndex(null);
+  }
+
+  async function saveCreationOrder() {
+    try {
+      setSavingOrder(true);
+      const orderedIds = creations.map((c) => c._id);
+      
+      const res = await fetch("/api/creations/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur lors de la sauvegarde");
+      }
+
+      setMessage("Ordre d'affichage sauvegardé ✔️");
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      console.error(err);
+      setMessage("Erreur lors de la sauvegarde de l'ordre.");
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
   if (status === "loading") {
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -385,9 +435,21 @@ function AdminCreationsContent() {
 
           {/* Liste des créations */}
           <Card className="p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">
-              📦 Créations existantes ({creations.length})
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                📦 Créations existantes ({creations.length})
+              </h2>
+              {creations.length > 1 && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={saveCreationOrder}
+                  disabled={savingOrder}
+                >
+                  {savingOrder ? "⏳ Sauvegarde..." : "💾 Sauvegarder l'ordre"}
+                </Button>
+              )}
+            </div>
 
             {loadingList && (
               <p className="text-sm text-slate-500">Chargement...</p>
@@ -399,18 +461,36 @@ function AdminCreationsContent() {
               </p>
             )}
 
+            {creations.length > 1 && (
+              <p className="text-xs text-slate-500 mb-3">
+                💡 Glissez les créations pour réorganiser l&apos;ordre d&apos;affichage sur la page d&apos;accueil
+              </p>
+            )}
+
             <div className="space-y-2">
-              {creations.map((c) => (
+              {creations.map((c, index) => (
                 <div
                   key={c._id}
-                  className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                  draggable
+                  onDragStart={() => handleListDragStart(index)}
+                  onDragOver={(e) => handleListDragOver(e, index)}
+                  onDragEnd={handleListDragEnd}
+                  className={`flex flex-col gap-3 rounded-xl border bg-white p-3 transition hover:shadow-sm sm:flex-row sm:items-center sm:justify-between cursor-move ${
+                    listDragIndex === index
+                      ? "border-blue-500 ring-2 ring-blue-200"
+                      : "border-slate-200"
+                  }`}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-600">
+                      {index + 1}
+                    </div>
                     {c.imageUrl && (
                       <img
                         src={c.imageUrl}
                         alt={c.title}
                         className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                        draggable={false}
                       />
                     )}
                     <div className="min-w-0 flex-1">

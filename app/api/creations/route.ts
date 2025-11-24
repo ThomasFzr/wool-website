@@ -6,7 +6,7 @@ import { checkAdminAuth } from "@/lib/auth";
 export async function GET() {
   try {
     await connectToDatabase();
-    const creations = await Creation.find().sort({ createdAt: -1 }).lean();
+    const creations = await Creation.find().sort({ displayOrder: -1, createdAt: -1 }).lean();
     return NextResponse.json(creations);
   } catch (err) {
     console.error(err);
