@@ -49,6 +49,7 @@ export default function AdminPage() {
   const [loadingList, setLoadingList] = useState(false);
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [touchStartIndex, setTouchStartIndex] = useState<number | null>(null);
 
   const [settings, setSettings] = useState({
     title: "",
@@ -366,6 +367,48 @@ export default function AdminPage() {
     setDragIndex(null);
   }
 
+  function handleTouchStart(index: number) {
+    setTouchStartIndex(index);
+    setDragIndex(index);
+  }
+
+  function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (touchStartIndex === null) return;
+
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    
+    if (!element) return;
+
+    const imageContainer = element.closest('[data-image-index]');
+    if (!imageContainer) return;
+
+    const targetIndex = Number(imageContainer.getAttribute('data-image-index'));
+    
+    if (targetIndex !== touchStartIndex && targetIndex >= 0) {
+      setForm((f) => {
+        const imagesArr = [...f.images];
+        const publicIdsArr = [...f.imagePublicIds];
+
+        const [movedImage] = imagesArr.splice(touchStartIndex, 1);
+        const [movedPublicId] = publicIdsArr.splice(touchStartIndex, 1);
+
+        imagesArr.splice(targetIndex, 0, movedImage);
+        publicIdsArr.splice(targetIndex, 0, movedPublicId);
+
+        return { ...f, images: imagesArr, imagePublicIds: publicIdsArr };
+      });
+
+      setTouchStartIndex(targetIndex);
+      setDragIndex(targetIndex);
+    }
+  }
+
+  function handleTouchEnd() {
+    setTouchStartIndex(null);
+    setDragIndex(null);
+  }
+
   // Afficher un loader pendant la vérification de la session
   if (status === "loading") {
     return (
@@ -590,10 +633,14 @@ export default function AdminPage() {
                         {form.images.map((url, i) => (
                           <div
                             key={i}
+                            data-image-index={i}
                             draggable
                             onDragStart={() => handleDragStart(i)}
                             onDragOver={(e) => handleDragOver(e, i)}
                             onDragEnd={handleDragEnd}
+                            onTouchStart={() => handleTouchStart(i)}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
                             style={{
                               position: "relative",
                               width: 80,
@@ -605,6 +652,7 @@ export default function AdminPage() {
                                   ? "2px dashed #4f46e5"
                                   : "1px solid #e2e8f0",
                               boxSizing: "border-box",
+                              touchAction: "none",
                             }}
                           >
                             <button
