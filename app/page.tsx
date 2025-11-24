@@ -39,7 +39,9 @@ export default function HomePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
+  const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
 
   // Pinch-to-zoom state
   const [scale, setScale] = useState(1);
@@ -56,11 +58,15 @@ export default function HomePage() {
   const [pendingReservations, setPendingReservations] = useState(0);
 
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const colorDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setAccountMenuOpen(false);
+      }
+      if (colorDropdownRef.current && !colorDropdownRef.current.contains(e.target as Node)) {
+        setColorDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -307,10 +313,17 @@ export default function HomePage() {
 
   const availableColors = [...sortedColors];
 
-  const filteredCreations =
-    selectedColor && selectedColor !== "all"
-      ? creations.filter((c) => c.color === selectedColor)
-      : creations;
+  const filteredCreations = creations.filter((c) => {
+    // Filtre de disponibilité
+    if (showOnlyAvailable && (c.sold || c.reserved)) {
+      return false;
+    }
+    // Filtre de couleurs (si au moins une couleur est sélectionnée)
+    if (selectedColors.length > 0 && !selectedColors.includes(c.color || "")) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <main className="min-h-screen">
@@ -427,33 +440,69 @@ export default function HomePage() {
           </p>
         )}
 
-        {/* Filtres couleur */}
+        {/* Filtres */}
         {!loading && !error && availableColors.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-slate-600">Filtrer par couleur :</span>
-            <button
-              type="button"
-              onClick={() => setSelectedColor(null)}
-              className={`rounded-full border px-3 py-1 ${!selectedColor
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-700"
-                }`}
-            >
-              Toutes
-            </button>
-            {availableColors.map((color) => (
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            {/* Dropdown couleurs */}
+            <div className="relative" ref={colorDropdownRef}>
               <button
-                key={color}
                 type="button"
-                onClick={() => setSelectedColor(color)}
-                className={`rounded-full border px-3 py-1 ${selectedColor === color
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-700"
-                  }`}
+                onClick={() => setColorDropdownOpen(!colorDropdownOpen)}
+                className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                {color}
+                <span>Couleur{selectedColors.length > 0 && ` (${selectedColors.length})`}</span>
+                <span className={`transition-transform ${colorDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
               </button>
-            ))}
+
+              {colorDropdownOpen && (
+                <div className="absolute left-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg animate-fadeIn">
+                  <div className="max-h-64 overflow-y-auto p-2">
+                    {availableColors.map((color) => (
+                      <label
+                        key={color}
+                        className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedColors.includes(color)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedColors([...selectedColors, color]);
+                            } else {
+                              setSelectedColors(selectedColors.filter((c) => c !== color));
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                        />
+                        <span>{color}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedColors.length > 0 && (
+                    <div className="border-t border-slate-200 p-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedColors([])}
+                        className="w-full rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        Tout effacer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Filtre disponibilité */}
+            <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={showOnlyAvailable}
+                onChange={(e) => setShowOnlyAvailable(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+              />
+              <span>Disponibles uniquement</span>
+            </label>
           </div>
         )}
 
