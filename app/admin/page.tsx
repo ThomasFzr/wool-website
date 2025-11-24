@@ -152,7 +152,7 @@ function AdminContent() {
             </Link>
             <Link
               href="/admin/reservations"
-              className="relative inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+              className="relative inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200 transition"
               onClick={loadPendingReservations}
             >
               <span>📋 Réservations</span>
