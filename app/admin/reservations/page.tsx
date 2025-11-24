@@ -341,7 +341,7 @@ export default function AdminReservations() {
                                                 {selected.creationId.title}
                                             </p>
                                             {selected.creationId.price != null && (
-                                                <Badge variant="default" className="bg-slate-900 text-white">
+                                                <Badge variant="default" className="bg-slate-900 text-white whitespace-nowrap">
                                                     {selected.creationId.price} €
                                                 </Badge>
                                             )}
