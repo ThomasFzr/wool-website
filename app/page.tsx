@@ -164,13 +164,14 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen">
+      <Header
+        title={settings?.title}
+        subtitle={settings?.subtitle}
+        pendingReservations={pendingReservations}
+        newMessages={newMessages}
+      />
+      
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <Header
-          title={settings?.title}
-          subtitle={settings?.subtitle}
-          pendingReservations={pendingReservations}
-          newMessages={newMessages}
-        />
 
         {loading && (
           <p className="text-sm text-slate-500">Chargement des créations...</p>
