@@ -47,6 +47,8 @@ function AdminContent() {
   const [pendingReservations, setPendingReservations] = useState(0);
   const [newMessages, setNewMessages] = useState(0);
   const [activeTab, setActiveTab] = useState<"creations" | "settings">("creations");
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -259,6 +261,8 @@ function AdminContent() {
       color: "",
     });
     setEditingId(null);
+    setShowEditModal(false);
+    setShowCreateModal(false);
     loadCreations();
   }
 
@@ -274,11 +278,7 @@ function AdminContent() {
       color: c.color ?? "",
     });
     setMessage(null);
-
-    if (formRef.current) {
-      const top = formRef.current.getBoundingClientRect().top + window.scrollY;
-      window.scrollTo({ top: top - 80, behavior: "smooth" });
-    }
+    setShowEditModal(true);
   }
 
   async function handleDelete(id: string) {
@@ -320,6 +320,8 @@ function AdminContent() {
       color: "",
     });
     setMessage(null);
+    setShowEditModal(false);
+    setShowCreateModal(false);
   }
 
   function removeImage(index: number) {
@@ -493,155 +495,27 @@ function AdminContent() {
         {/* Tab Content: Créations */}
         {activeTab === "creations" && (
           <div className="space-y-6">
-            {/* Formulaire de création/édition */}
-            <Card className="p-6">
-              <div ref={formRef}>
-                <h2 className="text-lg font-semibold text-slate-900 mb-4">
-                  {editingId ? "✏️ Modifier une création" : "➕ Ajouter une création"}
-                </h2>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {/* Colonne gauche */}
-                    <div className="space-y-4">
-                      <Input
-                        label="Titre *"
-                        placeholder="Ex : Snood rose poudré"
-                        value={form.title}
-                        onChange={(e) => setForm({ ...form, title: e.target.value })}
-                        required
-                      />
-
-                      <Textarea
-                        label="Description"
-                        placeholder="Détails, matière, pour qui..."
-                        value={form.description}
-                        onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        rows={4}
-                      />
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <Input
-                          label="Prix (€)"
-                          type="number"
-                          placeholder="25"
-                          value={form.price}
-                          onChange={(e) => setForm({ ...form, price: e.target.value })}
-                        />
-
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-slate-700">Couleur</label>
-                          <input
-                            list="color-options"
-                            placeholder="Rose poudré..."
-                            value={form.color}
-                            onChange={(e) => setForm({ ...form, color: e.target.value })}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                          />
-                          <datalist id="color-options">
-                            {colorOptions.map((color) => (
-                              <option key={color} value={color} />
-                            ))}
-                          </datalist>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Colonne droite - Images */}
-                    <div className="space-y-3">
-                      <label className="text-xs font-medium text-slate-700">Images</label>
-                      <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={handleImageChange}
-                          className="hidden"
-                          id="file-upload"
-                          disabled={uploading}
-                        />
-                        <label
-                          htmlFor="file-upload"
-                          className={`block cursor-pointer ${uploading ? 'opacity-50' : ''}`}
-                        >
-                          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-slate-200">
-                            📁
-                          </div>
-                          <p className="text-sm font-medium text-slate-700">
-                            {uploading ? "Upload en cours..." : "Cliquez pour ajouter des images"}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            ou glissez-déposez vos fichiers
-                          </p>
-                        </label>
-                      </div>
-
-                      {form.images.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-slate-700">
-                            {form.images.length} image{form.images.length > 1 ? "s" : ""} ajoutée{form.images.length > 1 ? "s" : ""}
-                          </p>
-                          <div className="grid grid-cols-4 gap-2">
-                            {form.images.map((url, i) => (
-                              <div
-                                key={i}
-                                data-image-index={i}
-                                draggable
-                                onDragStart={() => handleDragStart(i)}
-                                onDragOver={(e) => handleDragOver(e, i)}
-                                onDragEnd={handleDragEnd}
-                                onTouchStart={() => handleTouchStart(i)}
-                                onTouchMove={handleTouchMove}
-                                onTouchEnd={handleTouchEnd}
-                                className={`relative aspect-square cursor-move rounded-lg overflow-hidden ${
-                                  dragIndex === i ? "ring-2 ring-blue-500" : "ring-1 ring-slate-200"
-                                }`}
-                                style={{ touchAction: "none" }}
-                              >
-                                <button
-                                  onClick={() => removeImage(i)}
-                                  type="button"
-                                  className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600"
-                                >
-                                  ✕
-                                </button>
-                                {i === 0 && (
-                                  <div className="absolute left-1 top-1 z-10 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                                    Couverture
-                                  </div>
-                                )}
-                                <img
-                                  src={url}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                  draggable={false}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                          <p className="text-xs text-slate-500">
-                            💡 Glissez les images pour les réordonner
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Boutons d'action */}
-                  <div className="flex flex-wrap gap-2 pt-4 border-t">
-                    <Button type="submit" disabled={uploading || !form.title}>
-                      {uploading ? "⏳ Upload..." : editingId ? "💾 Mettre à jour" : "➕ Créer"}
-                    </Button>
-
-                    {editingId && (
-                      <Button type="button" variant="secondary" onClick={handleCancelEdit}>
-                        Annuler
-                      </Button>
-                    )}
-                  </div>
-                </form>
-              </div>
-            </Card>
+            {/* Bouton d'ajout */}
+            <div className="flex justify-end">
+              <Button
+                onClick={() => {
+                  setEditingId(null);
+                  setForm({
+                    title: "",
+                    description: "",
+                    imageUrl: "",
+                    images: [],
+                    imagePublicIds: [],
+                    price: "",
+                    color: "",
+                  });
+                  setShowCreateModal(true);
+                }}
+                className="bg-slate-900 hover:bg-slate-800"
+              >
+                ➕ Ajouter une création
+              </Button>
+            </div>
 
             {/* Liste des créations */}
             <Card className="p-6">
@@ -748,6 +622,324 @@ function AdminContent() {
           </Card>
         )}
       </div>
+
+      {/* Modale d'édition */}
+      {showEditModal && (
+        <>
+          {/* Fond semi-transparent */}
+          <div 
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 animate-fadeIn"
+            onClick={handleCancelEdit}
+          />
+          
+          <div className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white shadow-2xl p-6 z-50 overflow-y-auto animate-slideInRight">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-slate-900">✏️ Modifier la création</h2>
+              <button
+                onClick={handleCancelEdit}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 text-slate-600"
+                aria-label="Fermer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulaire d'édition */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                label="Titre *"
+                placeholder="Ex : Snood rose poudré"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+              />
+
+              <Textarea
+                label="Description"
+                placeholder="Détails, matière, pour qui..."
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={4}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Prix (€)"
+                  type="number"
+                  placeholder="25"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Couleur</label>
+                  <input
+                    list="color-options-modal"
+                    placeholder="Rose poudré..."
+                    value={form.color}
+                    onChange={(e) => setForm({ ...form, color: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                  />
+                  <datalist id="color-options-modal">
+                    {colorOptions.map((color) => (
+                      <option key={color} value={color} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Images */}
+              <div className="space-y-3">
+                <label className="text-xs font-medium text-slate-700">Images</label>
+                <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageChange}
+                    className="hidden"
+                    id="file-upload-modal"
+                    disabled={uploading}
+                  />
+                  <label
+                    htmlFor="file-upload-modal"
+                    className={`block cursor-pointer ${uploading ? 'opacity-50' : ''}`}
+                  >
+                    <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-slate-200">
+                      📁
+                    </div>
+                    <p className="text-sm font-medium text-slate-700">
+                      {uploading ? "Upload en cours..." : "Cliquez pour ajouter des images"}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      ou glissez-déposez vos fichiers
+                    </p>
+                  </label>
+                </div>
+
+                {form.images.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-700">
+                      {form.images.length} image{form.images.length > 1 ? "s" : ""} ajoutée{form.images.length > 1 ? "s" : ""}
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {form.images.map((url, i) => (
+                        <div
+                          key={i}
+                          data-image-index={i}
+                          draggable
+                          onDragStart={() => handleDragStart(i)}
+                          onDragOver={(e) => handleDragOver(e, i)}
+                          onDragEnd={handleDragEnd}
+                          onTouchStart={() => handleTouchStart(i)}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
+                          className={`relative aspect-square cursor-move rounded-lg overflow-hidden ${
+                            dragIndex === i ? "ring-2 ring-blue-500" : "ring-1 ring-slate-200"
+                          }`}
+                          style={{ touchAction: "none" }}
+                        >
+                          <button
+                            onClick={() => removeImage(i)}
+                            type="button"
+                            className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600"
+                          >
+                            ✕
+                          </button>
+                          {i === 0 && (
+                            <div className="absolute left-1 top-1 z-10 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                              Couverture
+                            </div>
+                          )}
+                          <img
+                            src={url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            draggable={false}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      💡 Glissez les images pour les réordonner
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Boutons */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button type="submit" disabled={uploading || !form.title} className="flex-1">
+                  {uploading ? "⏳ Upload..." : "💾 Mettre à jour"}
+                </Button>
+                <Button type="button" variant="secondary" onClick={handleCancelEdit}>
+                  Annuler
+                </Button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* Modale de création */}
+      {showCreateModal && (
+        <>
+          {/* Fond semi-transparent */}
+          <div 
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 animate-fadeIn"
+            onClick={handleCancelEdit}
+          />
+          
+          <div className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white shadow-2xl p-6 z-50 overflow-y-auto animate-slideInRight">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-slate-900">➕ Ajouter une création</h2>
+              <button
+                onClick={handleCancelEdit}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 text-slate-600"
+                aria-label="Fermer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulaire de création */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                label="Titre *"
+                placeholder="Ex : Snood rose poudré"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+              />
+
+              <Textarea
+                label="Description"
+                placeholder="Détails, matière, pour qui..."
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={4}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Prix (€)"
+                  type="number"
+                  placeholder="25"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Couleur</label>
+                  <input
+                    list="color-options-create"
+                    placeholder="Rose poudré..."
+                    value={form.color}
+                    onChange={(e) => setForm({ ...form, color: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                  />
+                  <datalist id="color-options-create">
+                    {colorOptions.map((color) => (
+                      <option key={color} value={color} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Images */}
+              <div className="space-y-3">
+                <label className="text-xs font-medium text-slate-700">Images</label>
+                <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageChange}
+                    className="hidden"
+                    id="file-upload-create"
+                    disabled={uploading}
+                  />
+                  <label
+                    htmlFor="file-upload-create"
+                    className={`block cursor-pointer ${uploading ? 'opacity-50' : ''}`}
+                  >
+                    <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-slate-200">
+                      📁
+                    </div>
+                    <p className="text-sm font-medium text-slate-700">
+                      {uploading ? "Upload en cours..." : "Cliquez pour ajouter des images"}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      ou glissez-déposez vos fichiers
+                    </p>
+                  </label>
+                </div>
+
+                {form.images.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-700">
+                      {form.images.length} image{form.images.length > 1 ? "s" : ""} ajoutée{form.images.length > 1 ? "s" : ""}
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {form.images.map((url, i) => (
+                        <div
+                          key={i}
+                          data-image-index={i}
+                          draggable
+                          onDragStart={() => handleDragStart(i)}
+                          onDragOver={(e) => handleDragOver(e, i)}
+                          onDragEnd={handleDragEnd}
+                          onTouchStart={() => handleTouchStart(i)}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
+                          className={`relative aspect-square cursor-move rounded-lg overflow-hidden ${
+                            dragIndex === i ? "ring-2 ring-blue-500" : "ring-1 ring-slate-200"
+                          }`}
+                          style={{ touchAction: "none" }}
+                        >
+                          <button
+                            onClick={() => removeImage(i)}
+                            type="button"
+                            className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600"
+                          >
+                            ✕
+                          </button>
+                          {i === 0 && (
+                            <div className="absolute left-1 top-1 z-10 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                              Couverture
+                            </div>
+                          )}
+                          <img
+                            src={url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            draggable={false}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      💡 Glissez les images pour les réordonner
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Boutons */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button type="submit" disabled={uploading || !form.title} className="flex-1">
+                  {uploading ? "⏳ Upload..." : "➕ Créer"}
+                </Button>
+                <Button type="button" variant="secondary" onClick={handleCancelEdit}>
+                  Annuler
+                </Button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
     </main>
   );
 }
