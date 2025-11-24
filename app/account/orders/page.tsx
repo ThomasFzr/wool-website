@@ -89,18 +89,18 @@ export default function OrdersPage() {
     }
   }
 
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      window.location.href = `/login?callbackUrl=${encodeURIComponent("/account/orders")}`;
+    }
+  }, [status]);
+
   if (status === "loading") {
     return <p className="p-8 text-sm text-slate-500">Chargement...</p>;
   }
 
   if (!session) {
-    return (
-      <main className="p-8 max-w-3xl mx-auto">
-        <p className="text-sm text-slate-600">
-          Vous devez être connecté pour voir vos réservations.
-        </p>
-      </main>
-    );
+    return null;
   }
 
   return (
