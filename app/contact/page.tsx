@@ -17,21 +17,39 @@ function ContactForm() {
     email: session?.user?.email || "",
     subject: creationId ? "Question sur une création" : "",
     message: "",
+    website: "", // Honeypot
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [formStartTime] = useState(Date.now());
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
 
+    // Protection honeypot
+    if (form.website) {
+      setMessage({ type: "error", text: "Soumission invalide." });
+      setLoading(false);
+      return;
+    }
+
+    // Protection timing (minimum 2 secondes)
+    const timeTaken = Date.now() - formStartTime;
+    if (timeTaken < 2000) {
+      setMessage({ type: "error", text: "Veuillez remplir le formulaire plus attentivement." });
+      setLoading(false);
+      return;
+    }
+
     try {
+      const { website, ...formData } = form;
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          ...formData,
           creationId: creationId || null,
         }),
       });
@@ -53,6 +71,7 @@ function ContactForm() {
           email: session?.user?.email || "",
           subject: "",
           message: "",
+          website: "",
         });
         if (!creationId) {
           router.push("/");
@@ -119,6 +138,18 @@ function ContactForm() {
               value={form.subject}
               onChange={(e) => setForm({ ...form, subject: e.target.value })}
               required
+            />
+
+            {/* Honeypot - champ invisible pour les bots */}
+            <input
+              type="text"
+              name="website"
+              value={form.website}
+              onChange={(e) => setForm({ ...form, website: e.target.value })}
+              autoComplete="off"
+              tabIndex={-1}
+              style={{ position: "absolute", left: "-9999px" }}
+              aria-hidden="true"
             />
 
             <div className="space-y-1">
