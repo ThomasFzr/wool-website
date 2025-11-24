@@ -374,7 +374,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
           </div>
 
           {creation.price != null && (
-            <Badge variant="default" className="text-sm font-semibold py-2 px-4 bg-slate-900 text-white">
+            <Badge variant="default" className="text-sm font-semibold py-2 whitespace-nowrap px-4 bg-slate-900 text-white">
               {creation.price} €
             </Badge>
           )}
