@@ -11,9 +11,10 @@ interface CreationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onReserve?: (creation: Creation) => Promise<void>;
+  hideActions?: boolean;
 }
 
-export function CreationModal({ creation, isOpen, onClose, onReserve }: CreationModalProps) {
+export function CreationModal({ creation, isOpen, onClose, onReserve, hideActions = false }: CreationModalProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -334,47 +335,49 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
         )}
 
         <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {justReserved ? (
-              <p className="text-sm font-medium text-green-600">
-                Article bien réservé ✔️
-              </p>
-            ) : creation.sold ? (
-              <p className="text-sm font-medium text-slate-700">
-                Cet article est déjà vendu.
-              </p>
-            ) : creation.reserved ? (
-              <p className="text-sm font-medium text-red-600">
-                Cet article est déjà réservé.
-              </p>
-            ) : !session ? (
-              <Button size="sm" onClick={() => signIn()}>
-                Se connecter pour réserver
-              </Button>
-            ) : (
-              <Button 
-                size="sm" 
-                onClick={handleReserve}
-                disabled={reserveLoading}
-              >
-                {reserveLoading ? "Réservation..." : "Réserver"}
-              </Button>
-            )}
+          {!hideActions && (
+            <div className="flex items-center gap-2">
+              {justReserved ? (
+                <p className="text-sm font-medium text-green-600">
+                  Article bien réservé ✔️
+                </p>
+              ) : creation.sold ? (
+                <p className="text-sm font-medium text-slate-700">
+                  Cet article est déjà vendu.
+                </p>
+              ) : creation.reserved ? (
+                <p className="text-sm font-medium text-red-600">
+                  Cet article est déjà réservé.
+                </p>
+              ) : !session ? (
+                <Button size="sm" onClick={() => signIn()}>
+                  Se connecter pour réserver
+                </Button>
+              ) : (
+                <Button 
+                  size="sm" 
+                  onClick={handleReserve}
+                  disabled={reserveLoading}
+                >
+                  {reserveLoading ? "Réservation..." : "Réserver"}
+                </Button>
+              )}
 
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                onClose();
-                router.push(`/contact?creation=${creation._id}`);
-              }}
-            >
-              📧 Contacter
-            </Button>
-          </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  onClose();
+                  router.push(`/contact?creation=${creation._id}`);
+                }}
+              >
+                📧 Contacter
+              </Button>
+            </div>
+          )}
 
           {creation.price != null && (
-            <Badge variant="default" className="text-sm font-semibold py-2 whitespace-nowrap px-4 bg-slate-900 text-white">
+            <Badge variant="default" className={`text-sm font-semibold py-2 whitespace-nowrap px-4 bg-slate-900 text-white ${hideActions ? 'ml-auto' : ''}`}>
               {creation.price} €
             </Badge>
           )}
