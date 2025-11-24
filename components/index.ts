@@ -12,7 +12,7 @@ export { CreationModal } from "./CreationModal";
 export { ReservationCard } from "./ReservationCard";
 export { Filters } from "./Filters";
 export { LogoutButton } from "./LogoutButton";
-export { AuthSessionProvider } from "./AuthSessionProvider";
+export { default as AuthSessionProvider } from "./AuthSessionProvider";
 
 // Types
 export type { Creation } from "./CreationCard";
