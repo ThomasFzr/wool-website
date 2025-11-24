@@ -14,12 +14,13 @@ export default function LoginForm() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   // On affiche un message si NextAuth renvoie ?error=...
   useEffect(() => {
     const err = searchParams.get("error");
     if (err) {
-      setMessage("Erreur de connexion (Google). Réessayez ou utilisez l’email.");
+      setMessage("Erreur de connexion (Google). Réessayez ou utilisez l'email.");
     }
   }, [searchParams]);
 
@@ -50,7 +51,7 @@ export default function LoginForm() {
       return;
     }
 
-    router.push("/");
+    router.push(callbackUrl);
   }
 
   return (
@@ -118,10 +119,10 @@ export default function LoginForm() {
 
         <div className="mt-4 border-t pt-4">
           <button
-            type="button"  // 🔥 important
+            type="button"
             onClick={() =>
               signIn("google", {
-                callbackUrl: "/", // ou "/account" si tu préfères
+                callbackUrl,
               })
             }
             className="w-full rounded-full border px-3 py-2 text-sm"
