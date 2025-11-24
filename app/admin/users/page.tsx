@@ -377,14 +377,25 @@ export default function AdminUsersPage() {
                 </select>
               </div>
 
-              <Input
-                label={editingUser ? "Nouveau mot de passe (laisser vide pour ne pas changer)" : "Mot de passe"}
-                type="password"
-                placeholder="••••••••"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                required={!editingUser}
-              />
+              {/* Ne pas afficher le champ mot de passe pour les utilisateurs SSO */}
+              {(!editingUser || editingUser.provider === "credentials") && (
+                <Input
+                  label={editingUser ? "Nouveau mot de passe (laisser vide pour ne pas changer)" : "Mot de passe"}
+                  type="password"
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required={!editingUser}
+                />
+              )}
+              
+              {editingUser && editingUser.provider !== "credentials" && (
+                <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                  <p className="text-xs text-blue-800">
+                    ℹ️ Cet utilisateur utilise <strong>{editingUser.provider}</strong> pour se connecter. Le mot de passe ne peut pas être modifié.
+                  </p>
+                </div>
+              )}
 
               <Input
                 label="Téléphone"
