@@ -160,15 +160,6 @@ function ContactForm() {
             </div>
           </form>
         </Card>
-
-        <div className="mt-6 rounded-lg bg-slate-100 p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-2">
-            Autres moyens de contact
-          </h2>
-          <p className="text-sm text-slate-600">
-            📧 Email : <a href="mailto:maillemum@gmail.com" className="text-slate-900 font-medium hover:underline">maillemum@gmail.com</a>
-          </p>
-        </div>
       </div>
     </main>
   );
