@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Badge } from "@/components";
@@ -26,6 +26,7 @@ type Contact = {
 export default function AdminContactPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const detailsRef = useRef<HTMLDivElement>(null);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
@@ -215,6 +216,15 @@ export default function AdminContactPage() {
                     if (contact.status === "new") {
                       updateStatus(contact._id, "read");
                     }
+                    // Scroll vers les détails sur mobile
+                    if (detailsRef.current && window.innerWidth < 1024) {
+                      setTimeout(() => {
+                        detailsRef.current?.scrollIntoView({ 
+                          behavior: "smooth", 
+                          block: "start" 
+                        });
+                      }, 100);
+                    }
                   }}
                   className={`w-full text-left rounded-lg border p-3 transition ${
                     selectedContact?._id === contact._id
@@ -246,8 +256,9 @@ export default function AdminContactPage() {
           </Card>
 
           {/* Détails du message */}
-          <Card className="p-4 h-[calc(100vh-240px)] overflow-y-auto">
-            {selectedContact ? (
+          <div ref={detailsRef}>
+            <Card className="p-4 h-[calc(100vh-240px)] overflow-y-auto">
+              {selectedContact ? (
               <>
                 <div className="flex items-start justify-between mb-4">
                   <h2 className="text-lg font-semibold text-slate-900">
@@ -406,7 +417,8 @@ export default function AdminContactPage() {
                 </p>
               </div>
             )}
-          </Card>
+            </Card>
+          </div>
         </div>
       </div>
     </main>
