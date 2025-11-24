@@ -1,15 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import {
-  FormEvent,
-  useState,
-  ChangeEvent,
-  useEffect,
-  useRef,
-} from "react";
+import { FormEvent, useState, ChangeEvent, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { Button, Input, Textarea, Card, Badge } from "@/components";
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -29,7 +24,6 @@ export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // Formulaire d'édition / création
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -42,24 +36,17 @@ export default function AdminPage() {
 
   const [message, setMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-
-  // Liste des créations
   const [creations, setCreations] = useState<Creation[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(false);
-
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [touchStartIndex, setTouchStartIndex] = useState<number | null>(null);
-
-  const [settings, setSettings] = useState({
-    title: "",
-    subtitle: "",
-  });
+  const [settings, setSettings] = useState({ title: "", subtitle: "" });
   const [savingSettings, setSavingSettings] = useState(false);
-  const formRef = useRef<HTMLDivElement>(null);
-
-  // 🔴 nombre de réservations en attente
   const [pendingReservations, setPendingReservations] = useState(0);
+  const [activeTab, setActiveTab] = useState<"creations" | "settings">("creations");
+  
+  const formRef = useRef<HTMLDivElement>(null);
 
   const colorOptions = Array.from(
     new Set(
@@ -81,8 +68,7 @@ export default function AdminPage() {
         const s = await res.json();
         setSettings({
           title: s.title ?? "Les créations en laine de maman 🧶",
-          subtitle:
-            s.subtitle ?? "Clique sur une création pour voir toutes les photos.",
+          subtitle: s.subtitle ?? "Clique sur une création pour voir toutes les photos.",
         });
       } catch (err) {
         console.error(err);
@@ -91,17 +77,13 @@ export default function AdminPage() {
     loadSettings();
   }, []);
 
-  // Rediriger si pas admin
   useEffect(() => {
     if (status === "loading") return;
-
     if (status === "unauthenticated" || session?.user?.role !== "admin") {
       router.push("/");
-      return;
     }
   }, [session, status, router]);
 
-  // Charger les créations uniquement si admin
   useEffect(() => {
     if (session?.user?.role === "admin") {
       loadCreations();
@@ -141,9 +123,7 @@ export default function AdminPage() {
 
       const res = await fetch("/api/settings", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
 
@@ -152,7 +132,8 @@ export default function AdminPage() {
         return;
       }
 
-      setMessage("Texte de la page d'accueil enregistré ✔️");
+      setMessage("Paramètres enregistrés ✔️");
+      setTimeout(() => setMessage(null), 3000);
     } catch (err) {
       console.error(err);
       setMessage("Erreur serveur lors de l'enregistrement.");
@@ -187,24 +168,21 @@ export default function AdminPage() {
           { method: "POST", body: formData }
         );
 
-        if (!res.ok) {
-          throw new Error("Erreur Cloudinary");
-        }
+        if (!res.ok) throw new Error("Erreur Cloudinary");
 
         const data = await res.json();
         uploadedUrls.push(data.secure_url);
         uploadedPublicIds.push(data.public_id);
-
       }
 
       setForm((f) => ({
         ...f,
         images: [...f.images, ...uploadedUrls],
         imagePublicIds: [...f.imagePublicIds, ...uploadedPublicIds],
-
       }));
 
       setMessage("Images uploadées ✔️");
+      setTimeout(() => setMessage(null), 3000);
     } catch (err) {
       console.error(err);
       setMessage("Erreur lors de l'upload des images.");
@@ -227,16 +205,12 @@ export default function AdminPage() {
       color: form.color || undefined,
     };
 
-    const url = editingId
-      ? `/api/creations/${editingId}`
-      : "/api/creations";
+    const url = editingId ? `/api/creations/${editingId}` : "/api/creations";
     const method = editingId ? "PATCH" : "POST";
 
     const res = await fetch(url, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
@@ -246,8 +220,9 @@ export default function AdminPage() {
     }
 
     setMessage(editingId ? "Création mise à jour ✔️" : "Création ajoutée ✔️");
-    setForm((f) => ({
-      ...f,
+    setTimeout(() => setMessage(null), 3000);
+    
+    setForm({
       title: "",
       description: "",
       imageUrl: "",
@@ -255,30 +230,27 @@ export default function AdminPage() {
       imagePublicIds: [],
       price: "",
       color: "",
-    }));
+    });
     setEditingId(null);
     loadCreations();
   }
 
   function handleEditClick(c: Creation) {
     setEditingId(c._id);
-    setForm((f) => ({
-      ...f,
+    setForm({
       title: c.title ?? "",
       description: c.description ?? "",
+      imageUrl: "",
       images: c.images ?? (c.imageUrl ? [c.imageUrl] : []),
       price: c.price != null ? String(c.price) : "",
       imagePublicIds: c.imagePublicIds ?? [],
       color: c.color ?? "",
-    }));
+    });
     setMessage(null);
 
     if (formRef.current) {
       const top = formRef.current.getBoundingClientRect().top + window.scrollY;
-      window.scrollTo({
-        top: top - 45,
-        behavior: "smooth",
-      });
+      window.scrollTo({ top: top - 80, behavior: "smooth" });
     }
   }
 
@@ -286,9 +258,7 @@ export default function AdminPage() {
     const ok = confirm("Supprimer cette création ?");
     if (!ok) return;
 
-    const res = await fetch(`/api/creations/${id}`, {
-      method: "DELETE",
-    });
+    const res = await fetch(`/api/creations/${id}`, { method: "DELETE" });
 
     if (!res.ok) {
       alert("Erreur lors de la suppression.");
@@ -297,8 +267,7 @@ export default function AdminPage() {
 
     if (editingId === id) {
       setEditingId(null);
-      setForm((f) => ({
-        ...f,
+      setForm({
         title: "",
         description: "",
         imageUrl: "",
@@ -306,7 +275,7 @@ export default function AdminPage() {
         imagePublicIds: [],
         price: "",
         color: "",
-      }));
+      });
     }
 
     loadCreations();
@@ -314,8 +283,7 @@ export default function AdminPage() {
 
   function handleCancelEdit() {
     setEditingId(null);
-    setForm((f) => ({
-      ...f,
+    setForm({
       title: "",
       description: "",
       imageUrl: "",
@@ -323,7 +291,7 @@ export default function AdminPage() {
       imagePublicIds: [],
       price: "",
       color: "",
-    }));
+    });
     setMessage(null);
   }
 
@@ -332,7 +300,6 @@ export default function AdminPage() {
       ...f,
       images: f.images.filter((_, i) => i !== index),
       imagePublicIds: f.imagePublicIds.filter((_, i) => i !== index),
-
     }));
   }
 
@@ -340,29 +307,23 @@ export default function AdminPage() {
     setDragIndex(index);
   }
 
-  function handleDragOver(
-    e: React.DragEvent<HTMLDivElement>,
-    index: number
-  ) {
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>, index: number) {
     e.preventDefault();
-
     if (dragIndex === null || dragIndex === index) return;
 
     setForm((f) => {
       const imagesArr = [...f.images];
       const publicIdsArr = [...f.imagePublicIds];
-
       const [movedImage] = imagesArr.splice(dragIndex, 1);
       const [movedPublicId] = publicIdsArr.splice(dragIndex, 1);
-
       imagesArr.splice(index, 0, movedImage);
       publicIdsArr.splice(index, 0, movedPublicId);
-
       return { ...f, images: imagesArr, imagePublicIds: publicIdsArr };
     });
 
     setDragIndex(index);
   }
+
   function handleDragEnd() {
     setDragIndex(null);
   }
@@ -374,28 +335,23 @@ export default function AdminPage() {
 
   function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
     if (touchStartIndex === null) return;
-
     const touch = e.touches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
-    
     if (!element) return;
 
-    const imageContainer = element.closest('[data-image-index]');
+    const imageContainer = element.closest("[data-image-index]");
     if (!imageContainer) return;
 
-    const targetIndex = Number(imageContainer.getAttribute('data-image-index'));
-    
+    const targetIndex = Number(imageContainer.getAttribute("data-image-index"));
+
     if (targetIndex !== touchStartIndex && targetIndex >= 0) {
       setForm((f) => {
         const imagesArr = [...f.images];
         const publicIdsArr = [...f.imagePublicIds];
-
         const [movedImage] = imagesArr.splice(touchStartIndex, 1);
         const [movedPublicId] = publicIdsArr.splice(touchStartIndex, 1);
-
         imagesArr.splice(targetIndex, 0, movedImage);
         publicIdsArr.splice(targetIndex, 0, movedPublicId);
-
         return { ...f, images: imagesArr, imagePublicIds: publicIdsArr };
       });
 
@@ -409,404 +365,338 @@ export default function AdminPage() {
     setDragIndex(null);
   }
 
-  // Afficher un loader pendant la vérification de la session
   if (status === "loading") {
     return (
-      <main className="min-h-screen flex items-center justify-center">
+      <main className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-slate-600">Chargement...</div>
       </main>
     );
   }
 
-  // Si pas admin, afficher rien (la redirection se fera via useEffect)
   if (!session || session.user.role !== "admin") {
     return null;
   }
 
   return (
-    <main className="min-h-screen">
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <div className="mb-4 flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-sm text-slate-600 hover:text-slate-900"
-          >
-            ← Retour à l&apos;accueil
-          </Link>
-        </div>
+    <main className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        {/* Header */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-2"
+            >
+              ← Retour à l&apos;accueil
+            </Link>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+              Administration
+            </h1>
+          </div>
 
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Admin – {editingId ? "Modifier une création" : "Ajouter une création"}
-          </h1>
-          <Link
-            href="/api/auth/signout"
-            className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Se déconnecter
-          </Link>
-        </div>
-
-        {/* Lien vers les réservations avec pastille */}
-        <div className="mb-6">
           <Link
             href="/admin/reservations"
-            className="relative inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+            className="relative inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
             onClick={loadPendingReservations}
           >
-            <span>Voir les réservations</span>
+            <span>📋 Réservations</span>
             {pendingReservations > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+              <Badge variant="danger" className="bg-red-500 text-white">
                 {pendingReservations}
-              </span>
+              </Badge>
             )}
           </Link>
         </div>
 
-        {/* Bloc : texte de la page d'accueil */}
-        <form
-          onSubmit={handleSaveSettings}
-          style={{
-            background: "white",
-            padding: 16,
-            borderRadius: 16,
-            boxShadow:
-              "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          <h2 style={{ fontSize: 16, fontWeight: 600 }}>
-            Texte de la page d&apos;accueil
-          </h2>
-
-          <input
-            placeholder="Titre"
-            value={settings.title}
-            onChange={(e) =>
-              setSettings((s) => ({ ...s, title: e.target.value }))
-            }
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #cbd5e0",
-            }}
-          />
-
-          <input
-            placeholder="Sous-titre"
-            value={settings.subtitle}
-            onChange={(e) =>
-              setSettings((s) => ({ ...s, subtitle: e.target.value }))
-            }
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #cbd5e0",
-            }}
-          />
-
+        {/* Tabs */}
+        <div className="mb-6 flex gap-2 border-b border-slate-200">
           <button
-            type="submit"
-            disabled={savingSettings}
-            style={{
-              alignSelf: "flex-start",
-              marginTop: 4,
-              padding: "8px 12px",
-              borderRadius: 9999,
-              border: "none",
-              background: savingSettings ? "#4a5568" : "black",
-              opacity: savingSettings ? 0.8 : 1,
-              color: "white",
-              fontWeight: 600,
-              cursor: savingSettings ? "not-allowed" : "pointer",
-            }}
+            onClick={() => setActiveTab("creations")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "creations"
+                ? "border-b-2 border-slate-900 text-slate-900"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
           >
-            {savingSettings ? "Enregistrement..." : "Enregistrer le texte"}
+            Créations
           </button>
-        </form>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "settings"
+                ? "border-b-2 border-slate-900 text-slate-900"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Paramètres
+          </button>
+        </div>
 
-        {/* Formulaire de création */}
-        <form
-          onSubmit={handleSubmit}
-          className="mb-8 space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100"
-        >
-          <div className="grid gap-4 md:grid-cols-2" ref={formRef}>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">
-                  Titre
-                </label>
-                <input
-                  placeholder="Ex : Snood rose poudré"
-                  value={form.title}
-                  onChange={(e) =>
-                    setForm({ ...form, title: e.target.value })
-                  }
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                />
-              </div>
+        {/* Message de succès/erreur */}
+        {message && (
+          <div className={`mb-4 rounded-lg p-3 text-sm ${
+            message.includes("✔️") 
+              ? "bg-green-50 text-green-800 border border-green-200" 
+              : "bg-red-50 text-red-800 border border-red-200"
+          }`}>
+            {message}
+          </div>
+        )}
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">
-                  Description
-                </label>
-                <textarea
-                  placeholder="Détails, matière, pour qui..."
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
-                  rows={4}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                />
-              </div>
+        {/* Tab Content: Créations */}
+        {activeTab === "creations" && (
+          <div className="space-y-6">
+            {/* Formulaire de création/édition */}
+            <Card className="p-6">
+              <div ref={formRef}>
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                  {editingId ? "✏️ Modifier une création" : "➕ Ajouter une création"}
+                </h2>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">
-                  Prix (en euros)
-                </label>
-                <input
-                  type="number"
-                  placeholder="Ex : 25"
-                  value={form.price}
-                  onChange={(e) =>
-                    setForm({ ...form, price: e.target.value })
-                  }
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                />
-              </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* Colonne gauche */}
+                    <div className="space-y-4">
+                      <Input
+                        label="Titre *"
+                        placeholder="Ex : Snood rose poudré"
+                        value={form.title}
+                        onChange={(e) => setForm({ ...form, title: e.target.value })}
+                        required
+                      />
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">
-                  Couleur
-                </label>
-                <input
-                  list="color-options"
-                  placeholder="Ex : Rose poudré, Bleu marine..."
-                  value={form.color}
-                  onChange={(e) => setForm({ ...form, color: e.target.value })}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                />
-                <datalist id="color-options">
-                  {colorOptions.map((color) => (
-                    <option key={color} value={color} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
+                      <Textarea
+                        label="Description"
+                        placeholder="Détails, matière, pour qui..."
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        rows={4}
+                      />
 
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">
-                  Image (upload depuis ton ordinateur)
-                </label>
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4 text-xs text-slate-600">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageChange}
-                    className="block w-full text-xs text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-800"
-                  />
-                  {uploading && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      Upload en cours...
-                    </p>
-                  )}
-                  {form.images.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      <p style={{ fontSize: 12, color: "#4a5568" }}>
-                        Aperçu des images :
-                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="Prix (€)"
+                          type="number"
+                          placeholder="25"
+                          value={form.price}
+                          onChange={(e) => setForm({ ...form, price: e.target.value })}
+                        />
 
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 12,
-                          marginTop: 8,
-                        }}
-                      >
-                        {form.images.map((url, i) => (
-                          <div
-                            key={i}
-                            data-image-index={i}
-                            draggable
-                            onDragStart={() => handleDragStart(i)}
-                            onDragOver={(e) => handleDragOver(e, i)}
-                            onDragEnd={handleDragEnd}
-                            onTouchStart={() => handleTouchStart(i)}
-                            onTouchMove={handleTouchMove}
-                            onTouchEnd={handleTouchEnd}
-                            style={{
-                              position: "relative",
-                              width: 80,
-                              height: 80,
-                              borderRadius: 8,
-                              overflow: "hidden",
-                              border:
-                                dragIndex === i
-                                  ? "2px dashed #4f46e5"
-                                  : "1px solid #e2e8f0",
-                              boxSizing: "border-box",
-                              touchAction: "none",
-                            }}
-                          >
-                            <button
-                              onClick={() => removeImage(i)}
-                              type="button"
-                              style={{
-                                position: "absolute",
-                                top: -6,
-                                right: -6,
-                                background: "#ef4444",
-                                color: "white",
-                                borderRadius: "50%",
-                                width: 20,
-                                height: 20,
-                                fontSize: 12,
-                                fontWeight: "bold",
-                                border: "none",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                              }}
-                            >
-                              ✕
-                            </button>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-slate-700">Couleur</label>
+                          <input
+                            list="color-options"
+                            placeholder="Rose poudré..."
+                            value={form.color}
+                            onChange={(e) => setForm({ ...form, color: e.target.value })}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                          />
+                          <datalist id="color-options">
+                            {colorOptions.map((color) => (
+                              <option key={color} value={color} />
+                            ))}
+                          </datalist>
+                        </div>
+                      </div>
+                    </div>
 
-                            <img
-                              src={url}
-                              alt=""
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                borderRadius: 8,
-                                userSelect: "none",
-                                pointerEvents: "none",
-                              }}
-                            />
+                    {/* Colonne droite - Images */}
+                    <div className="space-y-3">
+                      <label className="text-xs font-medium text-slate-700">Images</label>
+                      <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageChange}
+                          className="hidden"
+                          id="file-upload"
+                          disabled={uploading}
+                        />
+                        <label
+                          htmlFor="file-upload"
+                          className={`block cursor-pointer ${uploading ? 'opacity-50' : ''}`}
+                        >
+                          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-slate-200">
+                            📁
                           </div>
-                        ))}
+                          <p className="text-sm font-medium text-slate-700">
+                            {uploading ? "Upload en cours..." : "Cliquez pour ajouter des images"}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            ou glissez-déposez vos fichiers
+                          </p>
+                        </label>
                       </div>
 
-                      <p style={{ marginTop: 4, fontSize: 11, color: "#718096" }}>
-                        Astuce : glisse les images pour les réordonner.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={uploading}
-              className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {uploading
-                ? "Upload en cours..."
-                : editingId
-                  ? "Mettre à jour"
-                  : "Enregistrer"}
-            </button>
-
-            {editingId && (
-              <button
-                type="button"
-                onClick={handleCancelEdit}
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Annuler
-              </button>
-            )}
-          </div>
-
-          {message && (
-            <p className="text-sm text-slate-600">{message}</p>
-          )}
-        </form>
-
-        {/* Liste des créations */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-800">
-            Créations existantes
-          </h2>
-          {loadingList && (
-            <p className="text-sm text-slate-500">Chargement...</p>
-          )}
-          {!loadingList && creations.length === 0 && (
-            <p className="text-sm text-slate-500">
-              Aucune création pour l&apos;instant.
-            </p>
-          )}
-
-          <div className="space-y-3">
-            {creations.map((c) => (
-              <div
-                key={c._id}
-                className="flex flex-col gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-100 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  {c.imageUrl && (
-                    <img
-                      src={c.imageUrl}
-                      alt={c.title}
-                      className="h-14 w-14 shrink-0 rounded-lg object-cover"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-900">
-                        {c.title}
-                      </span>
-                      {c.price != null && (
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800">
-                          {c.price} €
-                        </span>
-                      )}
-                      {c.color != null && (
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800">
-                          {c.color}
-                        </span>
+                      {form.images.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-slate-700">
+                            {form.images.length} image{form.images.length > 1 ? "s" : ""} ajoutée{form.images.length > 1 ? "s" : ""}
+                          </p>
+                          <div className="grid grid-cols-4 gap-2">
+                            {form.images.map((url, i) => (
+                              <div
+                                key={i}
+                                data-image-index={i}
+                                draggable
+                                onDragStart={() => handleDragStart(i)}
+                                onDragOver={(e) => handleDragOver(e, i)}
+                                onDragEnd={handleDragEnd}
+                                onTouchStart={() => handleTouchStart(i)}
+                                onTouchMove={handleTouchMove}
+                                onTouchEnd={handleTouchEnd}
+                                className={`relative aspect-square cursor-move rounded-lg overflow-hidden ${
+                                  dragIndex === i ? "ring-2 ring-blue-500" : "ring-1 ring-slate-200"
+                                }`}
+                                style={{ touchAction: "none" }}
+                              >
+                                <button
+                                  onClick={() => removeImage(i)}
+                                  type="button"
+                                  className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600"
+                                >
+                                  ✕
+                                </button>
+                                {i === 0 && (
+                                  <div className="absolute left-1 top-1 z-10 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                    Couverture
+                                  </div>
+                                )}
+                                <img
+                                  src={url}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                  draggable={false}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            💡 Glissez les images pour les réordonner
+                          </p>
+                        </div>
                       )}
                     </div>
-                    {c.description && (
-                      <p className="text-xs text-slate-600 whitespace-pre-line line-clamp-2">
-                        {c.description}
-                      </p>
+                  </div>
+
+                  {/* Boutons d'action */}
+                  <div className="flex flex-wrap gap-2 pt-4 border-t">
+                    <Button type="submit" disabled={uploading || !form.title}>
+                      {uploading ? "⏳ Upload..." : editingId ? "💾 Mettre à jour" : "➕ Créer"}
+                    </Button>
+
+                    {editingId && (
+                      <Button type="button" variant="secondary" onClick={handleCancelEdit}>
+                        Annuler
+                      </Button>
                     )}
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2 sm:shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleEditClick(c)}
-                    className="flex-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:flex-initial"
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(c._id)}
-                    className="flex-1 rounded-full bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 sm:flex-initial"
-                  >
-                    Supprimer
-                  </button>
-                </div>
+                </form>
               </div>
-            ))}
+            </Card>
+
+            {/* Liste des créations */}
+            <Card className="p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                📦 Créations existantes ({creations.length})
+              </h2>
+
+              {loadingList && (
+                <p className="text-sm text-slate-500">Chargement...</p>
+              )}
+
+              {!loadingList && creations.length === 0 && (
+                <p className="text-sm text-slate-500 text-center py-8">
+                  Aucune création pour l&apos;instant. Créez-en une ci-dessus !
+                </p>
+              )}
+
+              <div className="space-y-2">
+                {creations.map((c) => (
+                  <div
+                    key={c._id}
+                    className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {c.imageUrl && (
+                        <img
+                          src={c.imageUrl}
+                          alt={c.title}
+                          className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="text-sm font-semibold text-slate-900">
+                            {c.title}
+                          </span>
+                          {c.price != null && (
+                            <Badge variant="default">{c.price} €</Badge>
+                          )}
+                          {c.color && (
+                            <Badge variant="default">{c.color}</Badge>
+                          )}
+                        </div>
+                        {c.description && (
+                          <p className="text-xs text-slate-600 line-clamp-2">
+                            {c.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:shrink-0">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleEditClick(c)}
+                      >
+                        ✏️ Modifier
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDelete(c._id)}
+                      >
+                        🗑️
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
-        </section>
+        )}
+
+        {/* Tab Content: Paramètres */}
+        {activeTab === "settings" && (
+          <Card className="p-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">
+              ⚙️ Paramètres de la page d&apos;accueil
+            </h2>
+
+            <form onSubmit={handleSaveSettings} className="space-y-4 max-w-2xl">
+              <Input
+                label="Titre principal"
+                placeholder="Les créations en laine de maman 🧶"
+                value={settings.title}
+                onChange={(e) => setSettings((s) => ({ ...s, title: e.target.value }))}
+              />
+
+              <Input
+                label="Sous-titre"
+                placeholder="Clique sur une création pour voir toutes les photos."
+                value={settings.subtitle}
+                onChange={(e) => setSettings((s) => ({ ...s, subtitle: e.target.value }))}
+              />
+
+              <Button type="submit" disabled={savingSettings}>
+                {savingSettings ? "⏳ Enregistrement..." : "💾 Enregistrer"}
+              </Button>
+            </form>
+          </Card>
+        )}
       </div>
     </main>
   );
