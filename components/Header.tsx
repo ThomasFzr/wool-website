@@ -31,8 +31,8 @@ export function Header({ title, subtitle, pendingReservations = 0, newMessages =
 
   return (
     <>
-      <header className="sticky top-0 z-30">
-        <div className="mx-auto max-w-5xl px-4 flex flex-row items-center justify-between gap-4">
+      <div className="mx-auto max-w-5xl px-4 pt-4 mb-4">
+        <div className="flex flex-row items-start justify-between gap-4">
           {/* Logo visible */}
           <img 
             src="/images/logo.png" 
@@ -46,8 +46,18 @@ export function Header({ title, subtitle, pendingReservations = 0, newMessages =
               {title}
             </h1>
           )}
+        </div>
 
-          <div className="relative shrink-0" ref={menuRef}>
+        {/* Sous-titre */}
+        {subtitle && (
+          <p className="text-lg sm:text-xl text-slate-600">
+            {subtitle}
+          </p>
+        )}
+      </div>
+
+      {/* Bouton sticky en position fixe */}
+      <div className="fixed top-4 right-4 z-30" ref={menuRef}>
             <button
               type="button"
               onClick={() => {
@@ -131,18 +141,7 @@ export function Header({ title, subtitle, pendingReservations = 0, newMessages =
                 </button>
               </div>
             )}
-          </div>
-        </div>
-      </header>
-
-      {/* Sous-titre en dessous du header sticky */}
-      {subtitle && (
-        <div className="mx-auto max-w-5xl px-4 mb-4">
-          <p className="text-lg sm:text-xl text-slate-600">
-            {subtitle}
-          </p>
-        </div>
-      )}
+      </div>
     </>
   );
 }
