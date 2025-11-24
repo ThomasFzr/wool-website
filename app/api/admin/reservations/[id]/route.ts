@@ -146,6 +146,13 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
         },
       });
 
+      // ✅ Marquer que c'est l'admin qui a annulé
+      (reservation as any).cancelledBy = "admin";
+      if (body.cancelReason) {
+        (reservation as any).cancelReason = body.cancelReason;
+      }
+      await reservation.save();
+
       const reason =
         (reservation as any).cancelReason ||
         body.cancelReason ||
@@ -161,7 +168,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
             <h1 style="font-size:20px;margin:0 0 12px 0;">Réservation annulée</h1>
             <p style="font-size:14px;margin:0 0 16px 0;">
               Bonjour <strong>${reservation.name}</strong>,<br/>
-              Votre réservation pour l’article suivant a été <strong>annulée</strong>.
+              Votre réservation pour l'article suivant a été <strong>annulée par la créatrice</strong>.
             </p>
 
             <div style="margin-top:16px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">

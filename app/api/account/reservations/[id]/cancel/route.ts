@@ -56,6 +56,7 @@ export async function PATCH(
     // 4️⃣ On annule + raison
     reservation.status = "cancelled";
     (reservation as any).cancelReason = reason ?? "";
+    (reservation as any).cancelledBy = "user"; // ✅ C'est l'utilisateur qui annule
     await reservation.save();
 
     // 5️⃣ On libère la création si elle n'est pas vendue

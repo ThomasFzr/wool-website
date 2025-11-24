@@ -19,8 +19,14 @@ const schema = new Schema(
       default: "pending",
     },
 
-    // ✅ nouvelle raison d’annulation côté client
+    // ✅ nouvelle raison d'annulation côté client
     cancelReason: String,
+
+    // ✅ qui a annulé : 'admin' ou 'user'
+    cancelledBy: {
+      type: String,
+      enum: ["admin", "user"],
+    },
   },
   { timestamps: true }
 );

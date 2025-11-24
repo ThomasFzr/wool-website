@@ -18,6 +18,7 @@ type Reservation = {
   status: "pending" | "validated" | "cancelled";
   message?: string;
   cancelReason?: string;
+  cancelledBy?: "admin" | "user";
   createdAt: string;
 };
 
@@ -198,10 +199,29 @@ export default function OrdersPage() {
                     </p>
                   )}
 
-                  {r.cancelReason && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Raison d&apos;annulation : {r.cancelReason}
-                    </p>
+                  {r.status === "cancelled" && r.cancelledBy === "user" && (
+                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 border border-slate-200">
+                      <p className="text-xs font-semibold text-slate-700">
+                        Vous avez annulé cette réservation
+                      </p>
+                      {r.cancelReason && (
+                        <p className="mt-1 text-xs text-slate-600">
+                          Raison : {r.cancelReason}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {r.status === "cancelled" && r.cancelledBy !== "user" && (
+                    <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 border border-red-200">
+                      <p className="text-xs font-semibold text-red-800">
+                        ⚠️ Annulée par la créatrice
+                      </p>
+                      {r.cancelReason && (
+                        <p className="mt-1 text-xs text-red-700">
+                          Raison : {r.cancelReason}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

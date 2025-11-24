@@ -11,6 +11,7 @@ type Reservation = {
     status: "pending" | "validated" | "cancelled";
     createdAt: string;
     cancelReason?: string;
+    cancelledBy?: "admin" | "user";
     creationId?: {
         _id: string;
         title: string;
