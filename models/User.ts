@@ -16,7 +16,10 @@ export interface IUser {
 //
 // 2) Document Mongoose typé
 //
-export interface IUserDocument extends IUser, Document {}
+export interface IUserDocument extends IUser, Document {
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 //
 // 3) Schéma Mongoose typé
