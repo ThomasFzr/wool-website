@@ -16,6 +16,7 @@ export const authOptions: NextAuthOptions = {
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+      allowDangerousEmailAccountLinking: true, // Permet de lier Google à un compte existant
     }),
 
     Credentials({
@@ -52,30 +53,34 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       // Mettre à jour ou créer l'utilisateur dans notre collection User
       if (account && user?.email) {
-        await connectToDatabase();
-        
-        // Chercher l'utilisateur existant
-        const existingUser = await User.findOne({ email: user.email });
-        
-        if (existingUser) {
-          // Mettre à jour le provider s'il existe
-          await User.findOneAndUpdate(
-            { email: user.email },
-            { 
-              $set: { 
-                provider: account.provider,
-                name: user.name || existingUser.name
-              } 
-            }
-          );
-        } else if (account.provider !== "credentials") {
-          // Créer un nouvel utilisateur pour les connexions SSO uniquement
-          await User.create({
-            email: user.email,
-            name: user.name || null,
-            provider: account.provider,
-            role: "user",
-          });
+        try {
+          await connectToDatabase();
+          
+          // Chercher l'utilisateur existant
+          const existingUser = await User.findOne({ email: user.email });
+          
+          if (existingUser) {
+            // Mettre à jour le provider s'il existe
+            await User.findOneAndUpdate(
+              { email: user.email },
+              { 
+                $set: { 
+                  provider: account.provider,
+                  name: user.name || existingUser.name
+                } 
+              }
+            );
+          } else if (account.provider !== "credentials") {
+            // Créer un nouvel utilisateur pour les connexions SSO uniquement
+            await User.create({
+              email: user.email,
+              name: user.name || null,
+              provider: account.provider,
+              role: "user",
+            });
+          }
+        } catch (error) {
+          console.error("[SignIn] Error:", error);
         }
       }
       return true;
