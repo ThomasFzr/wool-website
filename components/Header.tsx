@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession, signIn } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Badge } from "./ui";
@@ -109,12 +109,12 @@ export function Header({ title, subtitle, pendingReservations = 0 }: HeaderProps
 
             <div className="border-t border-slate-200" />
 
-            <Link
-              href="/api/auth/signout"
+            <button
+              onClick={() => signOut({ callbackUrl: "/" })}
               className="w-full block px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
             >
               Se déconnecter
-            </Link>
+            </button>
           </div>
         )}
       </div>
