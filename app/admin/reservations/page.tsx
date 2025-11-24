@@ -171,7 +171,7 @@ export default function AdminReservations() {
                         onClick={() => setSelected(null)}
                     />
                     
-                    <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl p-6 border-l z-50 overflow-y-auto">
+                    <div className="fixed top-0 right-0 h-full w-full sm:w-96 bg-white shadow-2xl p-6 border-l z-50 overflow-y-auto">
                         <button
                             className="mb-4 text-sm text-slate-600 hover:underline"
                             onClick={() => setSelected(null)}
