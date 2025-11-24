@@ -4,6 +4,7 @@ import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
+import { emailTemplate } from "@/lib/emailTemplate";
 import { checkAdminAuth } from "@/lib/auth";
 
 type AdminRouteContext = {
@@ -63,9 +64,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
         await sendEmail({
         to: reservation.contact,
         subject: "🎉 Votre réservation a été validée",
-        html: `
-        <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-          <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
+        html: emailTemplate(`
             <h1 style="font-size:20px;margin:0 0 12px 0;">Bonne nouvelle 🎉</h1>
             <p style="font-size:14px;margin:0 0 16px 0;">
               Bonjour <strong>${reservation.name}</strong>,<br/>
@@ -91,13 +90,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
               Vous pouvez retrouver cette commande dans :<br/>
               <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Mes réservations</a>
             </p>
-
-            <p style="font-size:11px;margin-top:24px;color:#9ca3af;">
-              Cet email est généré automatiquement, merci de ne pas y répondre directement.
-            </p>
-          </div>
-        </div>
-        `,
+        `),
         });
       }
 
@@ -106,9 +99,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
         await sendEmail({
           to: process.env.SELLER_EMAIL,
           subject: `✅ Réservation validée : ${creation.title}`,
-          html: `
-          <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-            <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
+          html: emailTemplate(`
               <h1 style="font-size:18px;margin:0 0 12px 0;">Réservation validée</h1>
               <p style="font-size:14px;margin:0 0 12px 0;">
                 La réservation de <strong>${reservation.name}</strong> (${reservation.contact}) a été <strong>validée</strong>.
@@ -128,9 +119,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
                   <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
                 </div>
               </div>
-            </div>
-          </div>
-          `,
+          `),
         });
       }
     }
@@ -174,9 +163,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
         await sendEmail({
         to: reservation.contact,
         subject: "❌ Votre réservation a été annulée",
-        html: `
-        <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-          <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #fee2e2;">
+        html: emailTemplate(`
             <h1 style="font-size:20px;margin:0 0 12px 0;">Réservation annulée</h1>
             <p style="font-size:14px;margin:0 0 16px 0;">
               Bonjour <strong>${reservation.name}</strong>,<br/>
@@ -202,13 +189,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
               <p style="margin:0 0 4px 0;font-size:12px;font-weight:600;">Raison de l'annulation</p>
               <p style="margin:0;font-size:13px;">${reason}</p>
             </div>
-
-            <p style="font-size:11px;margin-top:24px;color:#9ca3af;">
-              Cet email est généré automatiquement, merci de ne pas y répondre directement.
-            </p>
-          </div>
-        </div>
-        `,
+        `),
         });
       }
 
@@ -217,9 +198,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
                 await sendEmail({
           to: process.env.SELLER_EMAIL,
           subject: `❌ Réservation annulée : ${creation.title}`,
-          html: `
-          <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-            <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #fee2e2;">
+          html: emailTemplate(`
               <h1 style="font-size:18px;margin:0 0 12px 0;">Réservation annulée</h1>
               <p style="font-size:14px;margin:0 0 12px 0;">
                 La réservation de <strong>${reservation.name}</strong> (${reservation.contact}) a été <strong>annulée</strong>.
@@ -244,9 +223,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
                 <p style="margin:0 0 4px 0;font-size:12px;font-weight:600;">Raison de l'annulation</p>
                 <p style="margin:0;font-size:13px;">${reason}</p>
               </div>
-            </div>
-          </div>
-          `,
+          `),
         });
       }
     }

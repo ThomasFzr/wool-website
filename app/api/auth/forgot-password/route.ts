@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
+import { emailTemplate } from "@/lib/emailTemplate";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -52,16 +53,18 @@ export async function POST(req: NextRequest) {
     await sendEmail({
       to: user.email,
       subject: "Réinitialisation de votre mot de passe",
-      html: `
-        <h2>Réinitialisation de mot de passe</h2>
-        <p>Vous avez demandé à réinitialiser votre mot de passe.</p>
-        <p>Cliquez sur le lien ci-dessous pour créer un nouveau mot de passe :</p>
-        <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #0f172a; color: white; text-decoration: none; border-radius: 5px;">
-          Réinitialiser mon mot de passe
-        </a>
-        <p>Ce lien expirera dans 1 heure.</p>
-        <p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
-      `,
+      html: emailTemplate(`
+        <h2 style="font-size:18px;margin:0 0 12px 0;">Réinitialisation de mot de passe</h2>
+        <p style="font-size:14px;margin:0 0 12px 0;">Vous avez demandé à réinitialiser votre mot de passe.</p>
+        <p style="font-size:14px;margin:0 0 16px 0;">Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe :</p>
+        <p style="text-align:center;margin:24px 0;">
+          <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background-color:#0f172a;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
+            Réinitialiser mon mot de passe
+          </a>
+        </p>
+        <p style="font-size:13px;margin:16px 0 8px 0;color:#6b7280;">Ce lien expirera dans 1 heure.</p>
+        <p style="font-size:13px;margin:0;color:#6b7280;">Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+      `),
     });
 
     return NextResponse.json(

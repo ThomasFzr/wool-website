@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/db";
 import Contact from "@/models/Contact";
 import Creation from "@/models/Creation";
 import { sendEmail } from "@/lib/sendEmail";
+import { emailTemplate } from "@/lib/emailTemplate";
 
 // Rate limiting en mémoire (simple)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -158,9 +159,7 @@ export async function POST(req: NextRequest) {
       await sendEmail({
         to: process.env.SELLER_EMAIL,
         subject: `📧 Nouveau message : ${subject}`,
-        html: `
-        <div style="font-family: system-ui, -apple-system, sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-          <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
+        html: emailTemplate(`
             <h1 style="font-size:18px;margin:0 0 12px 0;">📧 Nouveau message de contact</h1>
             
             <div style="margin:16px 0;padding:16px;background:#f8fafc;border-radius:8px;">
@@ -179,9 +178,7 @@ export async function POST(req: NextRequest) {
             <p style="font-size:12px;margin-top:24px;color:#9ca3af;">
               <a href="${process.env.NEXT_PUBLIC_APP_URL}/admin/contact" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Voir tous les messages</a>
             </p>
-          </div>
-        </div>
-        `,
+        `),
       });
     }
 
@@ -189,21 +186,13 @@ export async function POST(req: NextRequest) {
     await sendEmail({
       to: email,
       subject: "✅ Votre message a bien été reçu",
-      html: `
-      <div style="font-family: system-ui, -apple-system, sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-        <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
+      html: emailTemplate(`
           <h1 style="font-size:18px;margin:0 0 12px 0;">Merci pour votre message !</h1>
           <p style="font-size:14px;margin:0 0 16px 0;">
             Bonjour <strong>${name}</strong>,<br/><br/>
             Nous avons bien reçu votre message concernant "<strong>${subject}</strong>". Nous vous répondrons dans les plus brefs délais.
           </p>
-
-          <p style="font-size:11px;margin-top:24px;color:#9ca3af;">
-            Cet email est généré automatiquement par MailleMum.
-          </p>
-        </div>
-      </div>
-      `,
+      `),
     });
 
     return NextResponse.json(contact, { status: 201 });

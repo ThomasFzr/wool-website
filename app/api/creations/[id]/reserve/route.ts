@@ -6,6 +6,7 @@ import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
+import { emailTemplate } from "@/lib/emailTemplate";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -74,9 +75,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       await sendEmail({
         to: contact,
         subject: "✅ Votre réservation chez MailleMum est enregistrée",
-      html: `
-      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-        <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
+        html: emailTemplate(`
           <h1 style="font-size:20px;margin:0 0 12px 0;">Merci pour votre réservation 🧶</h1>
           <p style="font-size:14px;margin:0 0 16px 0;">
             Bonjour <strong>${name || "👋"}</strong>,<br/>
@@ -107,13 +106,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
             <br/>
             <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Voir mes réservations</a>
           </p>
-
-          <p style="font-size:11px;margin-top:24px;color:#9ca3af;">
-            Cet email est généré automatiquement, merci de ne pas y répondre directement.
-          </p>
-        </div>
-      </div>
-      `,
+        `),
       });
     }
 
@@ -124,9 +117,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       await sendEmail({
         to: process.env.SELLER_EMAIL,
         subject: `🧶 Nouvelle réservation : ${creation.title}`,
-        html: `
-        <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-          <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
+        html: emailTemplate(`
             <h1 style="font-size:18px;margin:0 0 12px 0;">Nouvelle réservation</h1>
             <p style="font-size:14px;margin:0 0 12px 0;">
               <strong>${name}</strong> (${contact}) a réservé :
@@ -157,9 +148,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
             <p style="font-size:12px;margin-top:20px;color:#6b7280;">
               <a href="${appUrl}/admin/reservations" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer cette réservation dans l'admin</a>
             </p>
-          </div>
-        </div>
-        `,
+        `),
       });
     }
 

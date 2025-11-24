@@ -6,6 +6,7 @@ import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
+import { emailTemplate } from "@/lib/emailTemplate";
 
 export async function PATCH(
   req: NextRequest,
@@ -100,13 +101,11 @@ export async function PATCH(
         await sendEmail({
         to: reservation.contact,
         subject: "❌ Vous avez annulé votre réservation",
-        html: `
-        <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-          <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #fee2e2;">
+        html: emailTemplate(`
             <h1 style="font-size:20px;margin:0 0 12px 0;">Votre réservation a été annulée</h1>
             <p style="font-size:14px;margin:0 0 16px 0;">
               Bonjour <strong>${reservation.name}</strong>,<br/>
-              Vous avez annulé votre réservation pour l’article suivant :
+              Vous avez annulé votre réservation pour l'article suivant :
             </p>
 
             <div style="margin-top:16px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
@@ -130,16 +129,10 @@ export async function PATCH(
             </div>
 
             <p style="font-size:12px;margin-top:20px;color:#6b7280;">
-              Vous pouvez consulter l’historique de vos réservations ici :<br/>
+              Vous pouvez consulter l'historique de vos réservations ici :<br/>
               <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Mes réservations</a>
             </p>
-
-            <p style="font-size:11px;margin-top:24px;color:#9ca3af;">
-              Cet email est généré automatiquement, merci de ne pas y répondre directement.
-            </p>
-          </div>
-        </div>
-        `,
+        `),
         });
       }
 
@@ -148,9 +141,7 @@ export async function PATCH(
         await sendEmail({
           to: process.env.SELLER_EMAIL,
           subject: `❌ Réservation annulée par l'acheteur : ${creation.title}`,
-          html: `
-          <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
-            <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #fee2e2;">
+          html: emailTemplate(`
               <h1 style="font-size:18px;margin:0 0 12px 0;">Réservation annulée par l'acheteur</h1>
               <p style="font-size:14px;margin:0 0 12px 0;">
                 <strong>${reservation.name}</strong> (${reservation.contact}) a annulé sa réservation.
@@ -175,9 +166,7 @@ export async function PATCH(
                 <p style="margin:0 0 4px 0;font-size:12px;font-weight:600;">Raison de l'annulation</p>
                 <p style="margin:0;font-size:13px;">${displayedReason}</p>
               </div>
-            </div>
-          </div>
-          `,
+          `),
         });
       }
     }
