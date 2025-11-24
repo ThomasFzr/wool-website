@@ -190,13 +190,18 @@ export default function AdminReservations() {
                     {selected.status === "cancelled" && (
                         <div className="mt-4 rounded-lg bg-red-50 p-3">
                             <p className="text-xs font-semibold uppercase text-red-700">
-                                Raison de l&apos;annulation
+                                Annulée par {selected.cancelledBy === "user" ? "l'utilisateur" : "l'administrateur"}
                             </p>
-                            <p className="mt-1 text-sm text-red-800">
-                                {selected.cancelReason && selected.cancelReason.trim().length > 0
-                                    ? selected.cancelReason
-                                    : "Aucune raison précisée."}
-                            </p>
+                            {(selected.cancelReason && selected.cancelReason.trim().length > 0) && (
+                                <>
+                                    <p className="mt-2 text-xs font-semibold uppercase text-red-700">
+                                        Raison
+                                    </p>
+                                    <p className="mt-1 text-sm text-red-800">
+                                        {selected.cancelReason}
+                                    </p>
+                                </>
+                            )}
                         </div>
                     )}
 
