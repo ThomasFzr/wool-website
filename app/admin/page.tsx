@@ -20,6 +20,7 @@ type Creation = {
   description?: string;
   imageUrl?: string;
   images?: string[];
+  imagePublicIds?: string[];
   price?: number;
   color?: string;
 };
@@ -34,6 +35,7 @@ export default function AdminPage() {
     description: "",
     imageUrl: "",
     images: [] as string[],
+    imagePublicIds: [] as string[],
     price: "",
     color: "",
   });
@@ -91,7 +93,7 @@ export default function AdminPage() {
   // Rediriger si pas admin
   useEffect(() => {
     if (status === "loading") return;
-    
+
     if (status === "unauthenticated" || session?.user?.role !== "admin") {
       router.push("/");
       return;
@@ -172,6 +174,7 @@ export default function AdminPage() {
       setMessage("Upload des images en cours...");
 
       const uploadedUrls: string[] = [];
+      const uploadedPublicIds: string[] = [];
 
       for (const file of Array.from(files)) {
         const formData = new FormData();
@@ -189,11 +192,15 @@ export default function AdminPage() {
 
         const data = await res.json();
         uploadedUrls.push(data.secure_url);
+        uploadedPublicIds.push(data.public_id);
+
       }
 
       setForm((f) => ({
         ...f,
         images: [...f.images, ...uploadedUrls],
+        imagePublicIds: [...f.imagePublicIds, ...uploadedPublicIds],
+
       }));
 
       setMessage("Images uploadées ✔️");
@@ -214,6 +221,7 @@ export default function AdminPage() {
       description: form.description || undefined,
       imageUrl: form.images[0] || undefined,
       images: form.images,
+      imagePublicIds: form.imagePublicIds,
       price: form.price ? Number(form.price) : undefined,
       color: form.color || undefined,
     };
@@ -242,6 +250,8 @@ export default function AdminPage() {
       title: "",
       description: "",
       imageUrl: "",
+      images: [],
+      imagePublicIds: [],
       price: "",
       color: "",
     }));
@@ -257,6 +267,7 @@ export default function AdminPage() {
       description: c.description ?? "",
       images: c.images ?? (c.imageUrl ? [c.imageUrl] : []),
       price: c.price != null ? String(c.price) : "",
+      imagePublicIds: c.imagePublicIds ?? [],
       color: c.color ?? "",
     }));
     setMessage(null);
@@ -290,7 +301,10 @@ export default function AdminPage() {
         title: "",
         description: "",
         imageUrl: "",
+        images: [],
+        imagePublicIds: [],
         price: "",
+        color: "",
       }));
     }
 
@@ -304,7 +318,10 @@ export default function AdminPage() {
       title: "",
       description: "",
       imageUrl: "",
+      images: [],
+      imagePublicIds: [],
       price: "",
+      color: "",
     }));
     setMessage(null);
   }
@@ -313,6 +330,8 @@ export default function AdminPage() {
     setForm((f) => ({
       ...f,
       images: f.images.filter((_, i) => i !== index),
+      imagePublicIds: f.imagePublicIds.filter((_, i) => i !== index),
+
     }));
   }
 
@@ -329,15 +348,20 @@ export default function AdminPage() {
     if (dragIndex === null || dragIndex === index) return;
 
     setForm((f) => {
-      const arr = [...f.images];
-      const [moved] = arr.splice(dragIndex, 1);
-      arr.splice(index, 0, moved);
-      return { ...f, images: arr };
+      const imagesArr = [...f.images];
+      const publicIdsArr = [...f.imagePublicIds];
+
+      const [movedImage] = imagesArr.splice(dragIndex, 1);
+      const [movedPublicId] = publicIdsArr.splice(dragIndex, 1);
+
+      imagesArr.splice(index, 0, movedImage);
+      publicIdsArr.splice(index, 0, movedPublicId);
+
+      return { ...f, images: imagesArr, imagePublicIds: publicIdsArr };
     });
 
     setDragIndex(index);
   }
-
   function handleDragEnd() {
     setDragIndex(null);
   }

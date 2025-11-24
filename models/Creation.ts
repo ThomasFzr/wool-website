@@ -9,6 +9,9 @@ const schema = new Schema(
     price: Number,
     color: String,
 
+    imagePublicIds: [String],
+    imagePublicId: String,
+
     reserved: { type: Boolean, default: false },
     reservedName: String,
     reservedContact: String,

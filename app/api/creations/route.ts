@@ -24,22 +24,26 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     const body = await req.json();
 
-    // Sécurise le tableau d'images
     const images: string[] =
       Array.isArray(body.images) && body.images.length
         ? body.images
         : body.imageUrl
-          ? [body.imageUrl]
-          : [];
+        ? [body.imageUrl]
+        : [];
+
+    const imagePublicIds: string[] =
+      Array.isArray(body.imagePublicIds) && body.imagePublicIds.length
+        ? body.imagePublicIds
+        : [];
 
     const creation = await Creation.create({
       title: body.title,
       description: body.description,
       imageUrl: body.imageUrl ?? images[0] ?? undefined,
       images,
+      imagePublicIds,
       price: body.price,
       color: body.color,
-
     });
 
     return NextResponse.json(creation, { status: 201 });
