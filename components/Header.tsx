@@ -143,7 +143,7 @@ export function Header({ title, subtitle, pendingReservations = 0, newMessages =
       {/* Sous-titre */}
       {subtitle && (
         <div className="mx-auto max-w-5xl px-4 mb-4">
-          <p className="text-lg sm:text-xl text-slate-600">
+          <p className="text-lg sm:text-xl text-slate-600 whitespace-pre-line">
             {subtitle}
           </p>
         </div>

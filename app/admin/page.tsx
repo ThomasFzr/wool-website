@@ -731,12 +731,15 @@ function AdminContent() {
                 onChange={(e) => setSettings((s) => ({ ...s, title: e.target.value }))}
               />
 
-              <Input
-                label="Sous-titre"
-                placeholder="Clique sur une création pour voir toutes les photos."
-                value={settings.subtitle}
-                onChange={(e) => setSettings((s) => ({ ...s, subtitle: e.target.value }))}
-              />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Sous-titre</label>
+                <Textarea
+                  placeholder="Clique sur une création pour voir toutes les photos."
+                  value={settings.subtitle}
+                  onChange={(e) => setSettings((s) => ({ ...s, subtitle: e.target.value }))}
+                  rows={3}
+                />
+              </div>
 
               <Button type="submit" disabled={savingSettings}>
                 {savingSettings ? "⏳ Enregistrement..." : "💾 Enregistrer"}
