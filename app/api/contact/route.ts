@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import Contact from "@/models/Contact";
+import Creation from "@/models/Creation";
 import { sendEmail } from "@/lib/sendEmail";
 
 export async function POST(req: NextRequest) {
@@ -33,9 +34,34 @@ export async function POST(req: NextRequest) {
 
     // Envoyer un email à l'admin
     if (process.env.SELLER_EMAIL) {
-      const creationInfo = creationId 
-        ? `<p style="margin:12px 0 0 0;padding:12px;background:#fef9c3;border-radius:8px;font-size:13px;"><strong>📦 Création concernée :</strong> ID ${creationId}</p>`
-        : '';
+      let creationInfo = '';
+      
+      if (creationId) {
+        try {
+          const creation = await Creation.findById(creationId);
+          if (creation) {
+            const imageUrl = creation.imageUrl || (creation.images && creation.images[0]) || '';
+            const statusBadge = creation.sold 
+              ? '<span style="background:#ef4444;color:white;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;">Vendu</span>'
+              : creation.reserved
+              ? '<span style="background:#f59e0b;color:white;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;">Réservé</span>'
+              : '<span style="background:#10b981;color:white;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;">Disponible</span>';
+
+            creationInfo = `
+              <div style="margin:16px 0;padding:16px;background:#fef9c3;border-radius:12px;">
+                <p style="margin:0 0 12px 0;font-weight:600;font-size:14px;">📦 Création concernée :</p>
+                ${imageUrl ? `<img src="${imageUrl}" alt="${creation.title}" style="width:100%;max-width:300px;height:auto;border-radius:8px;margin-bottom:12px;"/>` : ''}
+                <p style="margin:0 0 6px 0;font-size:14px;font-weight:600;">${creation.title}</p>
+                ${creation.price ? `<p style="margin:0 0 6px 0;font-size:14px;">Prix : ${creation.price}€</p>` : ''}
+                ${creation.color ? `<p style="margin:0 0 6px 0;font-size:14px;">Couleur : ${creation.color}</p>` : ''}
+                <p style="margin:6px 0 0 0;">${statusBadge}</p>
+              </div>
+            `;
+          }
+        } catch (err) {
+          console.error("Erreur lors de la récupération de la création:", err);
+        }
+      }
 
       await sendEmail({
         to: process.env.SELLER_EMAIL,
