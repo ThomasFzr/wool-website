@@ -753,18 +753,18 @@ export default function AdminPage() {
             {creations.map((c) => (
               <div
                 key={c._id}
-                className="flex items-center justify-between gap-4 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-100"
+                className="flex flex-col gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-100 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex items-center gap-3">
                   {c.imageUrl && (
                     <img
                       src={c.imageUrl}
                       alt={c.title}
-                      className="h-14 w-14 rounded-lg object-cover"
+                      className="h-14 w-14 shrink-0 rounded-lg object-cover"
                     />
                   )}
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold text-slate-900">
                         {c.title}
                       </span>
@@ -787,18 +787,18 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 sm:shrink-0">
                   <button
                     type="button"
                     onClick={() => handleEditClick(c)}
-                    className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    className="flex-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:flex-initial"
                   >
                     Modifier
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(c._id)}
-                    className="rounded-full bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600"
+                    className="flex-1 rounded-full bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 sm:flex-initial"
                   >
                     Supprimer
                   </button>
