@@ -86,6 +86,17 @@ export default function LoginForm() {
             className="w-full rounded-lg border px-3 py-2 text-sm"
           />
 
+          {mode === "login" && (
+            <div className="text-right">
+              <a
+                href="/forgot-password"
+                className="text-xs text-slate-600 underline"
+              >
+                Mot de passe oublié ?
+              </a>
+            </div>
+          )}
+
           <button
             type="submit"
             className="w-full rounded-full bg-slate-900 px-3 py-2 text-sm font-semibold text-white"

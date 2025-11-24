@@ -9,6 +9,8 @@ export interface IUser {
   provider: string;
   password?: string | null;
   role: "user" | "admin";
+  resetToken?: string | null;
+  resetTokenExpiry?: Date | null;
 }
 
 //
@@ -26,6 +28,8 @@ const userSchema = new Schema<IUserDocument>(
     provider: { type: String, required: true },
     password: { type: String }, // utilisée avec Credentials
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    resetToken: { type: String },
+    resetTokenExpiry: { type: Date },
   },
   { timestamps: true }
 );
