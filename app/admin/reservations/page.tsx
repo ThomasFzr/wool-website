@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Badge, Card, Input } from "@/components";
 import { CreationModal } from "@/components/CreationModal";
@@ -18,7 +18,7 @@ type Reservation = {
     creationId?: Creation | null;
 };
 
-export default function AdminReservations() {
+function AdminReservationsContent() {
     const searchParams = useSearchParams();
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [page, setPage] = useState(1);
@@ -542,5 +542,21 @@ export default function AdminReservations() {
                 hideActions={true}
             />
         </main>
+    );
+}
+
+export default function AdminReservations() {
+    return (
+        <Suspense fallback={
+            <main className="min-h-screen bg-slate-50">
+                <div className="mx-auto max-w-6xl px-4 py-6">
+                    <div className="text-center py-12">
+                        <p className="text-slate-600">Chargement...</p>
+                    </div>
+                </div>
+            </main>
+        }>
+            <AdminReservationsContent />
+        </Suspense>
     );
 }
