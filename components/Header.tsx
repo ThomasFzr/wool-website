@@ -46,7 +46,7 @@ export function Header({ title, subtitle, pendingReservations = 0 }: HeaderProps
           type="button"
           onClick={() => {
             if (!session) {
-              signIn();
+              signIn(undefined, { callbackUrl: "/" });
             } else {
               setAccountMenuOpen((o) => !o);
             }
