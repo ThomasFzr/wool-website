@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Creation } from "./CreationCard";
 import { Button, Badge } from "./ui";
 
@@ -14,6 +15,7 @@ interface CreationModalProps {
 
 export function CreationModal({ creation, isOpen, onClose, onReserve }: CreationModalProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [zoomed, setZoomed] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -332,31 +334,44 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
         )}
 
         <div className="mt-4 flex items-center justify-between">
-          {justReserved ? (
-            <p className="text-sm font-medium text-green-600">
-              Article bien réservé ✔️
-            </p>
-          ) : creation.sold ? (
-            <p className="text-sm font-medium text-slate-700">
-              Cet article est déjà vendu.
-            </p>
-          ) : creation.reserved ? (
-            <p className="text-sm font-medium text-red-600">
-              Cet article est déjà réservé.
-            </p>
-          ) : !session ? (
-            <Button size="sm" onClick={() => signIn()}>
-              Se connecter pour réserver
-            </Button>
-          ) : (
-            <Button 
-              size="sm" 
-              onClick={handleReserve}
-              disabled={reserveLoading}
+          <div className="flex items-center gap-2">
+            {justReserved ? (
+              <p className="text-sm font-medium text-green-600">
+                Article bien réservé ✔️
+              </p>
+            ) : creation.sold ? (
+              <p className="text-sm font-medium text-slate-700">
+                Cet article est déjà vendu.
+              </p>
+            ) : creation.reserved ? (
+              <p className="text-sm font-medium text-red-600">
+                Cet article est déjà réservé.
+              </p>
+            ) : !session ? (
+              <Button size="sm" onClick={() => signIn()}>
+                Se connecter pour réserver
+              </Button>
+            ) : (
+              <Button 
+                size="sm" 
+                onClick={handleReserve}
+                disabled={reserveLoading}
+              >
+                {reserveLoading ? "Réservation..." : "Réserver"}
+              </Button>
+            )}
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                onClose();
+                router.push(`/contact?creation=${creation._id}`);
+              }}
             >
-              {reserveLoading ? "Réservation..." : "Réserver cet article"}
+              📧 Contacter
             </Button>
-          )}
+          </div>
 
           {creation.price != null && (
             <Badge variant="default" className="text-sm font-semibold py-2 px-4 bg-slate-900 text-white">

@@ -9,12 +9,15 @@ interface HeaderProps {
   title?: string;
   subtitle?: string;
   pendingReservations?: number;
+  newMessages?: number;
 }
 
-export function Header({ title, subtitle, pendingReservations = 0 }: HeaderProps) {
+export function Header({ title, subtitle, pendingReservations = 0, newMessages = 0 }: HeaderProps) {
   const { data: session } = useSession();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const totalNotifications = pendingReservations + newMessages;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -63,9 +66,9 @@ export function Header({ title, subtitle, pendingReservations = 0 }: HeaderProps
 
           <span className="hidden md:flex items-center gap-1.5">
             <span>{session ? "Mon compte" : "Se connecter"}</span>
-            {session?.user?.role === "admin" && pendingReservations > 0 && (
+            {session?.user?.role === "admin" && totalNotifications > 0 && (
               <Badge variant="danger" className="h-5 min-w-5 px-1.5 text-[10px]">
-                {pendingReservations}
+                {totalNotifications}
               </Badge>
             )}
           </span>
@@ -89,6 +92,14 @@ export function Header({ title, subtitle, pendingReservations = 0 }: HeaderProps
               Mes réservations
             </Link>
 
+            <Link
+              href="/contact"
+              className="w-full block px-4 py-2 text-left text-sm hover:bg-slate-100"
+              onClick={() => setAccountMenuOpen(false)}
+            >
+              📧 Contact
+            </Link>
+
             {session.user?.role === "admin" && (
               <>
                 <div className="border-t border-slate-200" />
@@ -98,9 +109,9 @@ export function Header({ title, subtitle, pendingReservations = 0 }: HeaderProps
                   onClick={() => setAccountMenuOpen(false)}
                 >
                   <span>Administration</span>
-                  {pendingReservations > 0 && (
+                  {totalNotifications > 0 && (
                     <Badge variant="danger" className="h-5 min-w-5 px-1.5 text-[10px]">
-                      {pendingReservations}
+                      {totalNotifications}
                     </Badge>
                   )}
                 </Link>

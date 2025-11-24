@@ -44,6 +44,7 @@ export default function AdminPage() {
   const [settings, setSettings] = useState({ title: "", subtitle: "" });
   const [savingSettings, setSavingSettings] = useState(false);
   const [pendingReservations, setPendingReservations] = useState(0);
+  const [newMessages, setNewMessages] = useState(0);
   const [activeTab, setActiveTab] = useState<"creations" | "settings">("creations");
   
   const formRef = useRef<HTMLDivElement>(null);
@@ -88,6 +89,7 @@ export default function AdminPage() {
     if (session?.user?.role === "admin") {
       loadCreations();
       loadPendingReservations();
+      loadNewMessages();
     }
   }, [session]);
 
@@ -97,6 +99,17 @@ export default function AdminPage() {
       if (!res.ok) return;
       const data = await res.json();
       setPendingReservations(data.pending || 0);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function loadNewMessages() {
+    try {
+      const res = await fetch("/api/admin/contact/count");
+      if (!res.ok) return;
+      const data = await res.json();
+      setNewMessages(data.new || 0);
     } catch (err) {
       console.error(err);
     }
@@ -400,6 +413,18 @@ export default function AdminPage() {
               className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200 transition"
             >
               <span>👥 Utilisateurs</span>
+            </Link>
+            <Link
+              href="/admin/contact"
+              className="relative inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200 transition"
+              onClick={loadNewMessages}
+            >
+              <span>📧 Messages</span>
+              {newMessages > 0 && (
+                <Badge variant="danger" className="bg-red-500 text-white">
+                  {newMessages}
+                </Badge>
+              )}
             </Link>
             <Link
               href="/admin/reservations"

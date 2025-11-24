@@ -23,6 +23,7 @@ export default function HomePage() {
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [pendingReservations, setPendingReservations] = useState(0);
+  const [newMessages, setNewMessages] = useState(0);
 
   // Charger les créations et settings
   useEffect(() => {
@@ -63,15 +64,24 @@ export default function HomePage() {
     load();
   }, []);
 
-  // Charger le nombre de réservations en attente si admin
+  // Charger le nombre de réservations en attente et messages si admin
   useEffect(() => {
-    async function loadPendingReservations() {
+    async function loadAdminNotifications() {
       if (session?.user?.role === "admin") {
         try {
-          const res = await fetch("/api/admin/reservations/count");
-          if (res.ok) {
-            const data = await res.json();
+          const [reservationsRes, messagesRes] = await Promise.all([
+            fetch("/api/admin/reservations/count"),
+            fetch("/api/admin/contact/count"),
+          ]);
+
+          if (reservationsRes.ok) {
+            const data = await reservationsRes.json();
             setPendingReservations(data.pending || 0);
+          }
+
+          if (messagesRes.ok) {
+            const data = await messagesRes.json();
+            setNewMessages(data.new || 0);
           }
         } catch (err) {
           console.error(err);
@@ -79,7 +89,7 @@ export default function HomePage() {
       }
     }
 
-    loadPendingReservations();
+    loadAdminNotifications();
   }, [session]);
 
   function openModal(creation: Creation) {
@@ -159,6 +169,7 @@ export default function HomePage() {
           title={settings?.title}
           subtitle={settings?.subtitle}
           pendingReservations={pendingReservations}
+          newMessages={newMessages}
         />
 
         {loading && (
