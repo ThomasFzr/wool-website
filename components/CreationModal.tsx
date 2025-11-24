@@ -26,6 +26,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
   const [swipeDeltaX, setSwipeDeltaX] = useState(0);
   const [reserveLoading, setReserveLoading] = useState(false);
   const [justReserved, setJustReserved] = useState(false);
+  const [hasDragged, setHasDragged] = useState(false);
 
   const images = creation?.images && creation.images.length > 0 
     ? creation.images 
@@ -81,11 +82,17 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
   function nextImage() {
     if (images.length <= 1) return;
     setCurrentIndex((prev) => (prev + 1) % images.length);
+    setZoomed(false);
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
   }
 
   function prevImage() {
     if (images.length <= 1) return;
     setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+    setZoomed(false);
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
   }
 
   async function handleReserve() {
@@ -140,17 +147,25 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
           className="relative h-[500px] w-full overflow-hidden rounded-xl bg-slate-100 touch-pan-y"
           onMouseDown={(e) => {
             if (!zoomed) return;
+            e.preventDefault();
             setIsDragging(true);
+            setHasDragged(false);
             setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
           }}
           onMouseMove={(e) => {
             if (!zoomed || !isDragging || !dragStart) return;
+            e.preventDefault();
+            setHasDragged(true);
             const newX = e.clientX - dragStart.x;
             const newY = e.clientY - dragStart.y;
             setOffset({ x: newX, y: newY });
           }}
-          onMouseUp={() => setIsDragging(false)}
-          onMouseLeave={() => setIsDragging(false)}
+          onMouseUp={() => {
+            setIsDragging(false);
+          }}
+          onMouseLeave={() => {
+            setIsDragging(false);
+          }}
           onTouchStart={(e) => {
             const touches = e.touches;
 
@@ -188,6 +203,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
 
             if (zoomed) {
               setIsDragging(true);
+              setHasDragged(false);
               setDragStart({ x: t.clientX - offset.x, y: t.clientY - offset.y });
             }
           }}
@@ -206,6 +222,8 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
             }
 
             if (zoomed && isDragging && dragStart && touches.length === 1) {
+              e.preventDefault();
+              setHasDragged(true);
               const t = touches[0];
               const newX = t.clientX - dragStart.x;
               const newY = t.clientY - dragStart.y;
@@ -240,6 +258,12 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
               src={images[currentIndex]}
               alt={`${creation.title} ${currentIndex + 1}`}
               onClick={() => {
+                // Ne pas dé-zoomer si on vient de drag
+                if (hasDragged) {
+                  setHasDragged(false);
+                  return;
+                }
+                
                 if (!zoomed) {
                   setZoomed(true);
                   setScale(1.7);
@@ -250,12 +274,13 @@ export function CreationModal({ creation, isOpen, onClose, onReserve }: Creation
                 }
               }}
               className={`h-full w-full object-contain transition-transform duration-300 select-none ${
-                zoomed ? "cursor-zoom-out" : "cursor-zoom-in"
+                zoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
               }`}
               style={{
                 transform: zoomed
-                  ? `scale(${scale}) translate(${offset.x}px, ${offset.y}px)`
+                  ? `scale(${scale}) translate(${offset.x / scale}px, ${offset.y / scale}px)`
                   : `translateX(${swipeDeltaX}px) scale(1)`,
+                transformOrigin: "center center",
               }}
               draggable={false}
             />
