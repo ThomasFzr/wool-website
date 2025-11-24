@@ -21,7 +21,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name, email, role, password } = body;
+    const { name, email, role, password, phone, address, city, postalCode, emailNotifications } = body;
 
     await connectToDatabase();
 
@@ -45,27 +45,42 @@ export async function PATCH(
       }
     }
 
-    // Mettre à jour les champs
-    if (name !== undefined) user.name = name;
-    if (email) user.email = email;
-    if (role) user.role = role;
+    // Mettre à jour les champs avec findOneAndUpdate pour éviter les problèmes de validation
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (email) updateData.email = email;
+    if (role) updateData.role = role;
+    if (phone !== undefined) updateData.phone = phone;
+    if (address !== undefined) updateData.address = address;
+    if (city !== undefined) updateData.city = city;
+    if (postalCode !== undefined) updateData.postalCode = postalCode;
+    if (emailNotifications !== undefined) updateData.emailNotifications = emailNotifications;
 
     // Si un nouveau mot de passe est fourni
     if (password) {
       const bcrypt = require("bcryptjs");
-      user.password = await bcrypt.hash(password, 10);
+      updateData.password = await bcrypt.hash(password, 10);
     }
 
-    await user.save();
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: false }
+    );
 
     const userResponse = {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      provider: user.provider,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      _id: updatedUser?._id,
+      name: updatedUser?.name,
+      email: updatedUser?.email,
+      role: updatedUser?.role,
+      provider: updatedUser?.provider,
+      phone: updatedUser?.phone,
+      address: updatedUser?.address,
+      city: updatedUser?.city,
+      postalCode: updatedUser?.postalCode,
+      emailNotifications: updatedUser?.emailNotifications,
+      createdAt: updatedUser?.createdAt,
+      updatedAt: updatedUser?.updatedAt,
     };
 
     return NextResponse.json(userResponse);

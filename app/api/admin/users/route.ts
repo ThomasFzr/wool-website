@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, email, role, password } = body;
+    const { name, email, role, password, phone, address, city, postalCode, emailNotifications } = body;
 
     if (!email) {
       return NextResponse.json(
@@ -79,6 +79,11 @@ export async function POST(req: NextRequest) {
       provider: password ? "credentials" : "admin-created",
       password: hashedPassword,
       role: role || "user",
+      phone: phone || null,
+      address: address || null,
+      city: city || null,
+      postalCode: postalCode || null,
+      emailNotifications: emailNotifications ?? true,
     });
 
     const userResponse = {
@@ -87,6 +92,11 @@ export async function POST(req: NextRequest) {
       email: newUser.email,
       role: newUser.role,
       provider: newUser.provider,
+      phone: newUser.phone,
+      address: newUser.address,
+      city: newUser.city,
+      postalCode: newUser.postalCode,
+      emailNotifications: newUser.emailNotifications,
       createdAt: newUser.createdAt,
     };
 

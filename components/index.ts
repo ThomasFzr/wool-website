@@ -12,6 +12,7 @@ export { CreationModal } from "./CreationModal";
 export { ReservationCard } from "./ReservationCard";
 export { Filters } from "./Filters";
 export { LogoutButton } from "./LogoutButton";
+export { ProfileForm } from "./ProfileForm";
 export { default as AuthSessionProvider } from "./AuthSessionProvider";
 
 // Types

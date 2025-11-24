@@ -11,6 +11,11 @@ export interface IUser {
   role: "user" | "admin";
   resetToken?: string | null;
   resetTokenExpiry?: Date | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  postalCode?: string | null;
+  emailNotifications?: boolean;
 }
 
 //
@@ -33,6 +38,11 @@ const userSchema = new Schema<IUserDocument>(
     role: { type: String, enum: ["user", "admin"], default: "user" },
     resetToken: { type: String },
     resetTokenExpiry: { type: Date },
+    phone: { type: String },
+    address: { type: String },
+    city: { type: String },
+    postalCode: { type: String },
+    emailNotifications: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

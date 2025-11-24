@@ -12,6 +12,11 @@ type User = {
   email: string;
   role: "user" | "admin";
   provider: string;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  postalCode?: string | null;
+  emailNotifications?: boolean;
   createdAt?: string;
 };
 
@@ -30,6 +35,11 @@ export default function AdminUsersPage() {
     email: "",
     role: "user" as "user" | "admin",
     password: "",
+    phone: "",
+    address: "",
+    city: "",
+    postalCode: "",
+    emailNotifications: true,
   });
 
   useEffect(() => {
@@ -62,7 +72,17 @@ export default function AdminUsersPage() {
 
   function handleCreate() {
     setEditingUser(null);
-    setForm({ name: "", email: "", role: "user", password: "" });
+    setForm({ 
+      name: "", 
+      email: "", 
+      role: "user", 
+      password: "",
+      phone: "",
+      address: "",
+      city: "",
+      postalCode: "",
+      emailNotifications: true,
+    });
     setShowModal(true);
     setMessage(null);
   }
@@ -74,6 +94,11 @@ export default function AdminUsersPage() {
       email: user.email,
       role: user.role,
       password: "",
+      phone: user.phone || "",
+      address: user.address || "",
+      city: user.city || "",
+      postalCode: user.postalCode || "",
+      emailNotifications: user.emailNotifications ?? true,
     });
     setShowModal(true);
     setMessage(null);
@@ -89,6 +114,11 @@ export default function AdminUsersPage() {
         email: form.email,
         role: form.role,
         password: form.password || undefined,
+        phone: form.phone || null,
+        address: form.address || null,
+        city: form.city || null,
+        postalCode: form.postalCode || null,
+        emailNotifications: form.emailNotifications,
       };
 
       const url = editingUser
@@ -114,7 +144,17 @@ export default function AdminUsersPage() {
       setTimeout(() => setMessage(null), 3000);
 
       setShowModal(false);
-      setForm({ name: "", email: "", role: "user", password: "" });
+      setForm({ 
+        name: "", 
+        email: "", 
+        role: "user", 
+        password: "",
+        phone: "",
+        address: "",
+        city: "",
+        postalCode: "",
+        emailNotifications: true,
+      });
       setEditingUser(null);
       loadUsers();
     } catch (err) {
@@ -152,7 +192,17 @@ export default function AdminUsersPage() {
   function closeModal() {
     setShowModal(false);
     setEditingUser(null);
-    setForm({ name: "", email: "", role: "user", password: "" });
+    setForm({ 
+      name: "", 
+      email: "", 
+      role: "user", 
+      password: "",
+      phone: "",
+      address: "",
+      city: "",
+      postalCode: "",
+      emailNotifications: true,
+    });
     setMessage(null);
   }
 
@@ -236,8 +286,18 @@ export default function AdminUsersPage() {
                       {user.role}
                     </Badge>
                     <Badge variant="default">{user.provider}</Badge>
+                    {user.emailNotifications === false && (
+                      <Badge variant="default">🔕 Notifs off</Badge>
+                    )}
                   </div>
                   <p className="text-sm text-slate-600">{user.email}</p>
+                  {(user.phone || user.city) && (
+                    <p className="text-xs text-slate-500">
+                      {user.phone && `📞 ${user.phone}`}
+                      {user.phone && user.city && " • "}
+                      {user.city && `📍 ${user.city}`}
+                    </p>
+                  )}
                   {user.createdAt && (
                     <p className="text-xs text-slate-500 mt-1">
                       Créé le{" "}
@@ -323,6 +383,55 @@ export default function AdminUsersPage() {
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required={!editingUser}
               />
+
+              <Input
+                label="Téléphone"
+                type="tel"
+                placeholder="06 12 34 56 78"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Adresse
+                </label>
+                <textarea
+                  placeholder="12 rue de la Laine"
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  rows={2}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Ville"
+                  placeholder="Paris"
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                />
+
+                <Input
+                  label="Code postal"
+                  placeholder="75001"
+                  value={form.postalCode}
+                  onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.emailNotifications}
+                  onChange={(e) => setForm({ ...form, emailNotifications: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300"
+                />
+                <span className="text-sm text-slate-700">
+                  Notifications par email activées
+                </span>
+              </label>
 
               <div className="flex gap-2 pt-2">
                 <Button type="submit">
