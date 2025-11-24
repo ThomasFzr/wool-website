@@ -33,7 +33,7 @@ const userSchema = new Schema<IUserDocument>(
   {
     name: { type: String },
     email: { type: String, required: true, unique: true },
-    provider: { type: String, required: true },
+    provider: { type: String, default: "credentials" },
     password: { type: String }, // utilisée avec Credentials
     role: { type: String, enum: ["user", "admin"], default: "user" },
     resetToken: { type: String },

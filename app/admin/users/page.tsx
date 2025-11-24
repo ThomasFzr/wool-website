@@ -283,9 +283,11 @@ export default function AdminUsersPage() {
                     <Badge
                       variant={user.role === "admin" ? "danger" : "default"}
                     >
-                      {user.role}
+                      {user.role || "user"}
                     </Badge>
-                    <Badge variant="default">{user.provider}</Badge>
+                    {user.provider && (
+                      <Badge variant="default">{user.provider}</Badge>
+                    )}
                     {user.emailNotifications === false && (
                       <Badge variant="default">🔕 Notifs off</Badge>
                     )}
