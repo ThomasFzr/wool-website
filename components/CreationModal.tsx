@@ -339,7 +339,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
             <div className="flex items-center gap-2">
               {justReserved ? (
                 <p className="text-sm font-medium text-green-600">
-                  Article bien réservé ✔️
+                  Article réservé ✔️
                 </p>
               ) : creation.sold ? (
                 <p className="text-sm font-medium text-slate-700">
