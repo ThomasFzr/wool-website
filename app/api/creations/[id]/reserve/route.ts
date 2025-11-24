@@ -146,7 +146,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
             </div>
 
             <p style="font-size:12px;margin-top:20px;color:#6b7280;">
-              <a href="${appUrl}/admin/reservations" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer cette réservation dans l'admin</a>
+              <a href="${appUrl}/admin/reservations" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer cette réservation</a>
             </p>
         `),
       });

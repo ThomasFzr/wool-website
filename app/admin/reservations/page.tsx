@@ -3,6 +3,16 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button, Badge, Card, Input } from "@/components";
 
+type Creation = {
+    _id: string;
+    title: string;
+    images?: string[];
+    imageUrl?: string;
+    price?: number;
+    color?: string;
+    description?: string;
+};
+
 type Reservation = {
     _id: string;
     name: string;
@@ -12,15 +22,7 @@ type Reservation = {
     createdAt: string;
     cancelReason?: string;
     cancelledBy?: "admin" | "user";
-    creationId?: {
-        _id: string;
-        title: string;
-        images?: string[];
-        imageUrl?: string;
-        price?: number;
-        color?: string;
-        description?: string;
-    } | null;
+    creationId?: Creation | null;
 };
 
 export default function AdminReservations() {
@@ -33,6 +35,8 @@ export default function AdminReservations() {
     const [showValidateConfirm, setShowValidateConfirm] = useState(false);
     const [showCancelConfirm, setShowCancelConfirm] = useState(false);
     const [cancelReason, setCancelReason] = useState("");
+    const [showCreationModal, setShowCreationModal] = useState(false);
+    const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
 
     async function load() {
         const params = new URLSearchParams({
@@ -321,10 +325,7 @@ export default function AdminReservations() {
                             <Card className="p-4 mb-4">
                                 <p className="text-xs font-semibold text-slate-700 mb-3">🎨 Article réservé</p>
 
-                                <Link
-                                    href={`/admin?edit=${selected.creationId._id}`}
-                                    className="flex gap-3 mb-3 p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition cursor-pointer"
-                                >
+                                <div className="flex gap-3 mb-3 p-3 rounded-lg border border-slate-200">
                                     {/* Image */}
                                     {(selected.creationId.images?.[0] || selected.creationId.imageUrl) && (
                                         <img
@@ -348,33 +349,43 @@ export default function AdminReservations() {
                                         </div>
 
                                         {selected.creationId.color && (
-                                            <div className="flex items-center gap-1.5">
+                                            <div className="flex items-center gap-1.5 mb-3">
                                                 <span className="text-xs text-slate-500">Couleur:</span>
                                                 <Badge variant="default">{selected.creationId.color}</Badge>
                                             </div>
                                         )}
-                                    </div>
 
-                                    <svg
-                                        className="h-5 w-5 text-slate-400 shrink-0 self-center"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                        />
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                        />
-                                    </svg>
-                                </Link>
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setSelectedCreation(selected.creationId!);
+                                                setShowCreationModal(true);
+                                            }}
+                                            className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-900 transition"
+                                        >
+                                            <svg
+                                                className="h-4 w-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                                />
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                                />
+                                            </svg>
+                                            Voir en détail
+                                        </button>
+                                    </div>
+                                </div>
 
                                 {/* Description complète */}
                                 {selected.creationId.description && (
@@ -510,6 +521,331 @@ export default function AdminReservations() {
                     </div>
                 </>
             )}
+
+            {/* Modale de visualisation de la création */}
+            {showCreationModal && selectedCreation && (
+                <CreationViewModal
+                    creation={selectedCreation}
+                    isOpen={showCreationModal}
+                    onClose={() => {
+                        setShowCreationModal(false);
+                        setSelectedCreation(null);
+                    }}
+                />
+            )}
         </main>
+    );
+}
+
+function CreationViewModal({ creation, isOpen, onClose }: { creation: Creation; isOpen: boolean; onClose: () => void }) {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [zoomed, setZoomed] = useState(false);
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+    const [scale, setScale] = useState(1);
+    const [pinchStartDistance, setPinchStartDistance] = useState<number | null>(null);
+    const [pinchStartScale, setPinchStartScale] = useState(1);
+    const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
+    const [swipeDeltaX, setSwipeDeltaX] = useState(0);
+    const [hasDragged, setHasDragged] = useState(false);
+
+    const images = creation?.images && creation.images.length > 0 
+        ? creation.images 
+        : creation?.imageUrl 
+            ? [creation.imageUrl] 
+            : [];
+
+    useEffect(() => {
+        if (!isOpen) {
+            setCurrentIndex(0);
+            setZoomed(false);
+            setOffset({ x: 0, y: 0 });
+            setScale(1);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen) {
+            const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+            document.body.style.overflow = "hidden";
+            document.body.style.paddingRight = `${scrollbarWidth}px`;
+        } else {
+            document.body.style.overflow = "unset";
+            document.body.style.paddingRight = "0px";
+        }
+
+        return () => {
+            document.body.style.overflow = "unset";
+            document.body.style.paddingRight = "0px";
+        };
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        function handleKey(e: KeyboardEvent) {
+            if (e.key === "Escape") {
+                onClose();
+            } else if (e.key === "ArrowRight") {
+                nextImage();
+            } else if (e.key === "ArrowLeft") {
+                prevImage();
+            }
+        }
+
+        window.addEventListener("keydown", handleKey);
+        return () => window.removeEventListener("keydown", handleKey);
+    }, [isOpen, currentIndex]);
+
+    function nextImage() {
+        if (images.length <= 1) return;
+        setCurrentIndex((prev) => (prev + 1) % images.length);
+        setZoomed(false);
+        setScale(1);
+        setOffset({ x: 0, y: 0 });
+    }
+
+    function prevImage() {
+        if (images.length <= 1) return;
+        setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+        setZoomed(false);
+        setScale(1);
+        setOffset({ x: 0, y: 0 });
+    }
+
+    if (!creation) return null;
+
+    return (
+        <div
+            className={`fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 transition-opacity duration-150 ${
+                isOpen ? "opacity-100" : "opacity-0"
+            }`}
+            onClick={onClose}
+        >
+            <div
+                className={`relative w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl transform-gpu transition-all duration-150 max-h-[90vh] ${
+                    isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                }`}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button
+                    onClick={onClose}
+                    className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
+                    aria-label="Fermer"
+                >
+                    ✕
+                </button>
+
+                <div className="mb-3">
+                    <h2 className="text-sm font-semibold text-slate-900">
+                        {creation.title}
+                    </h2>
+                    {creation.description && (
+                        <p className="mt-1 whitespace-pre-line text-xs text-slate-600">
+                            {creation.description}
+                        </p>
+                    )}
+                </div>
+
+                <div
+                    className="relative h-[500px] w-full overflow-hidden rounded-xl bg-slate-100 touch-pan-y"
+                    onMouseDown={(e) => {
+                        if (!zoomed) return;
+                        e.preventDefault();
+                        setIsDragging(true);
+                        setHasDragged(false);
+                        setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+                    }}
+                    onMouseMove={(e) => {
+                        if (!zoomed || !isDragging || !dragStart) return;
+                        e.preventDefault();
+                        setHasDragged(true);
+                        const newX = e.clientX - dragStart.x;
+                        const newY = e.clientY - dragStart.y;
+                        setOffset({ x: newX, y: newY });
+                    }}
+                    onMouseUp={() => {
+                        setIsDragging(false);
+                    }}
+                    onMouseLeave={() => {
+                        setIsDragging(false);
+                    }}
+                    onTouchStart={(e) => {
+                        const touches = e.touches;
+
+                        if (touches.length === 2) {
+                            const dx = touches[0].clientX - touches[1].clientX;
+                            const dy = touches[0].clientY - touches[1].clientY;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            setPinchStartDistance(dist);
+                            setPinchStartScale(scale || 1);
+                            setZoomed(true);
+                            setSwipeStartX(null);
+                            setSwipeDeltaX(0);
+                            return;
+                        }
+
+                        const t = touches[0];
+                        const now = Date.now();
+                        if ((window as any).lastTap && now - (window as any).lastTap < 280) {
+                            if (!zoomed) {
+                                setZoomed(true);
+                                setScale(1.7);
+                            } else {
+                                setZoomed(false);
+                                setScale(1);
+                                setOffset({ x: 0, y: 0 });
+                            }
+                            (window as any).lastTap = 0;
+                            return;
+                        }
+                        (window as any).lastTap = now;
+
+                        if (!zoomed) {
+                            setSwipeStartX(t.clientX);
+                        }
+
+                        if (zoomed) {
+                            setIsDragging(true);
+                            setHasDragged(false);
+                            setDragStart({ x: t.clientX - offset.x, y: t.clientY - offset.y });
+                        }
+                    }}
+                    onTouchMove={(e) => {
+                        const touches = e.touches;
+
+                        if (touches.length === 2 && pinchStartDistance !== null) {
+                            const dx = touches[0].clientX - touches[1].clientX;
+                            const dy = touches[0].clientY - touches[1].clientY;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            const factor = dist / pinchStartDistance;
+                            const newScale = Math.min(3, Math.max(1, pinchStartScale * factor));
+                            setScale(newScale);
+                            setZoomed(newScale > 1.02);
+                            return;
+                        }
+
+                        if (zoomed && isDragging && dragStart && touches.length === 1) {
+                            e.preventDefault();
+                            setHasDragged(true);
+                            const t = touches[0];
+                            const newX = t.clientX - dragStart.x;
+                            const newY = t.clientY - dragStart.y;
+                            setOffset({ x: newX, y: newY });
+                            return;
+                        }
+
+                        if (!zoomed && swipeStartX !== null && touches.length === 1) {
+                            const t = touches[0];
+                            const delta = t.clientX - swipeStartX;
+                            setSwipeDeltaX(delta);
+                        }
+                    }}
+                    onTouchEnd={() => {
+                        if (pinchStartDistance !== null) {
+                            setPinchStartDistance(null);
+                            setIsDragging(false);
+                            return;
+                        }
+
+                        if (!zoomed) {
+                            if (swipeDeltaX > 60) prevImage();
+                            if (swipeDeltaX < -60) nextImage();
+                        }
+                        setSwipeStartX(null);
+                        setSwipeDeltaX(0);
+                        setIsDragging(false);
+                    }}
+                >
+                    {images.length > 0 ? (
+                        <img
+                            src={images[currentIndex]}
+                            alt={`${creation.title} ${currentIndex + 1}`}
+                            onClick={() => {
+                                if (hasDragged) {
+                                    setHasDragged(false);
+                                    return;
+                                }
+                                
+                                if (!zoomed) {
+                                    setZoomed(true);
+                                    setScale(1.7);
+                                } else {
+                                    setZoomed(false);
+                                    setScale(1);
+                                    setOffset({ x: 0, y: 0 });
+                                }
+                            }}
+                            className={`h-full w-full object-contain transition-transform duration-300 select-none ${
+                                zoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
+                            }`}
+                            style={{
+                                transform: zoomed
+                                    ? `scale(${scale}) translate(${offset.x / scale}px, ${offset.y / scale}px)`
+                                    : `translateX(${swipeDeltaX}px) scale(1)`,
+                                transformOrigin: "center center",
+                            }}
+                            draggable={false}
+                        />
+                    ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
+                            Pas d&apos;image
+                        </div>
+                    )}
+
+                    {images.length > 1 && (
+                        <>
+                            <button
+                                onClick={prevImage}
+                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black"
+                            >
+                                ◀
+                            </button>
+                            <button
+                                onClick={nextImage}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black"
+                            >
+                                ▶
+                            </button>
+                            <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white">
+                                {currentIndex + 1} / {images.length}
+                            </span>
+                        </>
+                    )}
+                </div>
+
+                {images.length > 1 && (
+                    <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-2">
+                        {images.map((url, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setCurrentIndex(i)}
+                                className={`h-14 w-14 shrink-0 rounded-md border-2 transition ${
+                                    i === currentIndex ? "border-slate-900 ring-2 ring-slate-300" : "border-transparent opacity-60 hover:opacity-100"
+                                }`}
+                            >
+                                <img
+                                    src={url}
+                                    alt={`miniature ${i + 1}`}
+                                    className="h-full w-full rounded-md object-cover"
+                                />
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                <div className="mt-4 flex items-center justify-between">
+                    <div className="text-xs text-slate-600">
+                        💡 Cliquez sur l&apos;image pour zoomer
+                    </div>
+                    {creation.price != null && (
+                        <Badge variant="default" className="text-sm font-semibold py-2 whitespace-nowrap px-4 bg-slate-900 text-white">
+                            {creation.price} €
+                        </Badge>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }
