@@ -62,15 +62,14 @@ function AdminReservationsContent() {
         load();
     }, [page, search, statusFilter]);
 
-    // Ouvrir automatiquement la modale si creationId est dans l'URL
+    // Ouvrir automatiquement la sidebar de réservation si creationId est dans l'URL
     useEffect(() => {
         const creationId = searchParams.get('creationId');
         if (creationId && reservations.length > 0) {
             // Trouver la réservation avec cette création
             const reservation = reservations.find((r) => r.creationId?._id === creationId);
-            if (reservation?.creationId) {
-                setSelectedCreation(reservation.creationId);
-                setShowCreationModal(true);
+            if (reservation) {
+                setSelected(reservation);
                 // Nettoyer l'URL après ouverture
                 window.history.replaceState({}, '', '/admin/reservations');
             }
