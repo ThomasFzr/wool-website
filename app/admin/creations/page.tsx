@@ -45,6 +45,7 @@ function AdminCreationsContent() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [listDragIndex, setListDragIndex] = useState<number | null>(null);
+  const [listTouchStartIndex, setListTouchStartIndex] = useState<number | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   
   const formRef = useRef<HTMLDivElement>(null);
@@ -346,6 +347,41 @@ function AdminCreationsContent() {
     setListDragIndex(null);
   }
 
+  // Gestion du touch pour la liste des créations (mobile)
+  function handleListTouchStart(index: number) {
+    setListTouchStartIndex(index);
+    setListDragIndex(index);
+  }
+
+  function handleListTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (listTouchStartIndex === null) return;
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+
+    const creationCard = element.closest("[data-creation-index]");
+    if (!creationCard) return;
+
+    const targetIndex = Number(creationCard.getAttribute("data-creation-index"));
+
+    if (targetIndex !== listTouchStartIndex && targetIndex >= 0) {
+      setCreations((prev) => {
+        const newList = [...prev];
+        const [movedItem] = newList.splice(listTouchStartIndex, 1);
+        newList.splice(targetIndex, 0, movedItem);
+        return newList;
+      });
+
+      setListTouchStartIndex(targetIndex);
+      setListDragIndex(targetIndex);
+    }
+  }
+
+  function handleListTouchEnd() {
+    setListTouchStartIndex(null);
+    setListDragIndex(null);
+  }
+
   async function saveCreationOrder() {
     try {
       setSavingOrder(true);
@@ -471,15 +507,20 @@ function AdminCreationsContent() {
               {creations.map((c, index) => (
                 <div
                   key={c._id}
+                  data-creation-index={index}
                   draggable
                   onDragStart={() => handleListDragStart(index)}
                   onDragOver={(e) => handleListDragOver(e, index)}
                   onDragEnd={handleListDragEnd}
+                  onTouchStart={() => handleListTouchStart(index)}
+                  onTouchMove={handleListTouchMove}
+                  onTouchEnd={handleListTouchEnd}
                   className={`flex flex-col gap-3 rounded-xl border bg-white p-3 transition hover:shadow-sm sm:flex-row sm:items-center sm:justify-between cursor-move ${
                     listDragIndex === index
                       ? "border-blue-500 ring-2 ring-blue-200"
                       : "border-slate-200"
                   }`}
+                  style={{ touchAction: "none" }}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-600">
