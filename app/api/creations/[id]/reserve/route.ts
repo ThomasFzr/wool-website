@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
+import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 
 type RouteContext = {
@@ -52,6 +53,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
     creation.reservedAt = new Date();
     await creation.save();
 
+    // Vérifier les préférences de notification de l'utilisateur
+    const user = await User.findOne({ email: session.user.email });
+    const shouldSendEmail = user?.emailNotifications !== false;
 
     const productImage =
       (Array.isArray(creation.images) && creation.images.length > 0
@@ -66,9 +70,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
     /* ---------------------------
        📧 EMAIL À L'ACHETEUR (beau HTML)
     ----------------------------*/
-    await sendEmail({
-      to: contact,
-      subject: "✅ Votre réservation chez MailleMum est enregistrée",
+    if (shouldSendEmail) {
+      await sendEmail({
+        to: contact,
+        subject: "✅ Votre réservation chez MailleMum est enregistrée",
       html: `
       <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#0f172a; background:#f8fafc; padding:24px;">
         <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
@@ -109,7 +114,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
         </div>
       </div>
       `,
-    });
+      });
+    }
 
     /* ---------------------------
        📧 EMAIL AU VENDEUR (détails complets)

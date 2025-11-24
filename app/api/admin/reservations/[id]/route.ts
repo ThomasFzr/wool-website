@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
+import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { checkAdminAuth } from "@/lib/auth";
 
@@ -53,8 +54,13 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
         },
       });
 
+      // Vérifier les préférences de notification de l'utilisateur
+      const user = await User.findOne({ email: reservation.contact });
+      const shouldSendEmail = user?.emailNotifications !== false;
+
       // 📧 Email de confirmation à l'acheteur
-      await sendEmail({
+      if (shouldSendEmail) {
+        await sendEmail({
         to: reservation.contact,
         subject: "🎉 Votre réservation a été validée",
         html: `
@@ -92,7 +98,8 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
           </div>
         </div>
         `,
-      });
+        });
+      }
 
       // 📧 Email au vendeur
       if (process.env.SELLER_EMAIL) {
@@ -158,8 +165,13 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
         body.cancelReason ||
         "Aucune raison précisée.";
 
+      // Vérifier les préférences de notification de l'utilisateur
+      const user = await User.findOne({ email: reservation.contact });
+      const shouldSendEmail = user?.emailNotifications !== false;
+
       // 📧 Email à l'acheteur
-      await sendEmail({
+      if (shouldSendEmail) {
+        await sendEmail({
         to: reservation.contact,
         subject: "❌ Votre réservation a été annulée",
         html: `
@@ -197,7 +209,8 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
           </div>
         </div>
         `,
-      });
+        });
+      }
 
       // 📧 Email au vendeur
       if (process.env.SELLER_EMAIL) {

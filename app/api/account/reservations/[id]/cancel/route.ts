@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
+import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 
 export async function PATCH(
@@ -73,8 +74,12 @@ export async function PATCH(
       });
     }
 
-    // 6️⃣ Emails (inchangé, j’utilise ta logique)
+    // 6️⃣ Emails (inchangé, j'utilise ta logique)
     if (creation) {
+      // Vérifier les préférences de notification de l'utilisateur
+      const user = await User.findOne({ email: session.user.email });
+      const shouldSendEmail = user?.emailNotifications !== false;
+
       const appUrl = process.env.NEXT_PUBLIC_APP_URL;
       const productImage =
         (Array.isArray(creation.images) && creation.images.length > 0
@@ -91,7 +96,8 @@ export async function PATCH(
           : "Aucune raison précisée.";
 
       // 📧 Email à l'acheteur (c'est lui qui a annulé)
-      await sendEmail({
+      if (shouldSendEmail) {
+        await sendEmail({
         to: reservation.contact,
         subject: "❌ Vous avez annulé votre réservation",
         html: `
@@ -134,7 +140,8 @@ export async function PATCH(
           </div>
         </div>
         `,
-      });
+        });
+      }
 
       // 📧 Email au vendeur (l'utilisateur a annulé)
       if (process.env.SELLER_EMAIL) {
