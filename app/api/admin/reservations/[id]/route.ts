@@ -104,7 +104,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
             <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
               <h1 style="font-size:18px;margin:0 0 12px 0;">Réservation validée</h1>
               <p style="font-size:14px;margin:0 0 12px 0;">
-                La réservation de <strong>${reservation.name}</strong> (${reservation.contact}) a été marquée comme <strong>validée</strong>.
+                La réservation de <strong>${reservation.name}</strong> (${reservation.contact}) a été <strong>validée</strong>.
               </p>
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
@@ -209,7 +209,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
             <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #fee2e2;">
               <h1 style="font-size:18px;margin:0 0 12px 0;">Réservation annulée</h1>
               <p style="font-size:14px;margin:0 0 12px 0;">
-                La réservation de <strong>${reservation.name}</strong> (${reservation.contact}) a été marquée comme <strong>annulée</strong>.
+                La réservation de <strong>${reservation.name}</strong> (${reservation.contact}) a été <strong>annulée</strong>.
               </p>
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">

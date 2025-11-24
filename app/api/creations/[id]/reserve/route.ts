@@ -123,7 +123,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
           <div style="max-width:600px;margin:0 auto;background:white;border-radius:16px;padding:24px;border:1px solid #e5e7eb;">
             <h1 style="font-size:18px;margin:0 0 12px 0;">Nouvelle réservation</h1>
             <p style="font-size:14px;margin:0 0 12px 0;">
-              <strong>${name}</strong> (${contact}) a réservé un article.
+              <strong>${name}</strong> (${contact}) a réservé :
             </p>
 
             <div style="margin-top:12px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
             </div>
 
             <p style="font-size:12px;margin-top:20px;color:#6b7280;">
-              Gérer cette réservation dans l'admin.
+              <a href="${appUrl}/admin/reservations" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer cette réservation dans l'admin</a>
             </p>
           </div>
         </div>
