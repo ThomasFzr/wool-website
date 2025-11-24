@@ -30,6 +30,9 @@ export default function AdminReservations() {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [selected, setSelected] = useState<Reservation | null>(null);
+    const [showValidateConfirm, setShowValidateConfirm] = useState(false);
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+    const [cancelReason, setCancelReason] = useState("");
 
     async function load() {
         const params = new URLSearchParams({
@@ -52,6 +55,9 @@ export default function AdminReservations() {
         setPage(data.page);
         setTotalPages(data.totalPages);
         setSelected(null);
+        setShowValidateConfirm(false);
+        setShowCancelConfirm(false);
+        setCancelReason("");
     }
 
     useEffect(() => {
@@ -59,9 +65,14 @@ export default function AdminReservations() {
     }, [page, search, statusFilter]);
 
     async function updateStatus(id: string, status: string) {
+        const body: any = { status };
+        if (status === "cancelled" && cancelReason.trim()) {
+            body.cancelReason = cancelReason.trim();
+        }
+        
         await fetch(`/api/admin/reservations/${id}`, {
             method: "PATCH",
-            body: JSON.stringify({ status }),
+            body: JSON.stringify(body),
             headers: { "Content-Type": "application/json" },
         });
         load();
@@ -381,24 +392,102 @@ export default function AdminReservations() {
                             {selected.status === "pending" && (
                                 <>
                                     <p className="text-xs font-semibold text-slate-700 mb-2">⚡ Actions</p>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            onClick={() => updateStatus(selected._id, "validated")}
-                                            className="flex-1 bg-green-600 hover:bg-green-700"
-                                            size="md"
-                                        >
-                                            ✅ Valider
-                                        </Button>
+                                    
+                                    {!showValidateConfirm && !showCancelConfirm ? (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                onClick={() => setShowValidateConfirm(true)}
+                                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                                size="md"
+                                            >
+                                                ✅ Valider
+                                            </Button>
 
-                                        <Button
-                                            variant="danger"
-                                            onClick={() => updateStatus(selected._id, "cancelled")}
-                                            className="flex-1"
-                                            size="md"
-                                        >
-                                            ❌ Annuler
-                                        </Button>
-                                    </div>
+                                            <Button
+                                                variant="danger"
+                                                onClick={() => setShowCancelConfirm(true)}
+                                                className="flex-1"
+                                                size="md"
+                                            >
+                                                ❌ Annuler
+                                            </Button>
+                                        </div>
+                                    ) : null}
+
+                                    {/* Confirmation de validation */}
+                                    {showValidateConfirm && (
+                                        <Card className="p-4 bg-green-50 border-green-200">
+                                            <p className="text-sm font-semibold text-green-900 mb-3">
+                                                ✅ Confirmer la validation ?
+                                            </p>
+                                            <p className="text-xs text-green-700 mb-4">
+                                                L'article sera marqué comme vendu et un email sera envoyé au client.
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    onClick={() => {
+                                                        updateStatus(selected._id, "validated");
+                                                    }}
+                                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                                    size="sm"
+                                                >
+                                                    Confirmer
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={() => setShowValidateConfirm(false)}
+                                                    className="flex-1"
+                                                    size="sm"
+                                                >
+                                                    Annuler
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    )}
+
+                                    {/* Confirmation d'annulation avec raison */}
+                                    {showCancelConfirm && (
+                                        <Card className="p-4 bg-red-50 border-red-200">
+                                            <p className="text-sm font-semibold text-red-900 mb-3">
+                                                ❌ Confirmer l'annulation ?
+                                            </p>
+                                            <p className="text-xs text-red-700 mb-3">
+                                                La réservation sera annulée et l'article redeviendra disponible.
+                                            </p>
+                                            
+                                            <textarea
+                                                value={cancelReason}
+                                                onChange={(e) => setCancelReason(e.target.value)}
+                                                placeholder="Raison de l'annulation (optionnel)..."
+                                                className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-200 mb-3"
+                                                rows={3}
+                                            />
+                                            
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="danger"
+                                                    onClick={() => {
+                                                        updateStatus(selected._id, "cancelled");
+                                                    }}
+                                                    className="flex-1"
+                                                    size="sm"
+                                                >
+                                                    Confirmer l'annulation
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={() => {
+                                                        setShowCancelConfirm(false);
+                                                        setCancelReason("");
+                                                    }}
+                                                    className="flex-1"
+                                                    size="sm"
+                                                >
+                                                    Annuler
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    )}
                                 </>
                             )}
 
