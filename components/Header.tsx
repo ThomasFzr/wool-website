@@ -31,9 +31,10 @@ export function Header({ title, subtitle, pendingReservations = 0, newMessages =
 
   return (
     <>
-      <div className="mx-auto max-w-5xl px-4 pt-4 mb-4">
-        <div className="flex flex-row items-start justify-between gap-4">
-          {/* Logo visible */}
+      {/* Header sticky avec logo et bouton alignés */}
+      <header className="fixed top-0 left-0 right-0 z-30 h-24 sm:h-32">
+        <div className="h-full flex items-center justify-between px-4">
+          {/* Logo */}
           <img 
             src="/images/logo.png" 
             alt={title || "MailleMum"} 
@@ -46,18 +47,9 @@ export function Header({ title, subtitle, pendingReservations = 0, newMessages =
               {title}
             </h1>
           )}
-        </div>
 
-        {/* Sous-titre */}
-        {subtitle && (
-          <p className="text-lg sm:text-xl text-slate-600">
-            {subtitle}
-          </p>
-        )}
-      </div>
-
-      {/* Bouton sticky en position fixe */}
-      <div className="fixed top-4 right-4 z-30" ref={menuRef}>
+          {/* Bouton Mon compte */}
+          <div ref={menuRef}>
             <button
               type="button"
               onClick={() => {
@@ -141,7 +133,21 @@ export function Header({ title, subtitle, pendingReservations = 0, newMessages =
                 </button>
               </div>
             )}
-      </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Spacer pour compenser le header fixe */}
+      <div className="h-24 sm:h-32"></div>
+
+      {/* Sous-titre */}
+      {subtitle && (
+        <div className="mx-auto max-w-5xl px-4 mb-4">
+          <p className="text-lg sm:text-xl text-slate-600">
+            {subtitle}
+          </p>
+        </div>
+      )}
     </>
   );
 }
