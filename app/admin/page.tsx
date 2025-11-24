@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState, ChangeEvent, useEffect, useRef } from "react";
+import { FormEvent, useState, ChangeEvent, useEffect, useRef, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Input, Textarea, Card, Badge } from "@/components";
@@ -20,7 +20,7 @@ type Creation = {
   color?: string;
 };
 
-export default function AdminPage() {
+function AdminContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -746,5 +746,17 @@ export default function AdminPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-slate-600">Chargement...</div>
+      </main>
+    }>
+      <AdminContent />
+    </Suspense>
   );
 }
