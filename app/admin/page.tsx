@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState, ChangeEvent, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Input, Textarea, Card, Badge } from "@/components";
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -23,6 +23,7 @@ type Creation = {
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [form, setForm] = useState({
     title: "",
@@ -92,6 +93,19 @@ export default function AdminPage() {
       loadNewMessages();
     }
   }, [session]);
+
+  // Détection du paramètre edit dans l'URL
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (editId && creations.length > 0) {
+      const creation = creations.find((c) => c._id === editId);
+      if (creation) {
+        handleEditClick(creation);
+        // Retirer le paramètre de l'URL après chargement
+        router.replace("/admin", { scroll: false });
+      }
+    }
+  }, [searchParams, creations]);
 
   async function loadPendingReservations() {
     try {
