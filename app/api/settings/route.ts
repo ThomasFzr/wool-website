@@ -4,7 +4,7 @@ import Settings from "@/models/Settings";
 import { checkAdminAuth } from "@/lib/auth";
 
 const DEFAULT_SETTINGS = {
-  title: "Les créations en laine de maman 🧶",
+  title: "Les créations en laine de maman",
   subtitle: "Clique sur une création pour voir toutes les photos.",
 };
 

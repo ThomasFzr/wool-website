@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         to: contact,
         subject: "✅ Votre réservation chez MailleMum est enregistrée",
         html: emailTemplate(`
-          <h1 style="font-size:20px;margin:0 0 12px 0;">Merci pour votre réservation 🧶</h1>
+          <h1 style="font-size:20px;margin:0 0 12px 0;">Merci pour votre réservation</h1>
           <p style="font-size:14px;margin:0 0 16px 0;">
             Bonjour <strong>${name || "👋"}</strong>,<br/>
             Votre demande de réservation a bien été enregistrée. Nous vous recontacterons rapidement pour finaliser la vente.

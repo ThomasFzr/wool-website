@@ -69,7 +69,7 @@ function AdminContent() {
         if (!res.ok) return;
         const s = await res.json();
         setSettings({
-          title: s.title ?? "Les créations en laine de maman 🧶",
+          title: s.title ?? "Les créations en laine de maman",
           subtitle: s.subtitle ?? "Clique sur une création pour voir toutes les photos.",
         });
       } catch (err) {
