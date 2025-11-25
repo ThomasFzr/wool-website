@@ -28,6 +28,7 @@ function AdminReservationsContent() {
     const [selected, setSelected] = useState<Reservation | null>(null);
     const [showValidateConfirm, setShowValidateConfirm] = useState(false);
     const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [cancelReason, setCancelReason] = useState("");
     const [showCreationModal, setShowCreationModal] = useState(false);
     const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
@@ -55,6 +56,7 @@ function AdminReservationsContent() {
         setSelected(null);
         setShowValidateConfirm(false);
         setShowCancelConfirm(false);
+        setShowDeleteConfirm(false);
         setCancelReason("");
     }
 
@@ -525,6 +527,47 @@ function AdminReservationsContent() {
                                     </Badge>
                                 </div>
                             )}
+
+                            {/* Bouton de suppression définitive */}
+                            <div className="pt-4 mt-4 border-t border-slate-200">
+                                {!showDeleteConfirm ? (
+                                    <Button
+                                        variant="danger"
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        className="w-full bg-red-600 hover:bg-red-700"
+                                        size="sm"
+                                    >
+                                        🗑️ Supprimer définitivement
+                                    </Button>
+                                ) : (
+                                    <Card className="p-4 bg-red-50 border-red-200">
+                                        <p className="text-sm font-semibold text-red-900 mb-2">
+                                            ⚠️ Confirmer la suppression ?
+                                        </p>
+                                        <p className="text-xs text-red-700 mb-4">
+                                            Cette action est <strong>irréversible</strong>. La réservation sera supprimée de la base de données et l'article redeviendra disponible.
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="danger"
+                                                onClick={() => deleteReservation(selected._id)}
+                                                className="flex-1"
+                                                size="sm"
+                                            >
+                                                Supprimer
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => setShowDeleteConfirm(false)}
+                                                className="flex-1"
+                                                size="sm"
+                                            >
+                                                Annuler
+                                            </Button>
+                                        </div>
+                                    </Card>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </>
