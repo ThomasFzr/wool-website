@@ -12,12 +12,48 @@ interface HeaderProps {
   newMessages?: number;
 }
 
-export function Header({ title, subtitle, pendingReservations = 0, newMessages = 0 }: HeaderProps) {
+export function Header({ title, subtitle, pendingReservations: initialPending = 0, newMessages: initialMessages = 0 }: HeaderProps) {
   const { data: session } = useSession();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [pendingReservations, setPendingReservations] = useState(initialPending);
+  const [newMessages, setNewMessages] = useState(initialMessages);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const totalNotifications = pendingReservations + newMessages;
+
+  // Polling pour mettre à jour les notifications admin
+  useEffect(() => {
+    if (session?.user?.role !== "admin") return;
+
+    const fetchNotifications = async () => {
+      try {
+        const [reservationsRes, messagesRes] = await Promise.all([
+          fetch("/api/admin/reservations/count"),
+          fetch("/api/admin/contact/count"),
+        ]);
+
+        if (reservationsRes.ok) {
+          const data = await reservationsRes.json();
+          setPendingReservations(data.pending || 0);
+        }
+
+        if (messagesRes.ok) {
+          const data = await messagesRes.json();
+          setNewMessages(data.new || 0);
+        }
+      } catch (err) {
+        console.error("Erreur lors du chargement des notifications:", err);
+      }
+    };
+
+    // Première vérification immédiate
+    fetchNotifications();
+
+    // Puis toutes les 30 secondes
+    const interval = setInterval(fetchNotifications, 30000);
+
+    return () => clearInterval(interval);
+  }, [session]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

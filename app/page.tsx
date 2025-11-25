@@ -4,8 +4,6 @@ import { HomeClient } from "./HomeClient";
 import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
 import Settings from "@/models/Settings";
-import { getServerSession } from "next-auth";
-import { authOptions } from "./api/auth/[...nextauth]/authOptions";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -62,46 +60,19 @@ async function getSettings(): Promise<SettingsType | null> {
   };
 }
 
-async function getAdminNotifications(role?: string) {
-  if (role !== "admin") return { pendingReservations: 0, newMessages: 0 };
-
-  try {
-    await connectToDatabase();
-    const Reservation = (await import("@/models/Reservation")).default;
-    const Contact = (await import("@/models/Contact")).default;
-
-    const [pendingReservations, newMessages] = await Promise.all([
-      Reservation.countDocuments({ status: "pending" }),
-      Contact.countDocuments({ status: "new" }),
-    ]);
-
-    return { pendingReservations, newMessages };
-  } catch (err) {
-    console.error(err);
-    return { pendingReservations: 0, newMessages: 0 };
-  }
-}
-
 export const revalidate = 300; // Revalider toutes les 5 minutes (300 secondes)
 
 export default async function HomePage() {
-  const [creations, settings, session] = await Promise.all([
+  const [creations, settings] = await Promise.all([
     getCreations(),
     getSettings(),
-    getServerSession(authOptions),
   ]);
-
-  const { pendingReservations, newMessages } = await getAdminNotifications(
-    session?.user?.role
-  );
 
   return (
     <main className="min-h-screen">
       <Header
         title={settings?.title}
         subtitle={settings?.subtitle}
-        pendingReservations={pendingReservations}
-        newMessages={newMessages}
       />
       <HomeClient initialCreations={creations} />
     </main>
