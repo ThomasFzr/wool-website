@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
-import "@/models/Creation";
+import CreationModel from "@/models/Creation";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
@@ -64,7 +64,7 @@ export async function PATCH(
     // 5️⃣ On libère la création si elle n'est pas vendue
     const creation: any = reservation.creationId;
     if (creation && !creation.sold) {
-      await Creation.findByIdAndUpdate(creation._id, {
+      await CreationModel.findByIdAndUpdate(creation._id, {
         $set: { reserved: false },
         $unset: {
           reservedName: "",
