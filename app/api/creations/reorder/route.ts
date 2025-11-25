@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +29,10 @@ export async function POST(req: NextRequest) {
     }));
 
     await Creation.bulkWrite(updates);
+
+    // 🔄 Invalider le cache pour que le nouvel ordre soit visible immédiatement
+    revalidatePath('/');
+    revalidatePath('/api/creations');
 
     return NextResponse.json({ success: true });
   } catch (err) {
