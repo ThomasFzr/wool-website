@@ -6,6 +6,23 @@ import CreationModel from "@/models/Creation";
 import Settings from "@/models/Settings";
 import { getServerSession } from "next-auth";
 import { authOptions } from "./api/auth/[...nextauth]/authOptions";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "MailleMum - Créations artisanales en laine",
+  description: "Découvrez nos créations artisanales uniques en laine : peluches, décorations et accessoires faits main avec passion.",
+  keywords: ["laine", "artisanat", "créations", "fait main", "peluches", "tricot", "crochet"],
+  openGraph: {
+    title: "MailleMum - Créations artisanales en laine",
+    description: "Découvrez nos créations artisanales uniques en laine",
+    type: "website",
+    locale: "fr_FR",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 type SettingsType = {
   title: string;
