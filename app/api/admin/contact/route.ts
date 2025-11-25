@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Contact from "@/models/Contact";
-import Creation from "@/models/Creation";
+import "@/models/Creation"; // Import pour enregistrer le schéma
 import { checkAdminAuth } from "@/lib/auth";
 
 // GET : Récupérer tous les messages
