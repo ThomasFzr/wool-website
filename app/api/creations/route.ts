@@ -3,6 +3,8 @@ import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
 
+export const revalidate = 60; // Cache avec revalidation toutes les 60 secondes
+
 export async function GET() {
   try {
     await connectToDatabase();
