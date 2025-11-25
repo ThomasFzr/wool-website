@@ -41,12 +41,10 @@ export function Header({ title, subtitle, pendingReservations = 0, newMessages =
             className="h-20 sm:h-28 w-auto object-contain"
           />
           
-          {/* Titre caché pour le SEO */}
-          {title && (
-            <h1 className="sr-only">
-              {title}
-            </h1>
-          )}
+          {/* Titre H1 pour le SEO */}
+          <h1 className="sr-only">
+            {title || "MailleMum - Créations artisanales en laine"}
+          </h1>
 
           {/* Bouton Mon compte */}
           <div ref={menuRef}>
