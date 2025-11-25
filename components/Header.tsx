@@ -106,9 +106,9 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
               <span className="hidden md:flex items-center gap-1.5">
                 <span>{session ? "Mon compte" : "Se connecter"}</span>
                 {session?.user?.role === "admin" && totalNotifications > 0 && (
-                  <Badge variant="danger" className="h-5 min-w-5 px-1.5 text-[10px]">
+                  <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
                     {totalNotifications}
-                  </Badge>
+                  </span>
                 )}
               </span>
             </button>
@@ -149,9 +149,9 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
                     >
                       <span>Administration</span>
                       {totalNotifications > 0 && (
-                        <Badge variant="danger" className="h-5 min-w-5 px-1.5 text-[10px]">
+                        <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
                           {totalNotifications}
-                        </Badge>
+                        </span>
                       )}
                     </Link>
                   </>

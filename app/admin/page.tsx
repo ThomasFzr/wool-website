@@ -145,9 +145,9 @@ function AdminContent() {
             >
               <span>📧 Messages</span>
               {newMessages > 0 && (
-                <Badge variant="danger" className="bg-red-500 text-white">
+                <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
                   {newMessages}
-                </Badge>
+                </span>
               )}
             </Link>
             <Link
@@ -157,9 +157,9 @@ function AdminContent() {
             >
               <span>📋 Réservations</span>
               {pendingReservations > 0 && (
-                <Badge variant="danger" className="bg-red-500 text-white">
+                <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
                   {pendingReservations}
-                </Badge>
+                </span>
               )}
             </Link>
           </div>
