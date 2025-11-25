@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
-export const revalidate = 60; // Cache avec revalidation toutes les 60 secondes
+export const revalidate = 300; // Cache avec revalidation toutes les 5 minutes
 
 export async function GET() {
   try {
@@ -47,6 +48,10 @@ export async function POST(req: NextRequest) {
       price: body.price,
       color: body.color,
     });
+
+    // 🔄 Invalider le cache immédiatement après création
+    revalidatePath('/');
+    revalidatePath('/api/creations');
 
     return NextResponse.json(creation, { status: 201 });
   } catch (err) {

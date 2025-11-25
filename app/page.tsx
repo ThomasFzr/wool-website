@@ -65,7 +65,7 @@ async function getAdminNotifications(role?: string) {
   }
 }
 
-export const revalidate = 60; // Revalider toutes les 60 secondes
+export const revalidate = 300; // Revalider toutes les 5 minutes (300 secondes)
 
 export default async function HomePage() {
   const [creations, settings, session] = await Promise.all([

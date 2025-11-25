@@ -4,6 +4,7 @@ import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
+import { revalidatePath } from "next/cache";
 
 /**
  * Récupère le public_id Cloudinary depuis une URL secure_url
@@ -71,6 +72,10 @@ export async function PATCH(
     if (!creation) {
       return new NextResponse("Not found", { status: 404 });
     }
+
+    // 🔄 Invalider le cache après modification
+    revalidatePath('/');
+    revalidatePath('/api/creations');
 
     return NextResponse.json(creation);
   } catch (err) {
@@ -145,6 +150,10 @@ export async function DELETE(
 
     // 4) Enfin, supprimer la création de la base
     await Creation.findByIdAndDelete(id);
+
+    // 🔄 Invalider le cache après suppression
+    revalidatePath('/');
+    revalidatePath('/api/creations');
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {
