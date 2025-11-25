@@ -222,20 +222,16 @@ export default function AdminUsersPage() {
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-6xl px-4 py-6">
         {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-2"
-            >
-              ← Retour à l&apos;administration
-            </Link>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              👥 Gestion des utilisateurs
-            </h1>
-          </div>
-
-          <Button onClick={handleCreate}>➕ Créer un utilisateur</Button>
+        <div className="mb-6">
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 mb-2"
+          >
+            ← Retour à l&apos;administration
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            👥 Gestion des utilisateurs
+          </h1>
         </div>
 
         {/* Message */}
