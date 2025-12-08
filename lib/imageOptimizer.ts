@@ -17,16 +17,19 @@ export function optimizeCloudinaryUrl(url: string, options: {
   const parts = url.split('/upload/');
   if (parts.length !== 2) return url;
 
-  // Construire les transformations optimales
+  // Si l'URL a déjà des transformations (depuis la DB), les remplacer
+  const afterUpload = parts[1];
+  const hasTransformations = afterUpload.includes('/');
+  const imagePath = hasTransformations ? afterUpload.split('/').slice(1).join('/') : afterUpload;
+
+  // Construire les transformations optimales pour l'affichage
   const transformations = [
     `f_${format}`,      // Format auto (WebP/AVIF selon navigateur)
-    `q_${quality}`,     // Qualité compressée
+    `q_${quality}`,     // Qualité adaptée à l'usage
     `w_${width}`,       // Largeur adaptée à l'affichage
-    'c_fill',           // Remplir en recadrant si nécessaire
-    'g_auto',           // Recadrage automatique intelligent
-    'ar_4:3',           // Ratio 4:3 pour les cartes
+    'c_limit',          // Limiter sans déformer
   ].join(',');
 
-  // Reconstruire l'URL avec les transformations
-  return `${parts[0]}/upload/${transformations}/${parts[1]}`;
+  // Reconstruire l'URL avec les nouvelles transformations
+  return `${parts[0]}/upload/${transformations}/${imagePath}`;
 }
