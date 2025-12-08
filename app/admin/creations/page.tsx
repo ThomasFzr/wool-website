@@ -88,6 +88,23 @@ function AdminCreationsContent() {
     }
   }, [searchParams, creations]);
 
+  // Désactiver le scroll quand une modale est ouverte
+  useEffect(() => {
+    if (showEditModal || showCreateModal) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = "hidden";
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    } else {
+      document.body.style.overflow = "unset";
+      document.body.style.paddingRight = "0px";
+    }
+
+    return () => {
+      document.body.style.overflow = "unset";
+      document.body.style.paddingRight = "0px";
+    };
+  }, [showEditModal, showCreateModal]);
+
   async function loadCreations() {
     try {
       setLoadingList(true);
