@@ -103,11 +103,12 @@ export function HomeClient({ initialCreations, availableColors = [], availableTy
 
         {filteredCreations.length > 0 && (
           <section className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredCreations.map((creation) => (
+            {filteredCreations.map((creation, index) => (
               <CreationCard
                 key={creation._id}
                 creation={creation}
                 onClick={() => openModal(creation)}
+                priority={index < 6}
               />
             ))}
           </section>

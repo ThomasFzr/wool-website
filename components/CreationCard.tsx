@@ -20,9 +20,10 @@ export type Creation = {
 interface CreationCardProps {
   creation: Creation;
   onClick: () => void;
+  priority?: boolean;
 }
 
-export function CreationCard({ creation, onClick }: CreationCardProps) {
+export function CreationCard({ creation, onClick, priority = false }: CreationCardProps) {
   const images = creation.images && creation.images.length > 0 
     ? creation.images 
     : creation.imageUrl 
@@ -68,6 +69,8 @@ export function CreationCard({ creation, onClick }: CreationCardProps) {
             height={300}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            priority={priority}
+            loading={priority ? undefined : "lazy"}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
