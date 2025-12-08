@@ -5,7 +5,6 @@ import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Creation } from "./CreationCard";
 import { Button, Badge } from "./ui";
-import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 interface CreationModalProps {
   creation: Creation | null;
@@ -38,12 +37,12 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
       ? [creation.imageUrl] 
       : [];
 
-  // Précharger toutes les images de la modale dès l'ouverture avec les mêmes optimisations
+  // Précharger toutes les images de la modale dès l'ouverture
   useEffect(() => {
     if (isOpen && images.length > 0) {
       images.forEach((src) => {
         const img = new Image();
-        img.src = optimizeCloudinaryUrl(src, { width: 1200, quality: 75, format: 'auto' });
+        img.src = src;
       });
     }
   }, [isOpen, images]);
@@ -269,7 +268,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
         >
           {images.length > 0 ? (
             <img
-              src={optimizeCloudinaryUrl(images[currentIndex], { width: 1200, quality: 75, format: 'auto' })}
+              src={images[currentIndex]}
               alt={`${creation.title} ${currentIndex + 1}`}
               onClick={() => {
                 // Ne pas dé-zoomer si on vient de drag
@@ -336,7 +335,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
                 }`}
               >
                 <img
-                  src={optimizeCloudinaryUrl(url, { width: 100, quality: 60, format: 'auto' })}
+                  src={url}
                   alt={`miniature ${i + 1}`}
                   className="h-full w-full rounded-md object-cover"
                 />
