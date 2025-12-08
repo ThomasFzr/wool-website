@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { Badge } from "./ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
@@ -32,8 +31,8 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
   
   // Optimiser avec Cloudinary directement
   const cover = images[0] ? optimizeCloudinaryUrl(images[0], {
-    width: 800,
-    quality: priority ? 75 : 65,
+    width: 600,
+    quality: priority ? 65 : 55,
     format: 'auto'
   }) : undefined;
 
@@ -72,16 +71,14 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
 
       <div className="relative h-56 w-full overflow-hidden bg-slate-100">
         {cover ? (
-          <Image
+          <img
             src={cover}
             alt={creation.title}
-            width={800}
-            height={600}
-            unoptimized
+            width={600}
+            height={450}
+            loading={priority ? "eager" : "lazy"}
+            decoding="async"
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            priority={priority}
-            loading={priority ? undefined : "lazy"}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">

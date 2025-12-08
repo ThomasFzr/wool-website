@@ -11,7 +11,7 @@ export function optimizeCloudinaryUrl(url: string, options: {
     return url;
   }
 
-  const { width = 800, quality = 70, format = 'auto' } = options;
+  const { width = 600, quality = 60, format = 'auto' } = options;
 
   // Extraire les parties de l'URL Cloudinary
   const parts = url.split('/upload/');
@@ -20,10 +20,11 @@ export function optimizeCloudinaryUrl(url: string, options: {
   // Construire les transformations optimales
   const transformations = [
     `f_${format}`,      // Format auto (WebP/AVIF selon navigateur)
-    `q_${quality}`,     // Qualité
-    `w_${width}`,       // Largeur max
-    'c_limit',          // Ne jamais agrandir
-    'dpr_auto',         // Retina automatique
+    `q_${quality}`,     // Qualité compressée
+    `w_${width}`,       // Largeur adaptée à l'affichage
+    'c_fill',           // Remplir en recadrant si nécessaire
+    'g_auto',           // Recadrage automatique intelligent
+    'ar_4:3',           // Ratio 4:3 pour les cartes
   ].join(',');
 
   // Reconstruire l'URL avec les transformations
