@@ -11,7 +11,8 @@ export type Creation = {
   type?: "bonnet" | "tour de cou" | "bandeau";
   reserved?: boolean;
   sold?: boolean;
-  isNew?: boolean;
+  showAsNew?: boolean;
+  isAvailableAgain?: boolean;
   createdAt?: string;
 };
 
@@ -30,9 +31,9 @@ export function CreationCard({ creation, onClick }: CreationCardProps) {
   const cover = images[0];
 
   // Vérifier si l'article est nouveau (moins de 7 jours)
-  const isNewArticle = creation.isNew && creation.createdAt 
+  const isNewArticle = creation.showAsNew && creation.createdAt 
     ? (new Date().getTime() - new Date(creation.createdAt).getTime()) / (1000 * 60 * 60 * 24) < 7
-    : creation.isNew;
+    : creation.showAsNew;
 
   return (
     <article
@@ -46,6 +47,10 @@ export function CreationCard({ creation, onClick }: CreationCardProps) {
       ) : creation.reserved ? (
         <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
           Réservé
+        </span>
+      ) : creation.isAvailableAgain ? (
+        <span className="absolute left-2 top-2 z-10 rounded-full bg-green-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+          Disponible
         </span>
       ) : isNewArticle ? (
         <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">

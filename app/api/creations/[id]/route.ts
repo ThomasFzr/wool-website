@@ -72,8 +72,10 @@ export async function PATCH(
     if (body.reservedMessage !== undefined)
       update.reservedMessage = body.reservedMessage;
     if (body.reservedAt !== undefined) update.reservedAt = body.reservedAt;
-    
-    if (body.isNew !== undefined) update.isNew = body.isNew;
+    if (body.sold !== undefined) update.sold = body.sold;
+    if (body.showAsNew !== undefined) update.showAsNew = body.showAsNew;
+    if (body.isAvailableAgain !== undefined) update.isAvailableAgain = body.isAvailableAgain;
+    if (body.displayOrder !== undefined) update.displayOrder = body.displayOrder;
 
     const creation = await Creation.findByIdAndUpdate(id, update, {
       new: true,

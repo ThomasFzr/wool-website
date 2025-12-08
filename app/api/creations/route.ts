@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       color: body.color,
       type: body.type && body.type !== "" ? body.type : undefined,
       displayOrder: nextDisplayOrder,
-      isNew: body.isNew !== undefined ? body.isNew : true,
+      showAsNew: body.showAsNew !== undefined ? body.showAsNew : true,
     });
 
     // 🔄 Invalider le cache immédiatement après création

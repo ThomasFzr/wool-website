@@ -37,7 +37,10 @@ type Creation = {
   price?: number;
   color?: string;
   type?: "bonnet" | "tour de cou" | "bandeau";
-  isNew?: boolean;
+  showAsNew?: boolean;
+  displayOrder?: number;
+  reserved?: boolean;
+  sold?: boolean;
 };
 
 function AdminCreationsContent() {
@@ -54,7 +57,7 @@ function AdminCreationsContent() {
     price: "",
     color: "",
     type: "" as string,
-    isNew: true as boolean,
+    showAsNew: true as boolean,
   });
 
   const [message, setMessage] = useState<string | null>(null);
@@ -202,7 +205,7 @@ function AdminCreationsContent() {
       price: form.price ? Number(form.price) : undefined,
       color: form.color || undefined,
       type: form.type || undefined,
-      isNew: form.isNew,
+      showAsNew: form.showAsNew,
     };
 
     const url = editingId ? `/api/creations/${editingId}` : "/api/creations";
@@ -231,7 +234,7 @@ function AdminCreationsContent() {
       price: "",
       color: "",
       type: "",
-      isNew: true,
+      showAsNew: true,
     });
     setEditingId(null);
     setShowEditModal(false);
@@ -250,7 +253,7 @@ function AdminCreationsContent() {
       imagePublicIds: c.imagePublicIds ?? [],
       color: c.color ?? "",
       type: c.type ?? "",
-      isNew: c.isNew !== undefined ? c.isNew : true,
+      showAsNew: c.showAsNew !== undefined ? c.showAsNew : true,
     });
     setMessage(null);
     setShowEditModal(true);
@@ -278,7 +281,7 @@ function AdminCreationsContent() {
         price: "",
         color: "",
         type: "",
-        isNew: true,
+        showAsNew: true,
       });
     }
 
@@ -296,7 +299,7 @@ function AdminCreationsContent() {
       price: "",
       color: "",
       type: "",
-      isNew: true,
+      showAsNew: true,
     });
     setMessage(null);
     setShowEditModal(false);
@@ -456,6 +459,38 @@ function AdminCreationsContent() {
     }
   }
 
+  async function handleMakeAvailableAgain(id: string) {
+    const ok = confirm("Remettre cet article disponible ? Il sera placé en haut de la liste avec le badge 'Nouveau'.");
+    if (!ok) return;
+
+    try {
+      // Récupérer le displayOrder maximum
+      const maxOrder = Math.max(...creations.map(c => c.displayOrder || 0), 0);
+      
+      const res = await fetch(`/api/creations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reserved: false,
+          sold: false,
+          isNew: true,
+          displayOrder: maxOrder + 1,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur lors de la mise à jour");
+      }
+
+      setMessage("Article remis disponible ✔️");
+      setTimeout(() => setMessage(null), 3000);
+      loadCreations();
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la remise en disponibilité");
+    }
+  }
+
   if (status === "loading") {
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -510,7 +545,7 @@ function AdminCreationsContent() {
                   price: "",
                   color: "",
                   type: "",
-                  isNew: true,
+                  showAsNew: true,
                 });
                 setShowCreateModal(true);
               }}
@@ -609,6 +644,17 @@ function AdminCreationsContent() {
                   </div>
 
                   <div className="flex items-center gap-2 sm:shrink-0">
+                    {(c.reserved || c.sold) && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleMakeAvailableAgain(c._id)}
+                        title="Remettre disponible"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        ↻ Disponible
+                      </Button>
+                    )}
                     <Button
                       variant="secondary"
                       size="sm"
@@ -715,8 +761,8 @@ function AdminCreationsContent() {
               <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm hover:bg-slate-100">
                 <input
                   type="checkbox"
-                  checked={form.isNew !== undefined ? form.isNew : true}
-                  onChange={(e) => setForm({ ...form, isNew: e.target.checked })}
+                  checked={form.showAsNew !== undefined ? form.showAsNew : true}
+                  onChange={(e) => setForm({ ...form, showAsNew: e.target.checked })}
                   className="h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500"
                 />
                 <span className="text-slate-700">
@@ -902,8 +948,8 @@ function AdminCreationsContent() {
               <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm hover:bg-slate-100">
                 <input
                   type="checkbox"
-                  checked={form.isNew !== undefined ? form.isNew : true}
-                  onChange={(e) => setForm({ ...form, isNew: e.target.checked })}
+                  checked={form.showAsNew !== undefined ? form.showAsNew : true}
+                  onChange={(e) => setForm({ ...form, showAsNew: e.target.checked })}
                   className="h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500"
                 />
                 <span className="text-slate-700">
