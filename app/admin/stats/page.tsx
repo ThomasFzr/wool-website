@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { StatsCard, StatsChart } from "@/components";
@@ -19,6 +19,7 @@ function StatsContent() {
 
   const [stats, setStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const hasLoadedStats = useRef(false);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -28,7 +29,7 @@ function StatsContent() {
   }, [session, status, router]);
 
   useEffect(() => {
-    if (session?.user?.role === "admin") {
+    if (session?.user?.role === "admin" && !hasLoadedStats.current) {
       loadStats();
     }
   }, [session]);
@@ -40,6 +41,7 @@ function StatsContent() {
       if (!res.ok) return;
       const data = await res.json();
       setStats(data);
+      hasLoadedStats.current = true;
     } catch (err) {
       console.error(err);
     } finally {
