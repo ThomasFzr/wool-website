@@ -451,6 +451,7 @@ function AdminCreationsContent() {
 
       setMessage("Ordre d'affichage sauvegardé ✔️");
       setTimeout(() => setMessage(null), 3000);
+      await loadCreations(); // Recharger pour s'assurer que l'ordre est correct
     } catch (err) {
       console.error(err);
       setMessage("Erreur lors de la sauvegarde de l'ordre.");
@@ -473,7 +474,7 @@ function AdminCreationsContent() {
         body: JSON.stringify({
           reserved: false,
           sold: false,
-          isNew: true,
+          showAsNew: true,
           displayOrder: maxOrder + 1,
         }),
       });
