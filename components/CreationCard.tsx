@@ -41,11 +41,11 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
     ? (new Date().getTime() - new Date(creation.createdAt).getTime()) / (1000 * 60 * 60 * 24) < 7
     : creation.showAsNew;
 
-  // Précharger toutes les images au survol pour ouverture instantanée de la modale
+  // Précharger toutes les images au survol avec les mêmes optimisations que la modale
   const handleMouseEnter = () => {
     images.forEach((src) => {
       const img = document.createElement('img');
-      img.src = src;
+      img.src = optimizeCloudinaryUrl(src, { width: 1200, quality: 80, format: 'auto' });
     });
   };
 
