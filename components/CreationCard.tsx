@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Badge } from "./ui";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 export type Creation = {
   _id: string;
@@ -29,7 +30,12 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
       ? [creation.imageUrl] 
       : [];
   
-  const cover = images[0];
+  // Optimiser avec Cloudinary directement
+  const cover = images[0] ? optimizeCloudinaryUrl(images[0], {
+    width: 800,
+    quality: priority ? 75 : 65,
+    format: 'auto'
+  }) : undefined;
 
   // Vérifier si l'article est nouveau (moins de 7 jours)
   const isNewArticle = creation.showAsNew && creation.createdAt 
@@ -69,9 +75,9 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
           <Image
             src={cover}
             alt={creation.title}
-            width={400}
-            height={300}
-            quality={priority ? 75 : 60}
+            width={800}
+            height={600}
+            unoptimized
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             priority={priority}
