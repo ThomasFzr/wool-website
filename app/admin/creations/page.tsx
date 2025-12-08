@@ -90,13 +90,23 @@ function AdminCreationsContent() {
       const res = await fetch("/api/settings");
       if (res.ok) {
         const data = await res.json();
-        // Supprimer les doublons
+        // Supprimer les doublons et trier
         const colors: string[] = data.colors || [];
         const types: string[] = data.types || [];
         const uniqueColors = [...new Set(colors)];
         const uniqueTypes = [...new Set(types)];
-        setAvailableColors(uniqueColors);
-        setAvailableTypes(uniqueTypes);
+        
+        // Trier les couleurs alphabétiquement (multicolore en dernier)
+        const sortedColors = uniqueColors
+          .filter(c => c !== "multicolore")
+          .sort((a, b) => a.localeCompare(b, 'fr'))
+          .concat(uniqueColors.filter(c => c === "multicolore"));
+        
+        // Trier les types alphabétiquement
+        const sortedTypes = uniqueTypes.sort((a, b) => a.localeCompare(b, 'fr'));
+        
+        setAvailableColors(sortedColors);
+        setAvailableTypes(sortedTypes);
       }
     } catch (err) {
       console.error("Error loading settings:", err);

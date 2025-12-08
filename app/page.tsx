@@ -67,18 +67,24 @@ async function getSettings(): Promise<SettingsType | null> {
   const settingsData = settings as any;
   if (!settingsData?.title && !settingsData?.subtitle) return null;
   
-  // Supprimer les doublons et trier les couleurs pour mettre "multicolore" en dernier
+  // Supprimer les doublons et trier les couleurs alphabétiquement (multicolore en dernier)
   const colors: string[] = settingsData.colors || [];
   const uniqueColors = [...new Set(colors)];
-  const sortedColors = uniqueColors.filter(c => c !== "multicolore").concat(
-    uniqueColors.filter(c => c === "multicolore")
-  );
+  const sortedColors = uniqueColors
+    .filter(c => c !== "multicolore")
+    .sort((a, b) => a.localeCompare(b, 'fr'))
+    .concat(uniqueColors.filter(c => c === "multicolore"));
+  
+  // Trier les types alphabétiquement
+  const types: string[] = settingsData.types || [];
+  const uniqueTypes = [...new Set(types)];
+  const sortedTypes = uniqueTypes.sort((a, b) => a.localeCompare(b, 'fr'));
   
   return {
     title: settingsData.title || "",
     subtitle: settingsData.subtitle || "",
     colors: sortedColors,
-    types: settingsData.types || [],
+    types: sortedTypes,
   };
 }
 

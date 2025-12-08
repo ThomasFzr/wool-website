@@ -30,17 +30,26 @@ function AdminContent() {
         if (!res.ok) return;
         const s = await res.json();
         
-        // Supprimer les doublons dans les couleurs et types
+        // Supprimer les doublons et trier
         const colors: string[] = s.colors ?? [];
         const types: string[] = s.types ?? [];
         const uniqueColors = [...new Set(colors)];
         const uniqueTypes = [...new Set(types)];
         
+        // Trier les couleurs alphabétiquement (multicolore en dernier)
+        const sortedColors = uniqueColors
+          .filter(c => c !== "multicolore")
+          .sort((a, b) => a.localeCompare(b, 'fr'))
+          .concat(uniqueColors.filter(c => c === "multicolore"));
+        
+        // Trier les types alphabétiquement
+        const sortedTypes = uniqueTypes.sort((a, b) => a.localeCompare(b, 'fr'));
+        
         setSettings({
           title: s.title ?? "Les créations en laine de maman",
           subtitle: s.subtitle ?? "Clique sur une création pour voir toutes les photos.",
-          colors: uniqueColors,
-          types: uniqueTypes,
+          colors: sortedColors,
+          types: sortedTypes,
         });
       } catch (err) {
         console.error(err);
@@ -168,16 +177,16 @@ function AdminContent() {
 
           <div className="flex gap-2 flex-wrap">
             <Link
-              href="/admin/stats"
-              className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200 transition"
-            >
-              <span>📊 Statistiques</span>
-            </Link>
-            <Link
               href="/admin/creations"
               className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200 transition"
             >
               <span>🧶 Créations</span>
+            </Link>
+            <Link
+              href="/admin/stats"
+              className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200 transition"
+            >
+              <span>📊 Statistiques</span>
             </Link>
             <Link
               href="/admin/users"
