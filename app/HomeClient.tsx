@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { CreationCard, Creation } from "@/components/CreationCard";
 import { CreationModal } from "@/components/CreationModal";
 import { Filters } from "@/components/Filters";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 type HomeClientProps = {
   initialCreations: Creation[];
@@ -20,6 +21,26 @@ export function HomeClient({ initialCreations, availableColors = [], availableTy
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
+
+  // Précharger toutes les images des modales après le chargement de la page
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      creations.forEach(creation => {
+        const images = creation.images && creation.images.length > 0 
+          ? creation.images 
+          : creation.imageUrl 
+            ? [creation.imageUrl] 
+            : [];
+        
+        images.forEach((src) => {
+          const img = new Image();
+          img.src = optimizeCloudinaryUrl(src, { width: 800, quality: 80, format: 'auto' });
+        });
+      });
+    }, 1000); // Attendre 1 seconde après le chargement initial
+
+    return () => clearTimeout(timer);
+  }, [creations]);
 
   function openModal(creation: Creation) {
     setOpenCreation(creation);
