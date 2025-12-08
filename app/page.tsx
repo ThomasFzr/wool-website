@@ -44,6 +44,8 @@ async function getCreations(): Promise<CreationType[]> {
     type: c.type,
     reserved: c.reserved,
     sold: c.sold,
+    isNew: c.isNew,
+    createdAt: c.createdAt?.toISOString(),
   }));
 }
 

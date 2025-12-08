@@ -37,6 +37,7 @@ type Creation = {
   price?: number;
   color?: string;
   type?: "bonnet" | "tour de cou" | "bandeau";
+  isNew?: boolean;
 };
 
 function AdminCreationsContent() {
@@ -53,6 +54,7 @@ function AdminCreationsContent() {
     price: "",
     color: "",
     type: "" as string,
+    isNew: true as boolean,
   });
 
   const [message, setMessage] = useState<string | null>(null);
@@ -200,6 +202,7 @@ function AdminCreationsContent() {
       price: form.price ? Number(form.price) : undefined,
       color: form.color || undefined,
       type: form.type || undefined,
+      isNew: form.isNew,
     };
 
     const url = editingId ? `/api/creations/${editingId}` : "/api/creations";
@@ -228,6 +231,7 @@ function AdminCreationsContent() {
       price: "",
       color: "",
       type: "",
+      isNew: true,
     });
     setEditingId(null);
     setShowEditModal(false);
@@ -246,6 +250,7 @@ function AdminCreationsContent() {
       imagePublicIds: c.imagePublicIds ?? [],
       color: c.color ?? "",
       type: c.type ?? "",
+      isNew: c.isNew !== undefined ? c.isNew : true,
     });
     setMessage(null);
     setShowEditModal(true);
@@ -273,6 +278,7 @@ function AdminCreationsContent() {
         price: "",
         color: "",
         type: "",
+        isNew: true,
       });
     }
 
@@ -290,6 +296,7 @@ function AdminCreationsContent() {
       price: "",
       color: "",
       type: "",
+      isNew: true,
     });
     setMessage(null);
     setShowEditModal(false);
@@ -503,6 +510,7 @@ function AdminCreationsContent() {
                   price: "",
                   color: "",
                   type: "",
+                  isNew: true,
                 });
                 setShowCreateModal(true);
               }}
@@ -703,6 +711,20 @@ function AdminCreationsContent() {
                 </div>
               </div>
 
+              {/* Flag New */}
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm hover:bg-slate-100">
+                <input
+                  type="checkbox"
+                  checked={form.isNew !== undefined ? form.isNew : true}
+                  onChange={(e) => setForm({ ...form, isNew: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500"
+                />
+                <span className="text-slate-700">
+                  <span className="font-semibold">Afficher le badge "New"</span>
+                  <span className="ml-2 text-xs text-slate-500">(automatiquement masqué après 7 jours)</span>
+                </span>
+              </label>
+
               {/* Images */}
               <div className="space-y-3">
                 <label className="text-xs font-medium text-slate-700">Images</label>
@@ -875,6 +897,20 @@ function AdminCreationsContent() {
                   </select>
                 </div>
               </div>
+
+              {/* Flag New */}
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm hover:bg-slate-100">
+                <input
+                  type="checkbox"
+                  checked={form.isNew !== undefined ? form.isNew : true}
+                  onChange={(e) => setForm({ ...form, isNew: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500"
+                />
+                <span className="text-slate-700">
+                  <span className="font-semibold">Afficher le badge "New"</span>
+                  <span className="ml-2 text-xs text-slate-500">(automatiquement masqué après 7 jours)</span>
+                </span>
+              </label>
 
               {/* Images */}
               <div className="space-y-3">

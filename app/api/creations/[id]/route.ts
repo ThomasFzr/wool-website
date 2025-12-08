@@ -72,6 +72,8 @@ export async function PATCH(
     if (body.reservedMessage !== undefined)
       update.reservedMessage = body.reservedMessage;
     if (body.reservedAt !== undefined) update.reservedAt = body.reservedAt;
+    
+    if (body.isNew !== undefined) update.isNew = body.isNew;
 
     const creation = await Creation.findByIdAndUpdate(id, update, {
       new: true,

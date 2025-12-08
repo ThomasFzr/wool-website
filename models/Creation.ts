@@ -23,6 +23,7 @@ const schema = new Schema(
     reservedAt: Date,
 
     sold: { type: Boolean, default: false },
+    isNew: { type: Boolean, default: true },
 
     displayOrder: { type: Number, default: 0 },
 
