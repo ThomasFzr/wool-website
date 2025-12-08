@@ -58,6 +58,7 @@ function AdminCreationsContent() {
   const [availableTypes, setAvailableTypes] = useState<string[]>([]);
   
   const formRef = useRef<HTMLDivElement>(null);
+  const hasLoadedCreations = useRef(false);
 
   const colorOptions = Array.from(
     new Set(
@@ -79,7 +80,7 @@ function AdminCreationsContent() {
   }, [session, status, router]);
 
   useEffect(() => {
-    if (session?.user?.role === "admin") {
+    if (session?.user?.role === "admin" && !hasLoadedCreations.current) {
       loadCreations();
       loadSettings();
     }
@@ -149,6 +150,7 @@ function AdminCreationsContent() {
       const res = await fetch("/api/creations");
       const data = await res.json();
       setCreations(data);
+      hasLoadedCreations.current = true;
     } catch (err) {
       console.error(err);
     } finally {

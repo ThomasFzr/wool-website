@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Card, Badge } from "@/components";
@@ -27,6 +27,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const hasLoadedUsers = useRef(false);
 
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -50,7 +51,7 @@ export default function AdminUsersPage() {
   }, [session, status, router]);
 
   useEffect(() => {
-    if (session?.user?.role === "admin") {
+    if (session?.user?.role === "admin" && !hasLoadedUsers.current) {
       loadUsers();
     }
   }, [session]);
@@ -79,6 +80,7 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error("Erreur de chargement");
       const data = await res.json();
       setUsers(data);
+      hasLoadedUsers.current = true;
     } catch (err) {
       console.error(err);
       setMessage("Erreur lors du chargement des utilisateurs.");
