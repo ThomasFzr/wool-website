@@ -21,6 +21,7 @@ const schema = new Schema(
 
     sold: { type: Boolean, default: false },
     showAsNew: { type: Boolean, default: true },
+    salesCount: { type: Number, default: 0 }, // Nombre de fois que l'article a été vendu
 
     displayOrder: { type: Number, default: 0 },
 

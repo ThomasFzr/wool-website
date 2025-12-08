@@ -72,7 +72,18 @@ export async function PATCH(
     if (body.reservedMessage !== undefined)
       update.reservedMessage = body.reservedMessage;
     if (body.reservedAt !== undefined) update.reservedAt = body.reservedAt;
-    if (body.sold !== undefined) update.sold = body.sold;
+    
+    // Gérer le changement de statut "vendu"
+    if (body.sold !== undefined) {
+      const currentCreation = await Creation.findById(id);
+      update.sold = body.sold;
+      
+      // Si on marque comme vendu et que ce n'était pas déjà vendu, incrémenter salesCount
+      if (body.sold === true && currentCreation && !currentCreation.sold) {
+        update.$inc = { salesCount: 1 };
+      }
+    }
+    
     if (body.showAsNew !== undefined) update.showAsNew = body.showAsNew;
     if (body.displayOrder !== undefined) update.displayOrder = body.displayOrder;
 

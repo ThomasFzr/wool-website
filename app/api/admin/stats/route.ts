@@ -22,15 +22,37 @@ export async function GET() {
         // Statistiques des créations
         const totalCreations = await Creation.countDocuments();
         const soldCreations = await Creation.countDocuments({ sold: true });
-        const reservedCreations = await Creation.countDocuments({ reserved: true, sold: false });
-        const availableCreations = await Creation.countDocuments({ sold: false, reserved: false });
+        const reservedCreations = await Creation.countDocuments({ 
+            reserved: true, 
+            $or: [{ sold: false }, { sold: { $exists: false } }]
+        });
+        const availableCreations = await Creation.countDocuments({ 
+            $and: [
+                { $or: [{ sold: false }, { sold: { $exists: false } }] },
+                { $or: [{ reserved: false }, { reserved: { $exists: false } }] }
+            ]
+        });
 
-        // Revenus totaux (créations vendues)
-        const soldItems = await Creation.find({ sold: true });
-        const totalRevenue = soldItems.reduce((sum, item) => sum + (item.price || 0), 0);
+        // Nombre total de ventes (somme de tous les salesCount)
+        const salesResult = await Creation.aggregate([
+            { $group: { _id: null, totalSales: { $sum: "$salesCount" } } }
+        ]);
+        const totalSales = salesResult.length > 0 ? salesResult[0].totalSales : 0;
 
-        // Prix moyen des créations vendues
-        const averagePrice = soldCreations > 0 ? totalRevenue / soldCreations : 0;
+        // Revenus totaux (basé sur salesCount * price de chaque création)
+        const revenueResult = await Creation.aggregate([
+            { $match: { salesCount: { $gt: 0 } } },
+            { 
+                $project: { 
+                    revenue: { $multiply: ["$salesCount", { $ifNull: ["$price", 0] }] } 
+                } 
+            },
+            { $group: { _id: null, totalRevenue: { $sum: "$revenue" } } }
+        ]);
+        const totalRevenue = revenueResult.length > 0 ? revenueResult[0].totalRevenue : 0;
+
+        // Prix moyen par vente
+        const averagePrice = totalSales > 0 ? totalRevenue / totalSales : 0;
 
         // Statistiques des 7 derniers jours
         const sevenDaysAgo = new Date();
@@ -58,11 +80,12 @@ export async function GET() {
             updatedAt: { $gte: thirtyDaysAgo }
         });
 
-        // Revenus des 30 derniers jours
+        // Ventes des 30 derniers jours (créations marquées vendues récemment)
         const soldLast30Days = await Creation.find({
             sold: true,
             updatedAt: { $gte: thirtyDaysAgo }
         });
+        const soldCountLast30Days = soldLast30Days.length;
         const revenueLast30Days = soldLast30Days.reduce((sum, item) => sum + (item.price || 0), 0);
 
         // Données pour le graphique (12 derniers mois) - Optimisé avec aggregation
@@ -158,7 +181,7 @@ export async function GET() {
             },
             creations: {
                 total: totalCreations,
-                sold: soldCreations,
+                sold: totalSales, // Nombre total de ventes (historique)
                 reserved: reservedCreations,
                 available: availableCreations,
             },
@@ -166,7 +189,7 @@ export async function GET() {
                 total: totalRevenue,
                 average: averagePrice,
                 last30Days: revenueLast30Days,
-                soldLast30Days: soldLast30Days.length,
+                soldLast30Days: soldCountLast30Days,
             },
             monthlyData
         });
