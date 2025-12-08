@@ -188,6 +188,7 @@ export async function GET() {
                 average: averagePrice,
                 last30Days: revenueLast30Days,
                 soldLast30Days: soldCountLast30Days,
+                totalSales: totalSales, // Nombre total de ventes (historique avec salesCount)
             },
             monthlyData
         });

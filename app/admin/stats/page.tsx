@@ -106,7 +106,7 @@ function StatsContent() {
                   title="Revenus totaux"
                   value={`${stats.revenue.total.toFixed(2)} €`}
                   icon="💵"
-                  subtitle={`${stats.creations.sold} vente${plural(stats.creations.sold)}`}
+                  subtitle={`${stats.revenue.totalSales} vente${plural(stats.revenue.totalSales)}`}
                 />
                 <StatsCard
                   title="Prix moyen"
