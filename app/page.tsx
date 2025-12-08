@@ -41,6 +41,7 @@ async function getCreations(): Promise<CreationType[]> {
     images: c.images,
     price: c.price,
     color: c.color,
+    type: c.type,
     reserved: c.reserved,
     sold: c.sold,
   }));

@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
       imagePublicIds,
       price: body.price,
       color: body.color,
+      type: body.type && body.type !== "" ? body.type : undefined,
     });
 
     // 🔄 Invalider le cache immédiatement après création

@@ -8,6 +8,10 @@ const schema = new Schema(
     images: [String],
     price: Number,
     color: String,
+    type: { 
+      type: String, 
+      enum: ["bonnet", "tour de cou", "bandeau"],
+    },
 
     imagePublicIds: [String],
     imagePublicId: String,

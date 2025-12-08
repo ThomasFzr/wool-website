@@ -8,6 +8,7 @@ export type Creation = {
   images?: string[];
   price?: number;
   color?: string;
+  type?: "bonnet" | "tour de cou" | "bandeau";
   reserved?: boolean;
   sold?: boolean;
 };

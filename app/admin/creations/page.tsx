@@ -18,6 +18,7 @@ type Creation = {
   imagePublicIds?: string[];
   price?: number;
   color?: string;
+  type?: "bonnet" | "tour de cou" | "bandeau";
 };
 
 function AdminCreationsContent() {
@@ -33,6 +34,7 @@ function AdminCreationsContent() {
     imagePublicIds: [] as string[],
     price: "",
     color: "",
+    type: "" as string,
   });
 
   const [message, setMessage] = useState<string | null>(null);
@@ -179,6 +181,7 @@ function AdminCreationsContent() {
       imagePublicIds: form.imagePublicIds,
       price: form.price ? Number(form.price) : undefined,
       color: form.color || undefined,
+      type: form.type || undefined,
     };
 
     const url = editingId ? `/api/creations/${editingId}` : "/api/creations";
@@ -206,6 +209,7 @@ function AdminCreationsContent() {
       imagePublicIds: [],
       price: "",
       color: "",
+      type: "",
     });
     setEditingId(null);
     setShowEditModal(false);
@@ -223,6 +227,7 @@ function AdminCreationsContent() {
       price: c.price != null ? String(c.price) : "",
       imagePublicIds: c.imagePublicIds ?? [],
       color: c.color ?? "",
+      type: c.type ?? "",
     });
     setMessage(null);
     setShowEditModal(true);
@@ -249,6 +254,7 @@ function AdminCreationsContent() {
         imagePublicIds: [],
         price: "",
         color: "",
+        type: "",
       });
     }
 
@@ -265,6 +271,7 @@ function AdminCreationsContent() {
       imagePublicIds: [],
       price: "",
       color: "",
+      type: "",
     });
     setMessage(null);
     setShowEditModal(false);
@@ -559,6 +566,9 @@ function AdminCreationsContent() {
                         {c.price != null && (
                           <Badge variant="default">{c.price} €</Badge>
                         )}
+                        {c.type && (
+                          <Badge variant="default">{c.type}</Badge>
+                        )}
                         {c.color && (
                           <Badge variant="default">{c.color}</Badge>
                         )}
@@ -633,6 +643,20 @@ function AdminCreationsContent() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={4}
               />
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Type d'article</label>
+                <select
+                  value={form.type}
+                  onChange={(e) => setForm({ ...form, type: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                >
+                  <option value="">-- Sélectionner --</option>
+                  <option value="bonnet">Bonnet</option>
+                  <option value="tour de cou">Tour de cou</option>
+                  <option value="bandeau">Bandeau</option>
+                </select>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <Input
@@ -792,6 +816,20 @@ function AdminCreationsContent() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={4}
               />
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Type d'article</label>
+                <select
+                  value={form.type}
+                  onChange={(e) => setForm({ ...form, type: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                >
+                  <option value="">-- Sélectionner --</option>
+                  <option value="bonnet">Bonnet</option>
+                  <option value="tour de cou">Tour de cou</option>
+                  <option value="bandeau">Bandeau</option>
+                </select>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <Input

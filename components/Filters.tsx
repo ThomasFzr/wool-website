@@ -6,6 +6,9 @@ interface FiltersProps {
   availableColors: string[];
   selectedColors: string[];
   onColorChange: (colors: string[]) => void;
+  availableTypes: string[];
+  selectedTypes: string[];
+  onTypeChange: (types: string[]) => void;
   showOnlyAvailable: boolean;
   onAvailabilityChange: (value: boolean) => void;
 }
@@ -14,16 +17,24 @@ export function Filters({
   availableColors,
   selectedColors,
   onColorChange,
+  availableTypes,
+  selectedTypes,
+  onTypeChange,
   showOnlyAvailable,
   onAvailabilityChange,
 }: FiltersProps) {
   const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const colorDropdownRef = useRef<HTMLDivElement | null>(null);
+  const typeDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (colorDropdownRef.current && !colorDropdownRef.current.contains(e.target as Node)) {
         setColorDropdownOpen(false);
+      }
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
+        setTypeDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -32,6 +43,60 @@ export function Filters({
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
+      {/* Dropdown types */}
+      <div className="relative" ref={typeDropdownRef}>
+        <button
+          type="button"
+          onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
+          className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <span>
+            Type{selectedTypes.length > 0 && ` (${selectedTypes.length})`}
+          </span>
+          <span className={`transition-transform ${typeDropdownOpen ? "rotate-180" : ""}`}>
+            ▼
+          </span>
+        </button>
+
+        {typeDropdownOpen && (
+          <div className="absolute left-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg animate-fadeIn">
+            <div className="max-h-64 overflow-y-auto p-2">
+              {availableTypes.map((type) => (
+                <label
+                  key={type}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedTypes.includes(type)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onTypeChange([...selectedTypes, type]);
+                      } else {
+                        onTypeChange(selectedTypes.filter((t) => t !== type));
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  />
+                  <span>{type.charAt(0).toUpperCase() + type.slice(1)}</span>
+                </label>
+              ))}
+            </div>
+            {selectedTypes.length > 0 && (
+              <div className="border-t border-slate-200 p-2">
+                <button
+                  type="button"
+                  onClick={() => onTypeChange([])}
+                  className="w-full rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Tout effacer
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Dropdown couleurs */}
       <div className="relative" ref={colorDropdownRef}>
         <button

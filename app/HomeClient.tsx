@@ -16,6 +16,7 @@ export function HomeClient({ initialCreations }: HomeClientProps) {
   const [openCreation, setOpenCreation] = useState<Creation | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
 
   function openModal(creation: Creation) {
@@ -77,12 +78,24 @@ export function HomeClient({ initialCreations }: HomeClientProps) {
     return a.localeCompare(b);
   });
 
+  // Calcul des types disponibles
+  const availableTypes = Array.from(
+    new Set(
+      creations
+        .map((c) => c.type?.trim())
+        .filter((t): t is string => Boolean(t))
+    )
+  ).sort();
+
   // Filtrage des créations
   const filteredCreations = creations.filter((c) => {
     if (showOnlyAvailable && (c.sold || c.reserved)) {
       return false;
     }
     if (selectedColors.length > 0 && !selectedColors.includes(c.color || "")) {
+      return false;
+    }
+    if (selectedTypes.length > 0 && !selectedTypes.includes(c.type || "")) {
       return false;
     }
     return true;
@@ -97,11 +110,14 @@ export function HomeClient({ initialCreations }: HomeClientProps) {
           </p>
         )}
 
-        {availableColors.length > 0 && (
+        {(availableColors.length > 0 || availableTypes.length > 0) && (
           <Filters
             availableColors={availableColors}
             selectedColors={selectedColors}
             onColorChange={setSelectedColors}
+            availableTypes={availableTypes}
+            selectedTypes={selectedTypes}
+            onTypeChange={setSelectedTypes}
             showOnlyAvailable={showOnlyAvailable}
             onAvailabilityChange={setShowOnlyAvailable}
           />
