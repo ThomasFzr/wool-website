@@ -39,6 +39,10 @@ export async function POST(req: NextRequest) {
         ? body.imagePublicIds
         : [];
 
+    // Récupérer le displayOrder maximum actuel
+    const maxOrderCreation = await Creation.findOne().sort({ displayOrder: -1 }).select('displayOrder').lean();
+    const nextDisplayOrder = maxOrderCreation ? ((maxOrderCreation as any).displayOrder || 0) + 1 : 1;
+
     const creation = await Creation.create({
       title: body.title,
       description: body.description,
@@ -48,6 +52,7 @@ export async function POST(req: NextRequest) {
       price: body.price,
       color: body.color,
       type: body.type && body.type !== "" ? body.type : undefined,
+      displayOrder: nextDisplayOrder,
     });
 
     // 🔄 Invalider le cache immédiatement après création
