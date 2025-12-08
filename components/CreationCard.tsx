@@ -77,6 +77,7 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
             width={600}
             height={450}
             loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "low"}
             decoding="async"
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
           />
