@@ -264,14 +264,14 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 label="Ville"
-                placeholder="Paris"
+                placeholder="Lyon"
                 value={form.city}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
               />
 
               <Input
                 label="Code postal"
-                placeholder="75001"
+                placeholder="69000"
                 value={form.postalCode}
                 onChange={(e) =>
                   setForm({ ...form, postalCode: e.target.value })
