@@ -8,11 +8,11 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "MailleMum - Créations artisanales en laine",
-  description: "Découvrez nos créations artisanales uniques en laine : peluches, décorations et accessoires faits main avec passion.",
-  keywords: ["laine", "artisanat", "créations", "fait main", "peluches", "tricot", "crochet"],
+  description: "Découvrez nos créations artisanales en laine : tours de cou, bandeaux et bonnets faits main avec passion.",
+  keywords: ["laine", "artisanat", "créations", "fait main", "tour de cou", "bandeau", "bonnet", "tricot", "crochet"],
   openGraph: {
     title: "MailleMum - Créations artisanales en laine",
-    description: "Découvrez nos créations artisanales uniques en laine : peluches, décorations et accessoires faits main avec passion.",
+    description: "Découvrez nos créations artisanales en laine : tours de cou, bandeaux et bonnets faits main avec passion.",
     type: "website",
     locale: "fr_FR",
     images: [

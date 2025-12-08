@@ -9,13 +9,13 @@ export const metadata: Metadata = {
     default: "MailleMum - Créations artisanales en laine",
     template: "%s | MailleMum",
   },
-  description: "Découvrez nos créations artisanales uniques en laine : peluches, décorations et accessoires faits main avec passion.",
+  description: "Découvrez nos créations artisanales en laine : tours de cou, bandeaux et bonnets faits main avec passion.",
   verification: {
     google: 'c7a33ae43fd6971e',
   },
   openGraph: {
     title: "MailleMum - Créations artisanales en laine",
-    description: "Découvrez nos créations artisanales uniques en laine : peluches, décorations et accessoires faits main avec passion.",
+    description: "Découvrez nos créations artisanales en laine : tours de cou, bandeaux et bonnets faits main avec passion.",
     url: 'https://www.maillemum.fr',
     siteName: 'MailleMum',
     images: [
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'MailleMum - Créations artisanales en laine',
-    description: 'Découvrez nos créations artisanales uniques en laine : peluches, décorations et accessoires faits main avec passion.',
+    description: 'Découvrez nos créations artisanales en laine : tours de cou, bandeaux et bonnets faits main avec passion.',
     images: ['/images/og-image.jpg'],
   },
 };
