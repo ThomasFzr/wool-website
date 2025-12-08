@@ -11,7 +11,7 @@ export function optimizeCloudinaryUrl(url: string, options: {
     return url;
   }
 
-  const { width = 800, quality = 70, format = 'auto' } = options;
+  const { width = 600, quality = 75, format = 'auto' } = options;
 
   // Extraire les parties de l'URL Cloudinary
   const parts = url.split('/upload/');

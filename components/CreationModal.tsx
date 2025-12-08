@@ -43,7 +43,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
     if (isOpen && images.length > 0) {
       images.forEach((src) => {
         const img = new Image();
-        img.src = optimizeCloudinaryUrl(src, { width: 900, quality: 85, format: 'auto' });
+        img.src = optimizeCloudinaryUrl(src, { width: 800, quality: 80, format: 'auto' });
       });
     }
   }, [isOpen, images]);
@@ -269,7 +269,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
         >
           {images.length > 0 ? (
             <img
-              src={optimizeCloudinaryUrl(images[currentIndex], { width: 900, quality: 85, format: 'auto' })}
+              src={optimizeCloudinaryUrl(images[currentIndex], { width: 800, quality: 80, format: 'auto' })}
               alt={`${creation.title} ${currentIndex + 1}`}
               onClick={() => {
                 // Ne pas dé-zoomer si on vient de drag
@@ -336,7 +336,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
                 }`}
               >
                 <img
-                  src={optimizeCloudinaryUrl(url, { width: 120, quality: 75, format: 'auto' })}
+                  src={optimizeCloudinaryUrl(url, { width: 100, quality: 70, format: 'auto' })}
                   alt={`miniature ${i + 1}`}
                   className="h-full w-full rounded-md object-cover"
                 />

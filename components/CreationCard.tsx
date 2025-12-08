@@ -29,10 +29,10 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
       ? [creation.imageUrl] 
       : [];
   
-  // Optimiser pour l'affichage carte (600px max, qualité adaptée)
+  // Optimiser pour l'affichage carte (500px max pour mobile)
   const cover = images[0] ? optimizeCloudinaryUrl(images[0], {
-    width: 600,
-    quality: priority ? 85 : 75,
+    width: 500,
+    quality: priority ? 80 : 70,
     format: 'auto'
   }) : undefined;
 
@@ -45,7 +45,7 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
   const handleMouseEnter = () => {
     images.forEach((src) => {
       const img = document.createElement('img');
-      img.src = optimizeCloudinaryUrl(src, { width: 900, quality: 85, format: 'auto' });
+      img.src = optimizeCloudinaryUrl(src, { width: 800, quality: 80, format: 'auto' });
     });
   };
 
