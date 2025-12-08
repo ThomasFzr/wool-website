@@ -12,9 +12,17 @@ export const metadata: Metadata = {
   keywords: ["laine", "artisanat", "créations", "fait main", "peluches", "tricot", "crochet"],
   openGraph: {
     title: "MailleMum - Créations artisanales en laine",
-    description: "Découvrez nos créations artisanales uniques en laine",
+    description: "Découvrez nos créations artisanales uniques en laine : peluches, décorations et accessoires faits main avec passion.",
     type: "website",
     locale: "fr_FR",
+    images: [
+      {
+        url: '/images/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'MailleMum - Créations artisanales en laine',
+      },
+    ],
   },
   robots: {
     index: true,
