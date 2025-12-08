@@ -6,6 +6,13 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { StatsCard, StatsChart } from "@/components";
 
+// Composant de chargement réutilisable
+const LoadingScreen = () => (
+  <main className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="text-slate-600">Chargement...</div>
+  </main>
+);
+
 function StatsContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -40,17 +47,16 @@ function StatsContent() {
     }
   }
 
-  if (status === "loading") {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Chargement...</div>
-      </main>
-    );
-  }
+  // Fonction helper pour calculer les pourcentages
+  const calcPercent = (value: number, total: number) => 
+    total > 0 ? ((value / total) * 100).toFixed(0) : '0';
 
-  if (!session || session.user.role !== "admin") {
-    return null;
-  }
+  // Fonction helper pour le pluriel
+  const plural = (count: number, singular: string = '') => 
+    count > 1 ? 's' : singular;
+
+  if (status === "loading") return <LoadingScreen />;
+  if (!session || session.user.role !== "admin") return null;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -98,7 +104,7 @@ function StatsContent() {
                   title="Revenus totaux"
                   value={`${stats.revenue.total.toFixed(2)} €`}
                   icon="💵"
-                  subtitle={`${stats.creations.sold} création${stats.creations.sold > 1 ? 's' : ''} vendue${stats.creations.sold > 1 ? 's' : ''}`}
+                  subtitle={`${stats.creations.sold} vente${plural(stats.creations.sold)}`}
                 />
                 <StatsCard
                   title="Prix moyen"
@@ -110,13 +116,7 @@ function StatsContent() {
                   title="Revenus (30j)"
                   value={`${stats.revenue.last30Days.toFixed(2)} €`}
                   icon="📈"
-                  subtitle={`${stats.revenue.soldLast30Days} vente${stats.revenue.soldLast30Days > 1 ? 's' : ''}`}
-                />
-                <StatsCard
-                  title="Créations vendues"
-                  value={stats.creations.sold}
-                  icon="✅"
-                  subtitle={`${stats.creations.available} disponible${stats.creations.available > 1 ? 's' : ''}`}
+                  subtitle={`${stats.revenue.soldLast30Days} vente${plural(stats.revenue.soldLast30Days)}`}
                 />
               </div>
             </div>
@@ -129,23 +129,25 @@ function StatsContent() {
                   title="Total créations"
                   value={stats.creations.total}
                   icon="🎨"
+                  subtitle={`${calcPercent(stats.creations.sold, stats.creations.total)}% vendues`}
                 />
                 <StatsCard
                   title="Disponibles"
                   value={stats.creations.available}
                   icon="🟢"
-                  subtitle={`${((stats.creations.available / stats.creations.total) * 100).toFixed(0)}% du catalogue`}
+                  subtitle={`${calcPercent(stats.creations.available, stats.creations.total)}% du catalogue`}
                 />
                 <StatsCard
                   title="Réservées"
                   value={stats.creations.reserved}
                   icon="⏳"
+                  subtitle={`${calcPercent(stats.creations.reserved, stats.creations.total)}% du catalogue`}
                 />
                 <StatsCard
                   title="Vendues"
                   value={stats.creations.sold}
                   icon="✨"
-                  subtitle={`${((stats.creations.sold / stats.creations.total) * 100).toFixed(0)}% du catalogue`}
+                  subtitle={`${calcPercent(stats.creations.sold, stats.creations.total)}% du catalogue`}
                 />
               </div>
             </div>
@@ -164,7 +166,7 @@ function StatsContent() {
                   value={stats.reservations.pending}
                   icon="⏰"
                   trend={{
-                    value: `${stats.reservations.last7Days} nouvelle${stats.reservations.last7Days > 1 ? 's' : ''}`,
+                    value: `${stats.reservations.last7Days} nouvelle${plural(stats.reservations.last7Days)}`,
                     label: "cette semaine"
                   }}
                 />
@@ -222,11 +224,7 @@ function StatsContent() {
 
 export default function StatsPage() {
   return (
-    <Suspense fallback={
-      <main className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Chargement...</div>
-      </main>
-    }>
+    <Suspense fallback={<LoadingScreen />}>
       <StatsContent />
     </Suspense>
   );
