@@ -90,11 +90,11 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-start justify-between gap-2">
           <h2 className="text-sm font-semibold text-slate-900">
             {creation.title}
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {creation.price != null && (
               <Badge variant="default" className="whitespace-nowrap">
                 {creation.price} €
