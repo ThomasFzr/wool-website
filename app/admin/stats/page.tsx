@@ -129,7 +129,6 @@ function StatsContent() {
                   title="Total créations"
                   value={stats.creations.total}
                   icon="🎨"
-                  subtitle={`${calcPercent(stats.creations.sold, stats.creations.total)}% vendues`}
                 />
                 <StatsCard
                   title="Disponibles"
@@ -141,7 +140,6 @@ function StatsContent() {
                   title="Réservées"
                   value={stats.creations.reserved}
                   icon="⏳"
-                  subtitle={`${calcPercent(stats.creations.reserved, stats.creations.total)}% du catalogue`}
                 />
                 <StatsCard
                   title="Vendues"
