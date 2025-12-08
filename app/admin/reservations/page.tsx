@@ -196,11 +196,11 @@ function AdminReservationsContent() {
 
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between gap-2 mb-1">
-                                                <div className="flex-1">
-                                                    <p className="font-semibold text-slate-900">{r.name}</p>
-                                                    <p className="text-xs text-slate-500">{r.contact}</p>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold text-slate-900 truncate">{r.name}</p>
+                                                    <p className="text-xs text-slate-500 truncate">{r.contact}</p>
                                                 </div>
-                                                <Badge variant={getStatusBadgeVariant(r.status) as any}>
+                                                <Badge variant={getStatusBadgeVariant(r.status) as any} className="shrink-0">
                                                     {getStatusLabel(r.status)}
                                                 </Badge>
                                             </div>
