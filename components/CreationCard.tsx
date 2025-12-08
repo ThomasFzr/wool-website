@@ -1,4 +1,5 @@
 import { Badge } from "./ui";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 export type Creation = {
   _id: string;
@@ -28,8 +29,12 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
       ? [creation.imageUrl] 
       : [];
   
-  // Utiliser directement les URLs optimisées de la DB
-  const cover = images[0];
+  // Optimiser pour l'affichage carte (800px max, qualité adaptée)
+  const cover = images[0] ? optimizeCloudinaryUrl(images[0], {
+    width: 800,
+    quality: priority ? 80 : 70,
+    format: 'auto'
+  }) : undefined;
 
   // Vérifier si l'article est nouveau (moins de 7 jours)
   const isNewArticle = creation.showAsNew && creation.createdAt 

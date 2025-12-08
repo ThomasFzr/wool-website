@@ -5,6 +5,7 @@ import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Creation } from "./CreationCard";
 import { Button, Badge } from "./ui";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 interface CreationModalProps {
   creation: Creation | null;
@@ -42,7 +43,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
     if (isOpen && images.length > 0) {
       images.forEach((src) => {
         const img = new Image();
-        img.src = src;
+        img.src = optimizeCloudinaryUrl(src, { width: 1200, quality: 80, format: 'auto' });
       });
     }
   }, [isOpen, images]);
@@ -268,7 +269,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
         >
           {images.length > 0 ? (
             <img
-              src={images[currentIndex]}
+              src={optimizeCloudinaryUrl(images[currentIndex], { width: 1200, quality: 80, format: 'auto' })}
               alt={`${creation.title} ${currentIndex + 1}`}
               onClick={() => {
                 // Ne pas dé-zoomer si on vient de drag
@@ -335,7 +336,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
                 }`}
               >
                 <img
-                  src={url}
+                  src={optimizeCloudinaryUrl(url, { width: 150, quality: 70, format: 'auto' })}
                   alt={`miniature ${i + 1}`}
                   className="h-full w-full rounded-md object-cover"
                 />
