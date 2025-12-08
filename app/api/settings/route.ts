@@ -6,13 +6,31 @@ import { checkAdminAuth } from "@/lib/auth";
 const DEFAULT_SETTINGS = {
   title: "Les créations en laine de maman",
   subtitle: "Clique sur une création pour voir toutes les photos.",
+  colors: [
+    "Blanc",
+    "Noir",
+    "Gris",
+    "Beige",
+    "Marron",
+    "Rouge",
+    "Rose",
+    "Rose poudré",
+    "Orange",
+    "Jaune",
+    "Vert",
+    "Bleu",
+    "Bleu marine",
+    "Violet",
+    "Multicolore",
+  ],
+  types: ["bonnet", "tour de cou", "bandeau"],
 };
 
 export async function GET() {
   try {
     await connectToDatabase();
     const doc = (await Settings.findById("main").lean()) as
-      | { title?: string; subtitle?: string }
+      | { title?: string; subtitle?: string; colors?: string[]; types?: string[] }
       | null;
 
     if (!doc) {
@@ -23,6 +41,8 @@ export async function GET() {
       _id: "main",
       title: doc.title ?? DEFAULT_SETTINGS.title,
       subtitle: doc.subtitle ?? DEFAULT_SETTINGS.subtitle,
+      colors: doc.colors ?? DEFAULT_SETTINGS.colors,
+      types: doc.types ?? DEFAULT_SETTINGS.types,
     });
   } catch (err) {
     console.error(err);
@@ -46,6 +66,8 @@ export async function POST(req: NextRequest) {
       {
         title: body.title,
         subtitle: body.subtitle,
+        colors: body.colors,
+        types: body.types,
       },
       { new: true, upsert: true }
     );

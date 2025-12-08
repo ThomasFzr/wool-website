@@ -132,7 +132,7 @@ export function Filters({
                     }}
                     className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                   />
-                  <span>{color}</span>
+                  <span>{color.charAt(0).toUpperCase() + color.slice(1)}</span>
                 </label>
               ))}
             </div>

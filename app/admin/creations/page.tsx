@@ -9,24 +9,6 @@ import { Button, Input, Textarea, Card, Badge } from "@/components";
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-const COLOR_OPTIONS = [
-  "Blanc",
-  "Noir",
-  "Gris",
-  "Beige",
-  "Marron",
-  "Rouge",
-  "Rose",
-  "Rose poudré",
-  "Orange",
-  "Jaune",
-  "Vert",
-  "Bleu",
-  "Bleu marine",
-  "Violet",
-  "Multicolore",
-];
-
 type Creation = {
   _id: string;
   title: string;
@@ -36,7 +18,7 @@ type Creation = {
   imagePublicIds?: string[];
   price?: number;
   color?: string;
-  type?: "bonnet" | "tour de cou" | "bandeau";
+  type?: string;
   showAsNew?: boolean;
   displayOrder?: number;
   reserved?: boolean;
@@ -72,6 +54,8 @@ function AdminCreationsContent() {
   const [listDragIndex, setListDragIndex] = useState<number | null>(null);
   const [listTouchStartIndex, setListTouchStartIndex] = useState<number | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [availableColors, setAvailableColors] = useState<string[]>([]);
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
   
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -97,8 +81,22 @@ function AdminCreationsContent() {
   useEffect(() => {
     if (session?.user?.role === "admin") {
       loadCreations();
+      loadSettings();
     }
   }, [session]);
+
+  async function loadSettings() {
+    try {
+      const res = await fetch("/api/settings");
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableColors(data.colors || []);
+        setAvailableTypes(data.types || []);
+      }
+    } catch (err) {
+      console.error("Error loading settings:", err);
+    }
+  }
 
   // Détection du paramètre edit dans l'URL
   useEffect(() => {
@@ -726,9 +724,11 @@ function AdminCreationsContent() {
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                 >
                   <option value="">-- Sélectionner --</option>
-                  <option value="bonnet">Bonnet</option>
-                  <option value="tour de cou">Tour de cou</option>
-                  <option value="bandeau">Bandeau</option>
+                  {availableTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -749,9 +749,9 @@ function AdminCreationsContent() {
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                   >
                     <option value="">-- Sélectionner --</option>
-                    {COLOR_OPTIONS.map((color) => (
+                    {availableColors.map((color) => (
                       <option key={color} value={color}>
-                        {color}
+                        {color.charAt(0).toUpperCase() + color.slice(1)}
                       </option>
                     ))}
                   </select>
@@ -913,9 +913,11 @@ function AdminCreationsContent() {
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                 >
                   <option value="">-- Sélectionner --</option>
-                  <option value="bonnet">Bonnet</option>
-                  <option value="tour de cou">Tour de cou</option>
-                  <option value="bandeau">Bandeau</option>
+                  {availableTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -936,9 +938,9 @@ function AdminCreationsContent() {
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                   >
                     <option value="">-- Sélectionner --</option>
-                    {COLOR_OPTIONS.map((color) => (
+                    {availableColors.map((color) => (
                       <option key={color} value={color}>
-                        {color}
+                        {color.charAt(0).toUpperCase() + color.slice(1)}
                       </option>
                     ))}
                   </select>

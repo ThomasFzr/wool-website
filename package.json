@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "sync-users": "tsx scripts/sync-users.ts"
+    "sync-users": "tsx scripts/sync-users.ts",
+    "init-settings": "tsx scripts/init-settings.ts"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.1",

@@ -25,6 +25,8 @@ export const metadata: Metadata = {
 type SettingsType = {
   title: string;
   subtitle: string;
+  colors?: string[];
+  types?: string[];
 };
 
 async function getCreations(): Promise<CreationType[]> {
@@ -58,9 +60,17 @@ async function getSettings(): Promise<SettingsType | null> {
   const settingsData = settings as any;
   if (!settingsData?.title && !settingsData?.subtitle) return null;
   
+  // Trier les couleurs pour mettre "multicolore" en dernier
+  const colors = settingsData.colors || [];
+  const sortedColors = colors.filter((c: string) => c !== "multicolore").concat(
+    colors.filter((c: string) => c === "multicolore")
+  );
+  
   return {
     title: settingsData.title || "",
     subtitle: settingsData.subtitle || "",
+    colors: sortedColors,
+    types: settingsData.types || [],
   };
 }
 
@@ -78,7 +88,11 @@ export default async function HomePage() {
         title={settings?.title}
         subtitle={settings?.subtitle}
       />
-      <HomeClient initialCreations={creations} />
+      <HomeClient 
+        initialCreations={creations}
+        availableColors={settings?.colors || []}
+        availableTypes={settings?.types || []}
+      />
     </main>
   );
 }

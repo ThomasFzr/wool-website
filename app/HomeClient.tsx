@@ -8,9 +8,11 @@ import { Filters } from "@/components/Filters";
 
 type HomeClientProps = {
   initialCreations: Creation[];
+  availableColors?: string[];
+  availableTypes?: string[];
 };
 
-export function HomeClient({ initialCreations }: HomeClientProps) {
+export function HomeClient({ initialCreations, availableColors = [], availableTypes = [] }: HomeClientProps) {
   const { data: session } = useSession();
   const [creations, setCreations] = useState<Creation[]>(initialCreations);
   const [openCreation, setOpenCreation] = useState<Creation | null>(null);
@@ -62,30 +64,6 @@ export function HomeClient({ initialCreations }: HomeClientProps) {
       )
     );
   }
-
-  // Calcul des couleurs disponibles
-  const rawColors = Array.from(
-    new Set(
-      creations
-        .map((c) => c.color?.trim())
-        .filter((c): c is string => Boolean(c))
-    )
-  );
-
-  const availableColors = rawColors.sort((a, b) => {
-    if (a.toLowerCase() === "multicolore") return 1;
-    if (b.toLowerCase() === "multicolore") return -1;
-    return a.localeCompare(b);
-  });
-
-  // Calcul des types disponibles
-  const availableTypes = Array.from(
-    new Set(
-      creations
-        .map((c) => c.type?.trim())
-        .filter((t): t is string => Boolean(t))
-    )
-  ).sort();
 
   // Filtrage des créations
   const filteredCreations = creations.filter((c) => {
