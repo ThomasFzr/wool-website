@@ -38,12 +38,12 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
       ? [creation.imageUrl] 
       : [];
 
-  // Précharger toutes les images de la modale dès l'ouverture
+  // Précharger toutes les images de la modale dès l'ouverture avec les mêmes optimisations
   useEffect(() => {
     if (isOpen && images.length > 0) {
       images.forEach((src) => {
         const img = new Image();
-        img.src = src;
+        img.src = optimizeCloudinaryUrl(src, { width: 1200, quality: 75, format: 'auto' });
       });
     }
   }, [isOpen, images]);
