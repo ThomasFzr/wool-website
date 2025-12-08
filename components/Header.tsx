@@ -79,6 +79,9 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
             height={112}
             className="h-20 sm:h-28 w-auto object-contain"
             priority
+            quality={90}
+            placeholder="blur"
+            blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTEyIiBoZWlnaHQ9IjExMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTEyIiBoZWlnaHQ9IjExMiIgZmlsbD0iI2Y4ZjhmOCIvPjwvc3ZnPg=="
           />
           
           {/* Titre H1 pour le SEO */}

@@ -67,11 +67,13 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
             alt={creation.title}
             width={400}
             height={300}
-            quality={85}
+            quality={80}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             priority={priority}
             loading={priority ? undefined : "lazy"}
+            placeholder="blur"
+            blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2YxZjVmOSIvPjwvc3ZnPg=="
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
