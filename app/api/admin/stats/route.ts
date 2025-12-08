@@ -65,36 +65,83 @@ export async function GET() {
         });
         const revenueLast30Days = soldLast30Days.reduce((sum, item) => sum + (item.price || 0), 0);
 
-        // Données pour le graphique (12 derniers mois)
-        const monthlyData = [];
+        // Données pour le graphique (12 derniers mois) - Optimisé avec aggregation
         const now = new Date();
-        
+        const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
+        // Agrégation des réservations par mois
+        const reservationsAgg = await Reservation.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: twelveMonthsAgo }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$createdAt" },
+                        month: { $month: "$createdAt" }
+                    },
+                    total: { $sum: 1 },
+                    validated: {
+                        $sum: {
+                            $cond: [{ $eq: ["$status", "validated"] }, 1, 0]
+                        }
+                    }
+                }
+            }
+        ]);
+
+        // Agrégation des créations vendues par mois
+        const creationsAgg = await Creation.aggregate([
+            {
+                $match: {
+                    sold: true,
+                    updatedAt: { $gte: twelveMonthsAgo }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$updatedAt" },
+                        month: { $month: "$updatedAt" }
+                    },
+                    count: { $sum: 1 },
+                    revenue: { $sum: "$price" }
+                }
+            }
+        ]);
+
+        // Créer un map pour un accès rapide
+        const resMap = new Map();
+        reservationsAgg.forEach(r => {
+            const key = `${r._id.year}-${r._id.month}`;
+            resMap.set(key, r);
+        });
+
+        const creMap = new Map();
+        creationsAgg.forEach(c => {
+            const key = `${c._id.year}-${c._id.month}`;
+            creMap.set(key, c);
+        });
+
+        // Construire les données mensuelles
+        const monthlyData = [];
         for (let i = 11; i >= 0; i--) {
             const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
-            
-            const monthReservations = await Reservation.countDocuments({
-                createdAt: { $gte: monthStart, $lte: monthEnd }
-            });
-            
-            const monthValidated = await Reservation.countDocuments({
-                status: "validated",
-                updatedAt: { $gte: monthStart, $lte: monthEnd }
-            });
+            const year = monthStart.getFullYear();
+            const month = monthStart.getMonth() + 1;
+            const key = `${year}-${month}`;
 
-            const monthSold = await Creation.find({
-                sold: true,
-                updatedAt: { $gte: monthStart, $lte: monthEnd }
-            });
-
-            const monthRevenue = monthSold.reduce((sum, item) => sum + (item.price || 0), 0);
+            const resData = resMap.get(key);
+            const creData = creMap.get(key);
 
             monthlyData.push({
                 month: monthStart.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
-                reservations: monthReservations,
-                validated: monthValidated,
-                revenue: monthRevenue,
-                sold: monthSold.length
+                reservations: resData?.total || 0,
+                validated: resData?.validated || 0,
+                revenue: creData?.revenue || 0,
+                sold: creData?.count || 0
             });
         }
 
