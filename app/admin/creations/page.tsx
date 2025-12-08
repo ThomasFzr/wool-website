@@ -464,21 +464,16 @@ function AdminCreationsContent() {
   }
 
   async function handleMakeAvailableAgain(id: string) {
-    const ok = confirm("Remettre cet article disponible ? Il sera placé en haut de la liste avec le badge 'Nouveau'.");
+    const ok = confirm("Remettre cet article disponible ?");
     if (!ok) return;
 
     try {
-      // Récupérer le displayOrder maximum
-      const maxOrder = Math.max(...creations.map(c => c.displayOrder || 0), 0);
-      
       const res = await fetch(`/api/creations/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           reserved: false,
           sold: false,
-          showAsNew: true,
-          displayOrder: maxOrder + 1,
         }),
       });
 

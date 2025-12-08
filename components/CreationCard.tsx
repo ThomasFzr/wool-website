@@ -13,7 +13,6 @@ export type Creation = {
   reserved?: boolean;
   sold?: boolean;
   showAsNew?: boolean;
-  isAvailableAgain?: boolean;
   createdAt?: string;
 };
 
@@ -49,10 +48,6 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
       ) : creation.reserved ? (
         <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
           Réservé
-        </span>
-      ) : creation.isAvailableAgain ? (
-        <span className="absolute left-2 top-2 z-10 rounded-full bg-green-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-          Disponible
         </span>
       ) : isNewArticle ? (
         <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">

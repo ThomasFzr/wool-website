@@ -21,7 +21,6 @@ const schema = new Schema(
 
     sold: { type: Boolean, default: false },
     showAsNew: { type: Boolean, default: true },
-    isAvailableAgain: { type: Boolean, default: false },
 
     displayOrder: { type: Number, default: 0 },
 
