@@ -320,7 +320,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
               <button
                 key={i}
                 onClick={() => setCurrentIndex(i)}
-                className={`h-14 w-14 shrink-0 rounded-md border ${
+                className={`h-14 w-14 shrink-0 rounded-md border overflow-hidden ${
                   i === currentIndex ? "border-slate-900" : "border-transparent opacity-60"
                 }`}
               >

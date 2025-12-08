@@ -36,10 +36,19 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
     ? (new Date().getTime() - new Date(creation.createdAt).getTime()) / (1000 * 60 * 60 * 24) < 7
     : creation.showAsNew;
 
+  // Précharger toutes les images au survol pour ouverture instantanée de la modale
+  const handleMouseEnter = () => {
+    images.forEach((src) => {
+      const img = document.createElement('img');
+      img.src = src;
+    });
+  };
+
   return (
     <article
       className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
       onClick={onClick}
+      onMouseEnter={handleMouseEnter}
     >
       {creation.sold ? (
         <span className="absolute left-2 top-2 z-10 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
@@ -62,13 +71,11 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
             alt={creation.title}
             width={400}
             height={300}
-            quality={80}
+            quality={75}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             priority={priority}
             loading={priority ? undefined : "lazy"}
-            placeholder="blur"
-            blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2YxZjVmOSIvPjwvc3ZnPg=="
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
