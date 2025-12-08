@@ -55,6 +55,23 @@ export default function AdminUsersPage() {
     }
   }, [session]);
 
+  // Désactiver le scroll quand la modale est ouverte
+  useEffect(() => {
+    if (showModal) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = "hidden";
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    } else {
+      document.body.style.overflow = "unset";
+      document.body.style.paddingRight = "0px";
+    }
+
+    return () => {
+      document.body.style.overflow = "unset";
+      document.body.style.paddingRight = "0px";
+    };
+  }, [showModal]);
+
   async function loadUsers() {
     try {
       setLoading(true);
@@ -333,11 +350,19 @@ export default function AdminUsersPage() {
 
       {/* Modal de création/édition */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-md p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">
-              {editingUser ? "✏️ Modifier l'utilisateur" : "➕ Créer un utilisateur"}
-            </h2>
+        <>
+          {/* Fond semi-transparent cliquable pour fermer */}
+          <div 
+            className="fixed inset-0 z-50 bg-black/50"
+            onClick={closeModal}
+          />
+          
+          {/* Contenu de la modale */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <Card className="w-full max-w-md p-6 pointer-events-auto">
+              <h2 className="text-xl font-bold text-slate-900 mb-4">
+                {editingUser ? "✏️ Modifier l'utilisateur" : "➕ Créer un utilisateur"}
+              </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
@@ -453,6 +478,7 @@ export default function AdminUsersPage() {
             </form>
           </Card>
         </div>
+        </>
       )}
     </main>
   );
