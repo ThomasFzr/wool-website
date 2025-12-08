@@ -67,7 +67,7 @@ export function CreationCard({ creation, onClick }: CreationCardProps) {
           </h2>
           <div className="flex items-center gap-2">
             {creation.price != null && (
-              <Badge variant="default">
+              <Badge variant="default" className="whitespace-nowrap">
                 {creation.price} €
               </Badge>
             )}
