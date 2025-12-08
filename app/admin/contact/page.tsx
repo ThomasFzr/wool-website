@@ -27,6 +27,7 @@ export default function AdminContactPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const detailsRef = useRef<HTMLDivElement>(null);
+  const hasLoadedContacts = useRef(false);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,9 @@ export default function AdminContactPage() {
 
   useEffect(() => {
     if (session?.user?.role === "admin") {
-      loadContacts();
+      if (!hasLoadedContacts.current || filter !== "all") {
+        loadContacts();
+      }
     }
   }, [session, filter]);
 
@@ -54,6 +57,7 @@ export default function AdminContactPage() {
       if (!res.ok) throw new Error("Erreur de chargement");
       const data = await res.json();
       setContacts(data);
+      hasLoadedContacts.current = true;
     } catch (err) {
       console.error(err);
       setMessage("Erreur lors du chargement des messages.");
