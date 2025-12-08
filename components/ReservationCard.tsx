@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Badge, Button, Textarea } from "./ui";
 
 export type Reservation = {
@@ -75,9 +76,11 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
     >
       <div className="flex gap-3">
         {image && (
-          <img
+          <Image
             src={image}
             alt={creation?.title ?? "Article réservé"}
+            width={80}
+            height={80}
             className="h-20 w-20 rounded-md object-cover shrink-0"
           />
         )}

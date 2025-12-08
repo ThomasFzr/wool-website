@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Badge } from "./ui";
 
 export type Creation = {
@@ -60,10 +61,13 @@ export function CreationCard({ creation, onClick }: CreationCardProps) {
 
       <div className="relative h-56 w-full overflow-hidden bg-slate-100">
         {cover ? (
-          <img
+          <Image
             src={cover}
             alt={creation.title}
+            width={400}
+            height={300}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">

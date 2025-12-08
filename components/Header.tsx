@@ -3,6 +3,7 @@
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Badge } from "./ui";
 
 interface HeaderProps {
@@ -71,10 +72,13 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
       <header className="fixed top-0 left-0 right-0 z-30 h-24 sm:h-32">
         <div className="h-full flex items-center justify-between px-4">
           {/* Logo */}
-          <img 
-            src="/images/logo.png" 
-            alt={title || "MailleMum"} 
+          <Image
+            src="/images/logo.png"
+            alt={title || "MailleMum"}
+            width={112}
+            height={112}
             className="h-20 sm:h-28 w-auto object-contain"
+            priority
           />
           
           {/* Titre H1 pour le SEO */}
