@@ -1,6 +1,5 @@
 import Image from "next/image";
 import { Badge } from "./ui";
-import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 export type Creation = {
   _id: string;
@@ -30,12 +29,7 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
       ? [creation.imageUrl] 
       : [];
   
-  // Optimiser l'URL de couverture avec Cloudinary
-  const cover = images[0] ? optimizeCloudinaryUrl(images[0], { 
-    width: 800, 
-    quality: priority ? 75 : 60,
-    format: 'auto'
-  }) : undefined;
+  const cover = images[0];
 
   // Vérifier si l'article est nouveau (moins de 7 jours)
   const isNewArticle = creation.showAsNew && creation.createdAt 
