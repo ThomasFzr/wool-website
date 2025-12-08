@@ -320,14 +320,16 @@ function AdminContent() {
                       <button
                         type="button"
                         onClick={async () => {
-                          const newColors = settings.colors.filter(c => c !== color);
-                          setSettings(s => ({ ...s, colors: newColors }));
-                          // Sauvegarder immédiatement
-                          await fetch("/api/settings", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ ...settings, colors: newColors }),
-                          });
+                          if (confirm(`Supprimer la couleur "${color}" ?`)) {
+                            const newColors = settings.colors.filter(c => c !== color);
+                            setSettings(s => ({ ...s, colors: newColors }));
+                            // Sauvegarder immédiatement
+                            await fetch("/api/settings", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ ...settings, colors: newColors }),
+                            });
+                          }
                         }}
                         className="text-red-500 hover:text-red-700"
                       >
@@ -394,14 +396,16 @@ function AdminContent() {
                     <button
                       type="button"
                       onClick={async () => {
-                        const newTypes = settings.types.filter(t => t !== type);
-                        setSettings(s => ({ ...s, types: newTypes }));
-                        // Sauvegarder immédiatement
-                        await fetch("/api/settings", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ ...settings, types: newTypes }),
-                        });
+                        if (confirm(`Supprimer le type "${type}" ?`)) {
+                          const newTypes = settings.types.filter(t => t !== type);
+                          setSettings(s => ({ ...s, types: newTypes }));
+                          // Sauvegarder immédiatement
+                          await fetch("/api/settings", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ ...settings, types: newTypes }),
+                          });
+                        }
                       }}
                       className="text-red-500 hover:text-red-700"
                     >
