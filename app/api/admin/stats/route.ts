@@ -24,13 +24,11 @@ export async function GET() {
         const soldCreations = await Creation.countDocuments({ sold: true });
         const reservedCreations = await Creation.countDocuments({ 
             reserved: true, 
-            $or: [{ sold: false }, { sold: { $exists: false } }]
+            sold: { $ne: true }
         });
         const availableCreations = await Creation.countDocuments({ 
-            $and: [
-                { $or: [{ sold: false }, { sold: { $exists: false } }] },
-                { $or: [{ reserved: false }, { reserved: { $exists: false } }] }
-            ]
+            sold: { $ne: true },
+            reserved: { $ne: true }
         });
 
         // Nombre total de ventes (somme de tous les salesCount)
@@ -181,7 +179,7 @@ export async function GET() {
             },
             creations: {
                 total: totalCreations,
-                sold: totalSales, // Nombre total de ventes (historique)
+                sold: soldCreations, // Nombre de créations actuellement vendues
                 reserved: reservedCreations,
                 available: availableCreations,
             },
