@@ -13,6 +13,8 @@ export { ReservationCard } from "./ReservationCard";
 export { Filters } from "./Filters";
 export { LogoutButton } from "./LogoutButton";
 export { ProfileForm } from "./ProfileForm";
+export { StatsCard } from "./StatsCard";
+export { StatsChart } from "./StatsChart";
 export { default as AuthSessionProvider } from "./AuthSessionProvider";
 
 // Types
