@@ -1,5 +1,6 @@
 import "./globals.css";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
+import { Analytics } from "@vercel/analytics/react";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -46,6 +47,7 @@ export default function RootLayout({
     <html lang="fr">
       <body className="font-sans bg-slate-50 text-slate-900">
         <AuthSessionProvider>{children}</AuthSessionProvider>
+        <Analytics />
       </body>
     </html>
   );
