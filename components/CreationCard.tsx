@@ -67,6 +67,7 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
             alt={creation.title}
             width={400}
             height={300}
+            quality={85}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             priority={priority}

@@ -108,7 +108,7 @@ export function HomeClient({ initialCreations, availableColors = [], availableTy
                 key={creation._id}
                 creation={creation}
                 onClick={() => openModal(creation)}
-                priority={index < 6}
+                priority={index < 3}
               />
             ))}
           </section>
