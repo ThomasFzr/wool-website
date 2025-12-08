@@ -484,6 +484,7 @@ function AdminCreationsContent() {
                   imagePublicIds: [],
                   price: "",
                   color: "",
+                  type: "",
                 });
                 setShowCreateModal(true);
               }}
