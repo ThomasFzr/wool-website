@@ -60,10 +60,11 @@ async function getSettings(): Promise<SettingsType | null> {
   const settingsData = settings as any;
   if (!settingsData?.title && !settingsData?.subtitle) return null;
   
-  // Trier les couleurs pour mettre "multicolore" en dernier
-  const colors = settingsData.colors || [];
-  const sortedColors = colors.filter((c: string) => c !== "multicolore").concat(
-    colors.filter((c: string) => c === "multicolore")
+  // Supprimer les doublons et trier les couleurs pour mettre "multicolore" en dernier
+  const colors: string[] = settingsData.colors || [];
+  const uniqueColors = [...new Set(colors)];
+  const sortedColors = uniqueColors.filter(c => c !== "multicolore").concat(
+    uniqueColors.filter(c => c === "multicolore")
   );
   
   return {

@@ -90,8 +90,13 @@ function AdminCreationsContent() {
       const res = await fetch("/api/settings");
       if (res.ok) {
         const data = await res.json();
-        setAvailableColors(data.colors || []);
-        setAvailableTypes(data.types || []);
+        // Supprimer les doublons
+        const colors: string[] = data.colors || [];
+        const types: string[] = data.types || [];
+        const uniqueColors = [...new Set(colors)];
+        const uniqueTypes = [...new Set(types)];
+        setAvailableColors(uniqueColors);
+        setAvailableTypes(uniqueTypes);
       }
     } catch (err) {
       console.error("Error loading settings:", err);
@@ -628,10 +633,10 @@ function AdminCreationsContent() {
                           <Badge variant="default">{c.price} €</Badge>
                         )}
                         {c.type && (
-                          <Badge variant="default">{c.type}</Badge>
+                          <Badge variant="default">{c.type.charAt(0).toUpperCase() + c.type.slice(1)}</Badge>
                         )}
                         {c.color && (
-                          <Badge variant="default">{c.color}</Badge>
+                          <Badge variant="default">{c.color.charAt(0).toUpperCase() + c.color.slice(1)}</Badge>
                         )}
                       </div>
                       {c.description && (

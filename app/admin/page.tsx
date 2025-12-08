@@ -29,11 +29,18 @@ function AdminContent() {
         const res = await fetch("/api/settings", { cache: "no-store" });
         if (!res.ok) return;
         const s = await res.json();
+        
+        // Supprimer les doublons dans les couleurs et types
+        const colors: string[] = s.colors ?? [];
+        const types: string[] = s.types ?? [];
+        const uniqueColors = [...new Set(colors)];
+        const uniqueTypes = [...new Set(types)];
+        
         setSettings({
           title: s.title ?? "Les créations en laine de maman",
           subtitle: s.subtitle ?? "Clique sur une création pour voir toutes les photos.",
-          colors: s.colors ?? [],
-          types: s.types ?? [],
+          colors: uniqueColors,
+          types: uniqueTypes,
         });
       } catch (err) {
         console.error(err);
