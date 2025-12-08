@@ -9,6 +9,24 @@ import { Button, Input, Textarea, Card, Badge } from "@/components";
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
+const COLOR_OPTIONS = [
+  "Blanc",
+  "Noir",
+  "Gris",
+  "Beige",
+  "Marron",
+  "Rouge",
+  "Rose",
+  "Rose poudré",
+  "Orange",
+  "Jaune",
+  "Vert",
+  "Bleu",
+  "Bleu marine",
+  "Violet",
+  "Multicolore",
+];
+
 type Creation = {
   _id: string;
   title: string;
@@ -670,18 +688,18 @@ function AdminCreationsContent() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-slate-700">Couleur</label>
-                  <input
-                    list="color-options-modal"
-                    placeholder="Rose poudré..."
+                  <select
                     value={form.color}
                     onChange={(e) => setForm({ ...form, color: e.target.value })}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                  />
-                  <datalist id="color-options-modal">
-                    {colorOptions.map((color) => (
-                      <option key={color} value={color} />
+                  >
+                    <option value="">-- Sélectionner --</option>
+                    {COLOR_OPTIONS.map((color) => (
+                      <option key={color} value={color}>
+                        {color}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
               </div>
 
@@ -843,18 +861,18 @@ function AdminCreationsContent() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-slate-700">Couleur</label>
-                  <input
-                    list="color-options-create"
-                    placeholder="Rose poudré..."
+                  <select
                     value={form.color}
                     onChange={(e) => setForm({ ...form, color: e.target.value })}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                  />
-                  <datalist id="color-options-create">
-                    {colorOptions.map((color) => (
-                      <option key={color} value={color} />
+                  >
+                    <option value="">-- Sélectionner --</option>
+                    {COLOR_OPTIONS.map((color) => (
+                      <option key={color} value={color}>
+                        {color}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
               </div>
 
