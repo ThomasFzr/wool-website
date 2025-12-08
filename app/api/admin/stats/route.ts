@@ -22,7 +22,7 @@ export async function GET() {
         // Statistiques des créations
         const totalCreations = await Creation.countDocuments();
         const soldCreations = await Creation.countDocuments({ sold: true });
-        const reservedCreations = await Creation.countDocuments({ reserved: true });
+        const reservedCreations = await Creation.countDocuments({ reserved: true, sold: false });
         const availableCreations = await Creation.countDocuments({ sold: false, reserved: false });
 
         // Revenus totaux (créations vendues)
