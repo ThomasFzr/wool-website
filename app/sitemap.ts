@@ -31,11 +31,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     await connectToDatabase();
     const creations = await CreationModel.find()
-      .select('_id updatedAt')
+      .select('_id slug updatedAt')
       .lean();
 
     const creationPages = creations.map((creation: any) => ({
-      url: `${baseUrl}/creations/${creation._id}`,
+      url: `${baseUrl}/creations/${creation.slug || creation._id}`,
       lastModified: creation.updatedAt || new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.9,
