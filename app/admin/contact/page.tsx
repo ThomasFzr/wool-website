@@ -185,7 +185,7 @@ export default function AdminContactPage() {
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition ${
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition cursor-pointer ${
                 filter === f.value
                   ? "bg-slate-900 text-white"
                   : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
@@ -230,7 +230,7 @@ export default function AdminContactPage() {
                       }, 100);
                     }
                   }}
-                  className={`w-full text-left rounded-lg border p-3 transition ${
+                  className={`w-full text-left rounded-lg border p-3 transition cursor-pointer ${
                     selectedContact?._id === contact._id
                       ? "border-slate-900 bg-slate-50"
                       : "border-slate-200 hover:border-slate-300 bg-white"
@@ -372,6 +372,7 @@ export default function AdminContactPage() {
                         variant="secondary"
                         onClick={() => updateStatus(selectedContact._id, "read")}
                         disabled={selectedContact.status === "read"}
+                        className="cursor-pointer"
                       >
                         Marquer comme lu
                       </Button>
@@ -380,6 +381,7 @@ export default function AdminContactPage() {
                         variant="secondary"
                         onClick={() => updateStatus(selectedContact._id, "replied")}
                         disabled={selectedContact.status === "replied"}
+                        className="cursor-pointer"
                       >
                         Marquer comme répondu
                       </Button>
@@ -388,6 +390,7 @@ export default function AdminContactPage() {
                         variant="secondary"
                         onClick={() => updateStatus(selectedContact._id, "archived")}
                         disabled={selectedContact.status === "archived"}
+                        className="cursor-pointer"
                       >
                         Archiver
                       </Button>
@@ -398,7 +401,7 @@ export default function AdminContactPage() {
                         href={`mailto:${selectedContact.email}?subject=Re: ${selectedContact.subject}`}
                         className="inline-block"
                       >
-                        <Button size="sm">📧 Répondre par email</Button>
+                        <Button size="sm" className="cursor-pointer">📧 Répondre par email</Button>
                       </a>
                     </div>
 
@@ -407,6 +410,7 @@ export default function AdminContactPage() {
                         size="sm"
                         variant="danger"
                         onClick={() => deleteContact(selectedContact._id)}
+                        className="cursor-pointer"
                       >
                         🗑️ Supprimer
                       </Button>

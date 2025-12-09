@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button, Badge } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
@@ -44,6 +43,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   const [justReserved, setJustReserved] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [thumbnailScroll, setThumbnailScroll] = useState(0);
 
   const images = creation?.images && creation.images.length > 0 
     ? creation.images 
@@ -80,6 +80,20 @@ export function CreationDetail({ creation }: CreationDetailProps) {
     return () => window.removeEventListener("keydown", handleKey);
   }, [currentIndex]);
 
+  // Auto-scroll des miniatures pour suivre l'image actuelle
+  useEffect(() => {
+    if (images.length <= 4) return;
+    
+    // Si l'image actuelle n'est pas dans la fenêtre visible (4 miniatures)
+    if (currentIndex < thumbnailScroll) {
+      // Scroller vers le haut pour montrer l'image actuelle
+      setThumbnailScroll(currentIndex);
+    } else if (currentIndex >= thumbnailScroll + 4) {
+      // Scroller vers le bas pour montrer l'image actuelle
+      setThumbnailScroll(currentIndex - 3);
+    }
+  }, [currentIndex, images.length]);
+
   function nextImage() {
     if (images.length <= 1) return;
     setCurrentIndex((prev) => (prev + 1) % images.length);
@@ -94,6 +108,14 @@ export function CreationDetail({ creation }: CreationDetailProps) {
     setZoomed(false);
     setScale(1);
     setOffset({ x: 0, y: 0 });
+  }
+
+  function scrollThumbnailsUp() {
+    setThumbnailScroll((prev) => Math.max(0, prev - 1));
+  }
+
+  function scrollThumbnailsDown() {
+    setThumbnailScroll((prev) => Math.min(images.length - 4, prev + 1));
   }
 
   function toggleZoom() {
@@ -289,39 +311,79 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 pb-24 md:pb-8">
-      <Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 mb-6">
+      <button 
+        onClick={() => router.back()} 
+        className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 mb-6 cursor-pointer"
+      >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
         Retour aux créations
-      </Link>
+      </button>
 
       <div className="grid gap-4 md:gap-8 md:grid-cols-2">
         {/* Galerie d'images */}
         <div className="flex flex-col md:flex-row gap-2 md:gap-2">
           {/* Miniatures - À gauche sur desktop uniquement */}
           {images.length > 1 && (
-            <div className="hidden md:flex md:flex-col gap-1 md:w-16">
-              {images.map((img, idx) => (
+            <div className="hidden md:flex md:flex-col md:w-20 relative items-center">
+              {/* Flèche haut */}
+              {images.length > 4 && (
                 <button
-                  key={idx}
-                  onClick={() => {
-                    setCurrentIndex(idx);
-                    setZoomed(false);
-                    setScale(1);
-                    setOffset({ x: 0, y: 0 });
-                  }}
-                  className={`aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${
-                    idx === currentIndex ? "ring-2 ring-slate-900" : "ring-1 ring-slate-200"
-                  }`}
+                  onClick={scrollThumbnailsUp}
+                  disabled={thumbnailScroll === 0}
+                  className="mb-1 rounded-full bg-white/90 p-1.5 shadow-lg hover:bg-white cursor-pointer transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Miniatures précédentes"
                 >
-                  <img
-                    src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })}
-                    alt={`Miniature ${idx + 1}`}
-                    className="h-full w-full object-cover"
-                  />
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
                 </button>
-              ))}
+              )}
+              
+              {/* Container avec scroll */}
+              <div className="flex flex-col gap-1.5 overflow-hidden" style={{ height: '290px' }}>
+                <div 
+                  className="flex flex-col gap-1.5 transition-transform duration-300"
+                  style={{ transform: `translateY(-${thumbnailScroll * 73.5}px)` }}
+                >
+                  {images.map((img, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setCurrentIndex(idx);
+                        setZoomed(false);
+                        setScale(1);
+                        setOffset({ x: 0, y: 0 });
+                      }}
+                      className={`aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${
+                        idx === currentIndex ? "ring-2 ring-slate-900" : "ring-1 ring-slate-200"
+                      }`}
+                      style={{ width: '72px', height: '72px', flexShrink: 0 }}
+                    >
+                      <img
+                        src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })}
+                        alt={`Miniature ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Flèche bas */}
+              {images.length > 4 && (
+                <button
+                  onClick={scrollThumbnailsDown}
+                  disabled={thumbnailScroll >= images.length - 4}
+                  className="mt-1 rounded-full bg-white/90 p-1.5 shadow-lg hover:bg-white cursor-pointer transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Miniatures suivantes"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              )}
             </div>
           )}
 
@@ -443,7 +505,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                   className="w-full cursor-pointer"
                   size="lg"
                 >
-                  {reserveLoading ? "Réservation..." : "Réserver cet article"}
+                  {reserveLoading ? "Réservation..." : "Réserver"}
                 </Button>
               ) : (
                 <div className="rounded-lg bg-red-50 p-4 text-center">
@@ -472,7 +534,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               className="w-full cursor-pointer"
               size="lg"
             >
-              {reserveLoading ? "Réservation..." : "Réserver cet article"}
+              {reserveLoading ? "Réservation..." : "Réserver"}
             </Button>
           ) : (
             <div className="rounded-lg bg-red-50 p-3 text-center">

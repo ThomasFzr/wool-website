@@ -259,6 +259,7 @@ function AdminReservationsContent() {
                             size="sm"
                             disabled={page <= 1}
                             onClick={() => setPage((p) => p - 1)}
+                            className="cursor-pointer"
                         >
                             ← Précédent
                         </Button>
@@ -272,6 +273,7 @@ function AdminReservationsContent() {
                             size="sm"
                             disabled={page >= totalPages}
                             onClick={() => setPage((p) => p + 1)}
+                            className="cursor-pointer"
                         >
                             Suivant →
                         </Button>
@@ -294,7 +296,7 @@ function AdminReservationsContent() {
                             <h2 className="text-xl font-bold text-slate-900">Détails de la réservation</h2>
                             <button
                                 onClick={() => setSelected(null)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 text-slate-600"
+                                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 text-slate-600 cursor-pointer"
                                 aria-label="Fermer"
                             >
                                 ✕
@@ -388,7 +390,7 @@ function AdminReservationsContent() {
                                                 setSelectedCreation(selected.creationId!);
                                                 setShowCreationModal(true);
                                             }}
-                                            className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-900 transition"
+                                            className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-900 transition cursor-pointer"
                                         >
                                             <svg
                                                 className="h-4 w-4"
@@ -435,7 +437,7 @@ function AdminReservationsContent() {
                                         <div className="flex gap-2">
                                             <Button
                                                 onClick={() => setShowValidateConfirm(true)}
-                                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                                className="flex-1 bg-green-600 hover:bg-green-700 cursor-pointer"
                                                 size="md"
                                             >
                                                 ✅ Valider
@@ -444,7 +446,7 @@ function AdminReservationsContent() {
                                             <Button
                                                 variant="danger"
                                                 onClick={() => setShowCancelConfirm(true)}
-                                                className="flex-1"
+                                                className="flex-1 cursor-pointer"
                                                 size="md"
                                             >
                                                 ❌ Annuler
@@ -466,7 +468,7 @@ function AdminReservationsContent() {
                                                     onClick={() => {
                                                         updateStatus(selected._id, "validated");
                                                     }}
-                                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                                    className="flex-1 bg-green-600 hover:bg-green-700 cursor-pointer"
                                                     size="sm"
                                                 >
                                                     Confirmer
@@ -474,7 +476,7 @@ function AdminReservationsContent() {
                                                 <Button
                                                     variant="secondary"
                                                     onClick={() => setShowValidateConfirm(false)}
-                                                    className="flex-1"
+                                                    className="flex-1 cursor-pointer"
                                                     size="sm"
                                                 >
                                                     Annuler
@@ -507,7 +509,7 @@ function AdminReservationsContent() {
                                                     onClick={() => {
                                                         updateStatus(selected._id, "cancelled");
                                                     }}
-                                                    className="flex-1"
+                                                    className="flex-1 cursor-pointer"
                                                     size="sm"
                                                 >
                                                     Confirmer l'annulation
@@ -518,7 +520,7 @@ function AdminReservationsContent() {
                                                         setShowCancelConfirm(false);
                                                         setCancelReason("");
                                                     }}
-                                                    className="flex-1"
+                                                    className="flex-1 cursor-pointer"
                                                     size="sm"
                                                 >
                                                     Annuler

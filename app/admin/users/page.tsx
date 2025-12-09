@@ -470,7 +470,7 @@ export default function AdminUsersPage() {
               </label>
 
               <div className="flex gap-2 pt-2">
-                <Button type="submit">
+                <Button type="submit" className="cursor-pointer">
                   {editingUser ? "💾 Mettre à jour" : "➕ Créer"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={closeModal}>

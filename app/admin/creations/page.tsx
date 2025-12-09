@@ -560,7 +560,7 @@ function AdminCreationsContent() {
                 });
                 setShowCreateModal(true);
               }}
-              className="bg-slate-900 hover:bg-slate-800"
+              className="bg-slate-900 hover:bg-slate-800 cursor-pointer"
             >
               ➕ Ajouter une création
             </Button>
@@ -578,6 +578,7 @@ function AdminCreationsContent() {
                   variant="secondary"
                   onClick={saveCreationOrder}
                   disabled={savingOrder}
+                  className="cursor-pointer"
                 >
                   {savingOrder ? "⏳ Sauvegarde..." : "💾 Sauvegarder l'ordre"}
                 </Button>
@@ -661,7 +662,7 @@ function AdminCreationsContent() {
                         size="sm"
                         onClick={() => handleMakeAvailableAgain(c._id)}
                         title="Remettre disponible"
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-green-600 hover:bg-green-700 cursor-pointer"
                       >
                         ↻ Disponible
                       </Button>
@@ -670,6 +671,7 @@ function AdminCreationsContent() {
                       variant="secondary"
                       size="sm"
                       onClick={() => handleEditClick(c)}
+                      className="cursor-pointer"
                     >
                       ✏️ Modifier
                     </Button>
@@ -677,6 +679,7 @@ function AdminCreationsContent() {
                       variant="danger"
                       size="sm"
                       onClick={() => handleDelete(c._id)}
+                      className="cursor-pointer"
                     >
                       🗑️
                     </Button>
@@ -865,7 +868,7 @@ function AdminCreationsContent() {
 
               {/* Boutons */}
               <div className="flex gap-2 pt-4 border-t">
-                <Button type="submit" disabled={uploading || !form.title} className="flex-1">
+                <Button type="submit" disabled={uploading || !form.title} className="flex-1 cursor-pointer">
                   {uploading ? "⏳ Upload..." : "💾 Mettre à jour"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={handleCancelEdit}>
@@ -1054,7 +1057,7 @@ function AdminCreationsContent() {
 
               {/* Boutons */}
               <div className="flex gap-2 pt-4 border-t">
-                <Button type="submit" disabled={uploading || !form.title} className="flex-1">
+                <Button type="submit" disabled={uploading || !form.title} className="flex-1 cursor-pointer">
                   {uploading ? "⏳ Upload..." : "➕ Créer"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={handleCancelEdit}>
