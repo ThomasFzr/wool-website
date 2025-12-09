@@ -31,15 +31,16 @@ export async function GET() {
             reserved: { $ne: true }
         });
 
-        // Nombre total de ventes (somme de tous les salesCount)
+        // Nombre total de ventes (somme de tous les salesCount, en excluant null/undefined)
         const salesResult = await Creation.aggregate([
+            { $match: { salesCount: { $exists: true, $ne: null, $gt: 0 } } },
             { $group: { _id: null, totalSales: { $sum: "$salesCount" } } }
         ]);
         const totalSales = salesResult.length > 0 ? salesResult[0].totalSales : 0;
 
         // Revenus totaux (basé sur salesCount * price de chaque création)
         const revenueResult = await Creation.aggregate([
-            { $match: { salesCount: { $gt: 0 } } },
+            { $match: { salesCount: { $exists: true, $ne: null, $gt: 0 } } },
             { 
                 $project: { 
                     revenue: { $multiply: ["$salesCount", { $ifNull: ["$price", 0] }] } 
@@ -78,13 +79,17 @@ export async function GET() {
             updatedAt: { $gte: thirtyDaysAgo }
         });
 
-        // Ventes des 30 derniers jours (créations marquées vendues récemment)
-        const soldLast30Days = await Creation.find({
-            sold: true,
+        // Ventes des 30 derniers jours (réservations validées récemment)
+        const validatedReservationsLast30Days = await Reservation.find({
+            status: "validated",
             updatedAt: { $gte: thirtyDaysAgo }
-        });
-        const soldCountLast30Days = soldLast30Days.length;
-        const revenueLast30Days = soldLast30Days.reduce((sum, item) => sum + (item.price || 0), 0);
+        }).populate("creationId");
+        
+        const soldCountLast30Days = validatedReservationsLast30Days.length;
+        const revenueLast30Days = validatedReservationsLast30Days.reduce((sum, reservation: any) => {
+            const creation = reservation.creationId;
+            return sum + (creation?.price || 0);
+        }, 0);
 
         // Données pour le graphique (12 derniers mois) - Optimisé avec aggregation
         const now = new Date();
@@ -113,13 +118,24 @@ export async function GET() {
             }
         ]);
 
-        // Agrégation des créations vendues par mois
-        const creationsAgg = await Creation.aggregate([
+        // Agrégation des ventes par mois (basé sur les réservations validées)
+        const salesAgg = await Reservation.aggregate([
             {
                 $match: {
-                    sold: true,
+                    status: "validated",
                     updatedAt: { $gte: twelveMonthsAgo }
                 }
+            },
+            {
+                $lookup: {
+                    from: "creations",
+                    localField: "creationId",
+                    foreignField: "_id",
+                    as: "creation"
+                }
+            },
+            {
+                $unwind: "$creation"
             },
             {
                 $group: {
@@ -128,7 +144,7 @@ export async function GET() {
                         month: { $month: "$updatedAt" }
                     },
                     count: { $sum: 1 },
-                    revenue: { $sum: "$price" }
+                    revenue: { $sum: "$creation.price" }
                 }
             }
         ]);
@@ -140,10 +156,10 @@ export async function GET() {
             resMap.set(key, r);
         });
 
-        const creMap = new Map();
-        creationsAgg.forEach(c => {
-            const key = `${c._id.year}-${c._id.month}`;
-            creMap.set(key, c);
+        const salesMap = new Map();
+        salesAgg.forEach(s => {
+            const key = `${s._id.year}-${s._id.month}`;
+            salesMap.set(key, s);
         });
 
         // Construire les données mensuelles
@@ -155,14 +171,14 @@ export async function GET() {
             const key = `${year}-${month}`;
 
             const resData = resMap.get(key);
-            const creData = creMap.get(key);
+            const salesData = salesMap.get(key);
 
             monthlyData.push({
                 month: monthStart.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
                 reservations: resData?.total || 0,
                 validated: resData?.validated || 0,
-                revenue: creData?.revenue || 0,
-                sold: creData?.count || 0
+                revenue: salesData?.revenue || 0,
+                sold: salesData?.count || 0
             });
         }
 

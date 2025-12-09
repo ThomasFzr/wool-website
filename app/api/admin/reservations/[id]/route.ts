@@ -53,6 +53,9 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
           sold: true,
           reserved: false, // il n'est plus juste réservé, il est vendu
         },
+        $inc: {
+          salesCount: 1, // Incrémenter le compteur de ventes
+        },
       });
 
       // Vérifier les préférences de notification de l'utilisateur

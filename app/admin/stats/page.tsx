@@ -115,7 +115,7 @@ function StatsContent() {
                   subtitle="Par création vendue"
                 />
                 <StatsCard
-                  title="Revenus (30j)"
+                  title="Ventes récentes (30j)"
                   value={`${stats.revenue.last30Days.toFixed(2)} €`}
                   icon="📈"
                   subtitle={`${stats.revenue.soldLast30Days} vente${plural(stats.revenue.soldLast30Days)}`}
