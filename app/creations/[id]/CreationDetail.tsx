@@ -164,8 +164,9 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
         setIsSwiping(false);
       } else {
-        // Swipe pour changer d'image
+        // Swipe pour changer d'image - on enregistre juste la position
         setSwipeStartX(e.touches[0].clientX);
+        setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
         setSwipeDeltaX(0);
         setIsSwiping(true);
       }
@@ -199,11 +200,17 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         setOffset((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
         setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
       } else if (swipeStartX !== null && !zoomed && isSwiping) {
-        // Swipe pour navigation
+        // Swipe pour navigation - seulement si mouvement horizontal
         const deltaX = e.touches[0].clientX - swipeStartX;
-        if (Math.abs(deltaX) > 5) {
+        const deltaY = e.touches[0].clientY - (dragStart?.y || e.touches[0].clientY);
+        
+        // Détecter si c'est un swipe horizontal ou vertical
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+          // Swipe horizontal - changer d'image
+          e.preventDefault();
           setSwipeDeltaX(deltaX);
         }
+        // Si c'est vertical, on laisse le scroll de la page se faire naturellement
       }
     }
   }
@@ -331,18 +338,26 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onClick={handleImageClick}
-                style={{ touchAction: 'none' }}
+                style={{ touchAction: zoomed ? 'none' : 'pan-y' }}
               >
-                <img
-                  src={currentImageUrl}
-                  alt={`${creation.title} - Image ${currentIndex + 1}`}
-                  className="h-full w-full object-contain transition-transform duration-150 ease-out will-change-transform"
+                <div
+                  className="h-full w-full transition-transform"
                   style={{
-                    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                    cursor: zoomed ? (isDragging ? "grabbing" : "zoom-out") : "zoom-in",
+                    transform: !zoomed && isSwiping ? `translateX(${swipeDeltaX}px)` : 'none',
+                    transition: !zoomed && isSwiping ? 'none' : 'transform 0.3s ease-out',
                   }}
-                  draggable={false}
-                />
+                >
+                  <img
+                    src={currentImageUrl}
+                    alt={`${creation.title} - Image ${currentIndex + 1}`}
+                    className="h-full w-full object-contain transition-transform duration-150 ease-out will-change-transform"
+                    style={{
+                      transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                      cursor: zoomed ? (isDragging ? "grabbing" : "zoom-out") : "zoom-in",
+                    }}
+                    draggable={false}
+                  />
+                </div>
               </div>
             ) : (
               <div className="flex h-full items-center justify-center text-slate-400">
