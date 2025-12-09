@@ -43,6 +43,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   const [reserveLoading, setReserveLoading] = useState(false);
   const [justReserved, setJustReserved] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
+  const [isSwiping, setIsSwiping] = useState(false);
 
   const images = creation?.images && creation.images.length > 0 
     ? creation.images 
@@ -102,13 +103,14 @@ export function CreationDetail({ creation }: CreationDetailProps) {
       setOffset({ x: 0, y: 0 });
     } else {
       setZoomed(true);
-      setScale(2);
+      setScale(2.5);
     }
   }
 
   // Gestion du drag (desktop)
   function handleMouseDown(e: React.MouseEvent) {
     if (!zoomed) return;
+    e.preventDefault();
     setIsDragging(true);
     setHasDragged(false);
     setDragStart({ x: e.clientX, y: e.clientY });
@@ -116,9 +118,10 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
   function handleMouseMove(e: React.MouseEvent) {
     if (!isDragging || !dragStart || !zoomed) return;
+    e.preventDefault();
     const deltaX = e.clientX - dragStart.x;
     const deltaY = e.clientY - dragStart.y;
-    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
       setHasDragged(true);
     }
     setOffset((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
@@ -128,10 +131,14 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   function handleMouseUp(e: React.MouseEvent) {
     setIsDragging(false);
     setDragStart(null);
-    if (!hasDragged && zoomed) {
+    setTimeout(() => setHasDragged(false), 100);
+  }
+
+  function handleImageClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!hasDragged) {
       toggleZoom();
     }
-    setTimeout(() => setHasDragged(false), 0);
   }
 
   // Gestion pinch-to-zoom (mobile)
@@ -143,45 +150,60 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
   function handleTouchStart(e: React.TouchEvent) {
     if (e.touches.length === 2) {
+      // Pinch zoom
+      e.preventDefault();
       const dist = getTouchDistance(e.touches);
       setPinchStartDistance(dist);
       setPinchStartScale(scale);
+      setIsSwiping(false);
     } else if (e.touches.length === 1) {
       if (zoomed) {
+        // Drag en mode zoom
         setIsDragging(true);
         setHasDragged(false);
         setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+        setIsSwiping(false);
       } else {
+        // Swipe pour changer d'image
         setSwipeStartX(e.touches[0].clientX);
         setSwipeDeltaX(0);
+        setIsSwiping(true);
       }
     }
   }
 
   function handleTouchMove(e: React.TouchEvent) {
     if (e.touches.length === 2 && pinchStartDistance !== null) {
+      // Pinch zoom
+      e.preventDefault();
       const dist = getTouchDistance(e.touches);
       const newScale = pinchStartScale * (dist / pinchStartDistance);
       const clampedScale = Math.max(1, Math.min(4, newScale));
       setScale(clampedScale);
-      if (clampedScale > 1) {
+      if (clampedScale > 1.1) {
         setZoomed(true);
+        setIsSwiping(false);
       } else {
         setZoomed(false);
         setOffset({ x: 0, y: 0 });
       }
     } else if (e.touches.length === 1) {
       if (isDragging && dragStart && zoomed) {
+        // Drag en mode zoom
+        e.preventDefault();
         const deltaX = e.touches[0].clientX - dragStart.x;
         const deltaY = e.touches[0].clientY - dragStart.y;
-        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+        if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
           setHasDragged(true);
         }
         setOffset((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
         setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-      } else if (swipeStartX !== null && !zoomed) {
+      } else if (swipeStartX !== null && !zoomed && isSwiping) {
+        // Swipe pour navigation
         const deltaX = e.touches[0].clientX - swipeStartX;
-        setSwipeDeltaX(deltaX);
+        if (Math.abs(deltaX) > 5) {
+          setSwipeDeltaX(deltaX);
+        }
       }
     }
   }
@@ -189,15 +211,18 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   function handleTouchEnd(e: React.TouchEvent) {
     if (e.touches.length === 0) {
       setPinchStartDistance(null);
-      if (isDragging) {
+      
+      if (isDragging && zoomed) {
         setIsDragging(false);
         setDragStart(null);
-        if (!hasDragged && zoomed) {
-          toggleZoom();
-        }
+        // Pas de dézoom sur drag, seulement sur tap
         setTimeout(() => setHasDragged(false), 0);
+      } else if (!hasDragged && zoomed && !isSwiping) {
+        // Tap pour dézoomer
+        toggleZoom();
       }
-      if (swipeStartX !== null && !zoomed) {
+      
+      if (swipeStartX !== null && !zoomed && isSwiping) {
         if (Math.abs(swipeDeltaX) > 50) {
           if (swipeDeltaX > 0) {
             prevImage();
@@ -207,6 +232,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         }
         setSwipeStartX(null);
         setSwipeDeltaX(0);
+        setIsSwiping(false);
       }
     }
   }
@@ -296,7 +322,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
           <div className="flex-1 relative aspect-square overflow-hidden rounded-2xl bg-slate-100 shadow-lg">
             {currentImageUrl ? (
               <div
-                className="relative h-full w-full cursor-zoom-in overflow-hidden"
+                className="relative h-full w-full overflow-hidden touch-none"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -304,20 +330,16 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-                onClick={(e) => {
-                  if (!hasDragged && !zoomed) {
-                    toggleZoom();
-                  }
-                }}
-                style={{ touchAction: zoomed ? "none" : "auto" }}
+                onClick={handleImageClick}
+                style={{ touchAction: 'none' }}
               >
                 <img
                   src={currentImageUrl}
                   alt={`${creation.title} - Image ${currentIndex + 1}`}
-                  className="h-full w-full object-contain transition-transform duration-200"
+                  className="h-full w-full object-contain transition-transform duration-150 ease-out will-change-transform"
                   style={{
                     transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                    cursor: zoomed ? (isDragging ? "grabbing" : "grab") : "zoom-in",
+                    cursor: zoomed ? (isDragging ? "grabbing" : "zoom-out") : "zoom-in",
                   }}
                   draggable={false}
                 />
