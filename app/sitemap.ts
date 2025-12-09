@@ -35,7 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .lean();
 
     const creationPages = creations.map((creation: any) => ({
-      url: `${baseUrl}/?creation=${creation._id}`,
+      url: `${baseUrl}/creations/${creation._id}`,
       lastModified: creation.updatedAt || new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.9,

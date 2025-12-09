@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useState } from "react";
 import { CreationCard, Creation } from "@/components/CreationCard";
-import { CreationModal } from "@/components/CreationModal";
 import { Filters } from "@/components/Filters";
-import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 type HomeClientProps = {
   initialCreations: Creation[];
@@ -14,77 +11,10 @@ type HomeClientProps = {
 };
 
 export function HomeClient({ initialCreations, availableColors = [], availableTypes = [] }: HomeClientProps) {
-  const { data: session } = useSession();
-  const [creations, setCreations] = useState<Creation[]>(initialCreations);
-  const [openCreation, setOpenCreation] = useState<Creation | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [creations] = useState<Creation[]>(initialCreations);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
-
-  // Précharger toutes les images des modales après le chargement de la page
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      creations.forEach(creation => {
-        const images = creation.images && creation.images.length > 0 
-          ? creation.images 
-          : creation.imageUrl 
-            ? [creation.imageUrl] 
-            : [];
-        
-        images.forEach((src) => {
-          const img = new Image();
-          img.src = optimizeCloudinaryUrl(src, { width: 800, quality: 80, format: 'auto' });
-        });
-      });
-    }, 1000); // Attendre 1 seconde après le chargement initial
-
-    return () => clearTimeout(timer);
-  }, [creations]);
-
-  function openModal(creation: Creation) {
-    setOpenCreation(creation);
-    setShowModal(true);
-  }
-
-  function closeModal() {
-    setShowModal(false);
-    setTimeout(() => setOpenCreation(null), 150);
-  }
-
-  async function handleReserve(creation: Creation) {
-    if (!session?.user) return;
-
-    const name = session.user.name || "";
-    const contact = session.user.email || "";
-
-    if (!name || !contact) {
-      alert("Impossible de récupérer vos informations. Veuillez vous reconnecter.");
-      return;
-    }
-
-    const res = await fetch(`/api/creations/${creation._id}/reserve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, contact }),
-    });
-
-    if (res.status === 409) {
-      alert("Cet article vient déjà d'être réservé.");
-      return;
-    }
-    if (!res.ok) {
-      alert("Erreur lors de la réservation, réessayez plus tard.");
-      return;
-    }
-
-    // Mise à jour locale
-    setCreations((prev) =>
-      prev.map((c) =>
-        c._id === creation._id ? { ...c, reserved: true } : c
-      )
-    );
-  }
 
   // Filtrage des créations
   const filteredCreations = creations.filter((c) => {
@@ -128,7 +58,6 @@ export function HomeClient({ initialCreations, availableColors = [], availableTy
               <CreationCard
                 key={creation._id}
                 creation={creation}
-                onClick={() => openModal(creation)}
                 priority={index < 3}
               />
             ))}
@@ -141,13 +70,6 @@ export function HomeClient({ initialCreations, availableColors = [], availableTy
           </p>
         )}
       </div>
-
-      <CreationModal
-        creation={openCreation}
-        isOpen={showModal}
-        onClose={closeModal}
-        onReserve={handleReserve}
-      />
     </>
   );
 }

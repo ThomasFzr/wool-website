@@ -1,5 +1,6 @@
 import { Badge } from "./ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
+import Link from "next/link";
 
 export type Creation = {
   _id: string;
@@ -18,11 +19,10 @@ export type Creation = {
 
 interface CreationCardProps {
   creation: Creation;
-  onClick: () => void;
   priority?: boolean;
 }
 
-export function CreationCard({ creation, onClick, priority = false }: CreationCardProps) {
+export function CreationCard({ creation, priority = false }: CreationCardProps) {
   const images = creation.images && creation.images.length > 0 
     ? creation.images 
     : creation.imageUrl 
@@ -50,24 +50,24 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
   };
 
   return (
-    <article
-      className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
-      onClick={onClick}
-      onMouseEnter={handleMouseEnter}
-    >
-      {creation.sold ? (
-        <span className="absolute left-2 top-2 z-10 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-          Vendu
-        </span>
-      ) : creation.reserved ? (
-        <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-          Réservé
-        </span>
-      ) : isNewArticle ? (
-        <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-          Nouveau
-        </span>
-      ) : null}
+    <Link href={`/creations/${creation._id}`}>
+      <article
+        className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
+        onMouseEnter={handleMouseEnter}
+      >
+        {creation.sold ? (
+          <span className="absolute left-2 top-2 z-10 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+            Vendu
+          </span>
+        ) : creation.reserved ? (
+          <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+            Réservé
+          </span>
+        ) : isNewArticle ? (
+          <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+            Nouveau
+          </span>
+        ) : null}
 
       <div className="relative h-56 w-full overflow-hidden bg-slate-100">
         {cover ? (
@@ -113,6 +113,7 @@ export function CreationCard({ creation, onClick, priority = false }: CreationCa
           </p>
         )}
       </div>
-    </article>
+      </article>
+    </Link>
   );
 }
