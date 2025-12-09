@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
 import { Header } from "@/components/Header";
@@ -9,9 +10,13 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
-async function getCreation(id: string) {
+async function getCreation(slug: string) {
   await connectToDatabase();
-  const creation = await CreationModel.findById(id).lean();
+  // Essayer d'abord par slug, sinon par ID (rétrocompatibilité)
+  let creation = await CreationModel.findOne({ slug }).lean();
+  if (!creation && mongoose.Types.ObjectId.isValid(slug)) {
+    creation = await CreationModel.findById(slug).lean();
+  }
   
   if (!creation) return null;
   
@@ -19,6 +24,7 @@ async function getCreation(id: string) {
   
   return {
     _id: creationData._id.toString(),
+    slug: creationData.slug,
     title: creationData.title,
     description: creationData.description,
     imageUrl: creationData.imageUrl,

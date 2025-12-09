@@ -45,6 +45,7 @@ async function getCreations(): Promise<CreationType[]> {
   
   return creations.map((c: any) => ({
     _id: c._id.toString(),
+    slug: c.slug,
     title: c.title,
     description: c.description,
     imageUrl: c.imageUrl,

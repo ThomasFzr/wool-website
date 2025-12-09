@@ -3,6 +3,7 @@ import mongoose, { Schema } from "mongoose";
 const schema = new Schema(
   {
     title: { type: String, required: true },
+    slug: { type: String, unique: true, sparse: true },
     description: String,
     imageUrl: String,
     images: [String],

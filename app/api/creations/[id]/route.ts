@@ -7,6 +7,18 @@ import { cloudinary } from "@/lib/cloudinary";
 import { revalidatePath } from "next/cache";
 
 /**
+ * Génère un slug à partir d'un titre
+ */
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
  * Récupère le public_id Cloudinary depuis une URL secure_url
  * Exemple :
  * https://res.cloudinary.com/xxx/image/upload/v12345/folder/image_xyz.webp
@@ -47,7 +59,18 @@ export async function PATCH(
     const body = await req.json();
 
     const update: any = {};
-    if (body.title !== undefined) update.title = body.title;
+    if (body.title !== undefined) {
+      update.title = body.title;
+      // Régénérer le slug si le titre change
+      let baseSlug = generateSlug(body.title);
+      let slug = baseSlug;
+      let counter = 1;
+      while (await Creation.findOne({ slug, _id: { $ne: id } })) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+      update.slug = slug;
+    }
     if (body.description !== undefined) update.description = body.description;
     if (body.imageUrl !== undefined) update.imageUrl = body.imageUrl;
     if (body.images !== undefined) update.images = body.images;

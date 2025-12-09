@@ -6,6 +6,18 @@ import { revalidatePath } from "next/cache";
 
 export const revalidate = 300; // Cache avec revalidation toutes les 5 minutes
 
+/**
+ * Génère un slug à partir d'un titre
+ */
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export async function GET() {
   try {
     await connectToDatabase();
@@ -43,8 +55,18 @@ export async function POST(req: NextRequest) {
     const maxOrderCreation = await Creation.findOne().sort({ displayOrder: -1 }).select('displayOrder').lean();
     const nextDisplayOrder = maxOrderCreation ? ((maxOrderCreation as any).displayOrder || 0) + 1 : 1;
 
+    // Générer un slug unique
+    let baseSlug = generateSlug(body.title);
+    let slug = baseSlug;
+    let counter = 1;
+    while (await Creation.findOne({ slug })) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
     const creation = await Creation.create({
       title: body.title,
+      slug,
       description: body.description,
       imageUrl: body.imageUrl ?? images[0] ?? undefined,
       images,

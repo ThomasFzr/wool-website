@@ -9,6 +9,7 @@ import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 export type Creation = {
   _id: string;
+  slug?: string;
   title: string;
   description?: string;
   imageUrl?: string;

@@ -4,6 +4,7 @@ import Link from "next/link";
 
 export type Creation = {
   _id: string;
+  slug?: string;
   title: string;
   description?: string;
   imageUrl?: string;
@@ -50,7 +51,7 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
   };
 
   return (
-    <Link href={`/creations/${creation._id}`}>
+    <Link href={`/creations/${creation.slug || creation._id}`}>
       <article
         className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md"
         onMouseEnter={handleMouseEnter}
