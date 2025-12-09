@@ -5,6 +5,8 @@ import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Badge } from "@/components";
+import { CreationModal } from "@/components/CreationModal";
+import type { Creation } from "@/components/CreationCard";
 
 type Contact = {
   _id: string;
@@ -13,12 +15,7 @@ type Contact = {
   subject: string;
   message: string;
   status: "new" | "read" | "replied" | "archived";
-  creationId?: {
-    _id: string;
-    title: string;
-    imageUrl?: string;
-    images?: string[];
-  } | null;
+  creationId?: Creation | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -26,14 +23,14 @@ type Contact = {
 export default function AdminContactPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const detailsRef = useRef<HTMLDivElement>(null);
-  const hasLoadedContacts = useRef(false);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<string>("all");
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showCreationModal, setShowCreationModal] = useState(false);
+  const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -44,11 +41,26 @@ export default function AdminContactPage() {
 
   useEffect(() => {
     if (session?.user?.role === "admin") {
-      if (!hasLoadedContacts.current || filter !== "all") {
-        loadContacts();
-      }
+      loadContacts();
     }
   }, [session, filter]);
+
+  // Désactiver le scroll quand la modale est ouverte
+  useEffect(() => {
+    if (selectedContact) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = "hidden";
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    } else {
+      document.body.style.overflow = "unset";
+      document.body.style.paddingRight = "0px";
+    }
+
+    return () => {
+      document.body.style.overflow = "unset";
+      document.body.style.paddingRight = "0px";
+    };
+  }, [selectedContact]);
 
   async function loadContacts() {
     try {
@@ -57,7 +69,6 @@ export default function AdminContactPage() {
       if (!res.ok) throw new Error("Erreur de chargement");
       const data = await res.json();
       setContacts(data);
-      hasLoadedContacts.current = true;
     } catch (err) {
       console.error(err);
       setMessage("Erreur lors du chargement des messages.");
@@ -196,46 +207,36 @@ export default function AdminContactPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Liste des messages */}
-          <Card className="p-4 h-[calc(100vh-240px)] overflow-y-auto">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">
-              Messages ({contacts.length})
-            </h2>
+        {/* Liste des messages */}
+        <Card className="p-4">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">
+            Messages ({contacts.length})
+          </h2>
 
-            {loading && <p className="text-sm text-slate-500">Chargement...</p>}
+          {loading && <p className="text-sm text-slate-500">Chargement...</p>}
 
-            {!loading && contacts.length === 0 && (
-              <p className="text-sm text-slate-500 text-center py-8">
-                Aucun message trouvé.
-              </p>
-            )}
+          {!loading && contacts.length === 0 && (
+            <p className="text-sm text-slate-500 text-center py-8">
+              Aucun message trouvé.
+            </p>
+          )}
 
-            <div className="space-y-2">
-              {contacts.map((contact) => (
-                <button
-                  key={contact._id}
-                  onClick={() => {
-                    setSelectedContact(contact);
-                    if (contact.status === "new") {
-                      updateStatus(contact._id, "read");
-                    }
-                    // Scroll vers les détails sur mobile
-                    if (detailsRef.current && window.innerWidth < 1024) {
-                      setTimeout(() => {
-                        detailsRef.current?.scrollIntoView({ 
-                          behavior: "smooth", 
-                          block: "start" 
-                        });
-                      }, 100);
-                    }
-                  }}
-                  className={`w-full text-left rounded-lg border p-3 transition cursor-pointer ${
-                    selectedContact?._id === contact._id
-                      ? "border-slate-900 bg-slate-50"
-                      : "border-slate-200 hover:border-slate-300 bg-white"
-                  }`}
-                >
+          <div className="space-y-2">
+            {contacts.map((contact) => (
+              <button
+                key={contact._id}
+                onClick={() => {
+                  setSelectedContact(contact);
+                  if (contact.status === "new") {
+                    updateStatus(contact._id, "read");
+                  }
+                }}
+                className={`w-full text-left rounded-lg border p-3 transition cursor-pointer ${
+                  selectedContact?._id === contact._id
+                    ? "border-slate-900 bg-slate-50"
+                    : "border-slate-200 hover:border-slate-300 bg-white"
+                }`}
+              >
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <span className={`text-sm font-semibold ${
                       contact.status === "new" ? "text-slate-900" : "text-slate-700"
@@ -257,21 +258,38 @@ export default function AdminContactPage() {
                 </button>
               ))}
             </div>
-          </Card>
+        </Card>
 
-          {/* Détails du message */}
-          <div ref={detailsRef}>
-            <Card className="p-4 h-[calc(100vh-240px)] overflow-y-auto">
-              {selectedContact ? (
-              <>
-                <div className="flex items-start justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    Détails du message
-                  </h2>
-                  {getStatusBadge(selectedContact.status)}
-                </div>
+        {/* Modal latérale pour les détails */}
+        {selectedContact && (
+          <>
+            {/* Fond semi-transparent pour fermer au clic */}
+            <div 
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 animate-fadeIn"
+              onClick={() => setSelectedContact(null)}
+            />
+            
+            <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white shadow-2xl p-6 z-50 overflow-y-auto animate-slideInRight">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-slate-900">Détails du message</h2>
+                <button
+                  onClick={() => setSelectedContact(null)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 text-slate-600 cursor-pointer"
+                  aria-label="Fermer"
+                >
+                  ✕
+                </button>
+              </div>
 
-                <div className="space-y-4">
+              {/* Statut */}
+              <div className="mb-4">
+                {getStatusBadge(selectedContact.status)}
+              </div>
+
+              {/* Informations de l'expéditeur */}
+              <Card className="p-4 mb-4">
+                <div className="space-y-3">
                   <div>
                     <p className="text-xs font-medium text-slate-500">De</p>
                     <p className="text-sm font-semibold text-slate-900">
@@ -279,7 +297,7 @@ export default function AdminContactPage() {
                     </p>
                     <a
                       href={`mailto:${selectedContact.email}`}
-                      className="text-sm text-blue-600 hover:underline"
+                      className="text-sm text-blue-600 hover:underline cursor-pointer"
                     >
                       {selectedContact.email}
                     </a>
@@ -292,143 +310,145 @@ export default function AdminContactPage() {
                     </p>
                   </div>
 
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 mb-2">Message</p>
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-sm text-slate-900 whitespace-pre-line">
-                        {selectedContact.message}
-                      </p>
-                    </div>
-                  </div>
-
-                  {selectedContact.creationId && (
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 mb-2">
-                        Création concernée
-                      </p>
-                      <Link
-                        href={`/admin?edit=${selectedContact.creationId._id}`}
-                        className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:border-slate-400 hover:bg-slate-50 transition cursor-pointer"
-                      >
-                        {(selectedContact.creationId.images?.[0] ||
-                          selectedContact.creationId.imageUrl) && (
-                          <img
-                            src={
-                              selectedContact.creationId.images?.[0] ||
-                              selectedContact.creationId.imageUrl
-                            }
-                            alt={selectedContact.creationId.title}
-                            className="h-16 w-16 rounded-lg object-cover"
-                          />
-                        )}
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-slate-900">
-                            {selectedContact.creationId.title}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            ID: {selectedContact.creationId._id}
-                          </p>
-                        </div>
-                        <svg
-                          className="h-5 w-5 text-slate-400"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                          />
-                        </svg>
-                      </Link>
-                    </div>
-                  )}
-
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Date</p>
-                    <p className="text-sm text-slate-900">
-                      {new Date(selectedContact.createdAt).toLocaleString("fr-FR", {
-                        dateStyle: "full",
-                        timeStyle: "short",
-                      })}
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-200 space-y-2">
-                    <p className="text-xs font-medium text-slate-700 mb-2">
-                      Changer le statut
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => updateStatus(selectedContact._id, "read")}
-                        disabled={selectedContact.status === "read"}
-                        className="cursor-pointer"
-                      >
-                        Marquer comme lu
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => updateStatus(selectedContact._id, "replied")}
-                        disabled={selectedContact.status === "replied"}
-                        className="cursor-pointer"
-                      >
-                        Marquer comme répondu
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => updateStatus(selectedContact._id, "archived")}
-                        disabled={selectedContact.status === "archived"}
-                        className="cursor-pointer"
-                      >
-                        Archiver
-                      </Button>
-                    </div>
-
-                    <div className="pt-2">
-                      <a
-                        href={`mailto:${selectedContact.email}?subject=Re: ${selectedContact.subject}`}
-                        className="inline-block"
-                      >
-                        <Button size="sm" className="cursor-pointer">📧 Répondre par email</Button>
-                      </a>
-                    </div>
-
-                    <div className="pt-2">
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => deleteContact(selectedContact._id)}
-                        className="cursor-pointer"
-                      >
-                        🗑️ Supprimer
-                      </Button>
-                    </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span>🕒</span>
+                    <span>{new Date(selectedContact.createdAt).toLocaleString("fr-FR")}</span>
                   </div>
                 </div>
-              </>
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <p className="text-sm text-slate-500">
-                  Sélectionnez un message pour voir les détails
+              </Card>
+
+              {/* Message */}
+              <Card className="p-4 mb-4 bg-slate-50">
+                <p className="text-xs font-semibold text-slate-700 mb-2">💬 Message</p>
+                <p className="text-sm text-slate-900 whitespace-pre-line">
+                  {selectedContact.message}
                 </p>
-              </div>
-            )}
-            </Card>
-          </div>
-        </div>
+              </Card>
+
+              {/* Création concernée */}
+              {selectedContact.creationId && (
+                <Card className="p-4 mb-4">
+                  <p className="text-xs font-semibold text-slate-700 mb-3">📦 Création concernée</p>
+                  <div className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 mb-3">
+                    {(selectedContact.creationId.images?.[0] ||
+                      selectedContact.creationId.imageUrl) && (
+                      <img
+                        src={
+                          selectedContact.creationId.images?.[0] ||
+                          selectedContact.creationId.imageUrl
+                        }
+                        alt={selectedContact.creationId.title}
+                        className="h-16 w-16 rounded-lg object-cover"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {selectedContact.creationId.title}
+                      </p>
+                      {selectedContact.creationId.price && (
+                        <p className="text-xs text-slate-600">
+                          {selectedContact.creationId.price} €
+                        </p>
+                      )}
+                      {selectedContact.creationId.color && (
+                        <p className="text-xs text-slate-500">
+                          Couleur: {selectedContact.creationId.color}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setSelectedCreation(selectedContact.creationId!);
+                      setShowCreationModal(true);
+                    }}
+                    className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                    Voir en détail
+                  </button>
+                </Card>
+              )}
+
+              {/* Actions */}
+              <Card className="p-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-700">Actions</p>
+                
+                <div className="space-y-2">
+                  <a
+                    href={`mailto:${selectedContact.email}?subject=Re: ${selectedContact.subject}`}
+                    className="block"
+                  >
+                    <Button size="sm" className="w-full cursor-pointer">
+                      📧 Répondre par email
+                    </Button>
+                  </a>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => updateStatus(selectedContact._id, "replied")}
+                      disabled={selectedContact.status === "replied"}
+                      className="cursor-pointer"
+                    >
+                      ✅ Répondu
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => updateStatus(selectedContact._id, "archived")}
+                      disabled={selectedContact.status === "archived"}
+                      className="cursor-pointer"
+                    >
+                      📁 Archiver
+                    </Button>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => deleteContact(selectedContact._id)}
+                    className="w-full cursor-pointer"
+                  >
+                    🗑️ Supprimer
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </>
+        )}
       </div>
+
+      {showCreationModal && selectedCreation && (
+        <CreationModal
+          creation={selectedCreation}
+          isOpen={showCreationModal}
+          onClose={() => {
+            setShowCreationModal(false);
+            setSelectedCreation(null);
+          }}
+        />
+      )}
     </main>
   );
 }
