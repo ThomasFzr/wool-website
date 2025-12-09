@@ -495,8 +495,8 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {creation.color && <Badge>{creation.color}</Badge>}
-            {creation.type && <Badge>{creation.type}</Badge>}
+            {creation.color && <Badge>{creation.color.charAt(0).toUpperCase() + creation.color.slice(1)}</Badge>}
+            {creation.type && <Badge>{creation.type.charAt(0).toUpperCase() + creation.type.slice(1)}</Badge>}
           </div>
 
           {creation.description && (
