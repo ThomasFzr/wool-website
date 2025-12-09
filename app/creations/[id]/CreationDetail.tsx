@@ -263,10 +263,37 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         Retour aux créations
       </Link>
 
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="grid gap-4 md:gap-8 md:grid-cols-2">
         {/* Galerie d'images */}
-        <div className="space-y-4">
-          <div className="relative aspect-square overflow-hidden rounded-2xl bg-slate-100 shadow-lg">
+        <div className="flex flex-col md:flex-row gap-2 md:gap-2">
+          {/* Miniatures - À gauche sur desktop uniquement */}
+          {images.length > 1 && (
+            <div className="hidden md:flex md:flex-col gap-1 md:w-16">
+              {images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setCurrentIndex(idx);
+                    setZoomed(false);
+                    setScale(1);
+                    setOffset({ x: 0, y: 0 });
+                  }}
+                  className={`aspect-square overflow-hidden rounded-lg ${
+                    idx === currentIndex ? "ring-2 ring-slate-900" : "ring-1 ring-slate-200"
+                  }`}
+                >
+                  <img
+                    src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })}
+                    alt={`Miniature ${idx + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Image principale */}
+          <div className="flex-1 relative aspect-square overflow-hidden rounded-2xl bg-slate-100 shadow-lg">
             {currentImageUrl ? (
               <div
                 className="relative h-full w-full cursor-zoom-in overflow-hidden"
@@ -316,12 +343,12 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               </span>
             ) : null}
 
-            {/* Navigation images */}
+            {/* Navigation images - Desktop uniquement */}
             {images.length > 1 && (
               <>
                 <button
                   onClick={prevImage}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white"
+                  className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white items-center justify-center"
                   aria-label="Image précédente"
                 >
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -330,7 +357,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 </button>
                 <button
                   onClick={nextImage}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white"
+                  className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white items-center justify-center"
                   aria-label="Image suivante"
                 >
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -343,32 +370,6 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               </>
             )}
           </div>
-
-          {/* Miniatures */}
-          {images.length > 1 && (
-            <div className="grid grid-cols-4 gap-2">
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setCurrentIndex(idx);
-                    setZoomed(false);
-                    setScale(1);
-                    setOffset({ x: 0, y: 0 });
-                  }}
-                  className={`aspect-square overflow-hidden rounded-lg ${
-                    idx === currentIndex ? "ring-2 ring-slate-900" : "ring-1 ring-slate-200"
-                  }`}
-                >
-                  <img
-                    src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })}
-                    alt={`Miniature ${idx + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Informations */}
@@ -376,9 +377,11 @@ export function CreationDetail({ creation }: CreationDetailProps) {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{creation.title}</h1>
             {creation.price && (
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {creation.price.toFixed(2)} €
-              </p>
+              <div className="mt-3">
+                <span className="text-3xl font-bold text-slate-900">
+                  {creation.price.toFixed(2)} €
+                </span>
+              </div>
             )}
           </div>
 
@@ -400,7 +403,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 <Button
                   onClick={handleReserve}
                   disabled={reserveLoading}
-                  className="w-full"
+                  className="w-full cursor-pointer"
                   size="lg"
                 >
                   {reserveLoading ? "Réservation..." : "Réserver cet article"}
@@ -429,7 +432,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
             <Button
               onClick={handleReserve}
               disabled={reserveLoading}
-              className="w-full"
+              className="w-full cursor-pointer"
               size="lg"
             >
               {reserveLoading ? "Réservation..." : "Réserver cet article"}
