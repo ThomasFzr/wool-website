@@ -120,7 +120,7 @@ function ContactForm() {
           <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-4">
             <p className="text-sm text-blue-800">
               📦 {subjectParam === "commande" 
-                ? "L'article que vous souhaitez commander est indiqué en pièce jointe. Décrivez-nous vos préférences (couleur, taille, modifications...)" 
+                ? "L'article que vous souhaitez commander est indiqué en pièce jointe par défaut." 
                 : "Votre message concerne une création spécifique."}
             </p>
           </div>

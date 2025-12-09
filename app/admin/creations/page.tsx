@@ -89,10 +89,11 @@ function AdminCreationsContent() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       const matchTitle = c.title?.toLowerCase().includes(query);
+      const matchDescription = c.description?.toLowerCase().includes(query);
       const matchColor = c.color?.toLowerCase().includes(query);
       const matchType = c.type?.toLowerCase().includes(query);
       const matchPrice = c.price?.toString().includes(query);
-      return matchTitle || matchColor || matchType || matchPrice;
+      return matchTitle || matchDescription || matchColor || matchType || matchPrice;
     }
     
     return true;
