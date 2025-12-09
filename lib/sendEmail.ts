@@ -11,6 +11,14 @@ export async function sendEmail({
   subject: string;
   html: string;
 }) {
+  // Skip sending emails in development mode
+  if (process.env.NODE_ENV === "development") {
+    console.log("[sendEmail] DEV MODE - Email not sent:");
+    console.log("To:", to);
+    console.log("Subject:", subject);
+    console.log("HTML preview:", html.substring(0, 200) + "...");
+    return { data: { id: "dev-mode-skip" } };
+  }
 
   try {
     const result = await resend.emails.send({

@@ -100,14 +100,14 @@ export default function LoginForm() {
 
           <button
             type="submit"
-            className="w-full rounded-full bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
+            className="w-full rounded-full bg-slate-900 px-3 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-slate-800"
           >
             {mode === "login" ? "Se connecter" : "Créer le compte"}
           </button>
         </form>
 
         <button
-          className="mt-3 text-xs text-slate-600 underline"
+          className="mt-3 text-xs text-slate-600 underline cursor-pointer"
           onClick={() =>
             setMode((m) => (m === "login" ? "register" : "login"))
           }
@@ -125,7 +125,7 @@ export default function LoginForm() {
                 callbackUrl,
               })
             }
-            className="w-full rounded-full border px-3 py-2 text-sm"
+            className="w-full rounded-full border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50"
           >
             Continuer avec Google
           </button>
