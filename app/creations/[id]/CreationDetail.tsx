@@ -320,7 +320,7 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 pb-24 md:pb-8">
       <button 
-        onClick={() => router.back()} 
+        onClick={() => router.push('/')} 
         className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 mb-6 cursor-pointer"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

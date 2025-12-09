@@ -79,7 +79,6 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
 
       setMessage("Profil mis à jour ✔️");
       setTimeout(() => setMessage(null), 3000);
-      onUpdate();
     } catch (err) {
       console.error(err);
       setMessage("Erreur serveur");
@@ -154,7 +153,6 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
 
       setMessage("Préférences mises à jour ✔️");
       setTimeout(() => setMessage(null), 3000);
-      onUpdate();
     } catch (err) {
       console.error(err);
       setMessage("Erreur serveur");
@@ -182,7 +180,7 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
       <div className="flex gap-1 sm:gap-2 border-b border-slate-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab("profile")}
-          className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${
             activeTab === "profile"
               ? "border-b-2 border-slate-900 text-slate-900"
               : "text-slate-600 hover:text-slate-900"
@@ -193,7 +191,7 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
         {isCredentialsProvider && (
           <button
             onClick={() => setActiveTab("password")}
-            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === "password"
                 ? "border-b-2 border-slate-900 text-slate-900"
                 : "text-slate-600 hover:text-slate-900"
@@ -204,7 +202,7 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
         )}
         <button
           onClick={() => setActiveTab("preferences")}
-          className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${
             activeTab === "preferences"
               ? "border-b-2 border-slate-900 text-slate-900"
               : "text-slate-600 hover:text-slate-900"
@@ -279,7 +277,7 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
               />
             </div>
 
-            <Button type="submit" disabled={saving} className="w-full sm:w-auto">
+            <Button type="submit" disabled={saving} className="w-full sm:w-auto cursor-pointer">
               {saving ? "⏳ Enregistrement..." : "💾 Enregistrer"}
             </Button>
           </form>
@@ -327,7 +325,7 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
               required
             />
 
-            <Button type="submit" disabled={saving} className="w-full sm:w-auto">
+            <Button type="submit" disabled={saving} className="w-full sm:w-auto cursor-pointer">
               {saving ? "⏳ Mise à jour..." : "🔒 Changer le mot de passe"}
             </Button>
           </form>
@@ -347,7 +345,7 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
                 type="checkbox"
                 checked={emailNotifications}
                 onChange={(e) => setEmailNotifications(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300"
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300 cursor-pointer"
               />
               <div>
                 <p className="text-sm font-medium text-slate-900">
@@ -360,7 +358,7 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
               </div>
             </label>
 
-            <Button type="submit" disabled={saving} className="w-full sm:w-auto">
+            <Button type="submit" disabled={saving} className="w-full sm:w-auto cursor-pointer">
               {saving ? "⏳ Enregistrement..." : "💾 Enregistrer"}
             </Button>
           </form>

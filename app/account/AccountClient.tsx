@@ -20,8 +20,6 @@ export default function AccountClient({ user }: { user: User }) {
   const handleUpdate = () => {
     // Force un re-render en changeant la clé
     setKey((prev) => prev + 1);
-    // Recharger la page pour obtenir les nouvelles données
-    window.location.reload();
   };
 
   return <ProfileForm key={key} user={user} onUpdate={handleUpdate} />;

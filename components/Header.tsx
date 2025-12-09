@@ -166,7 +166,7 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
 
                 <button
                   onClick={() => signOut({ callbackUrl: "/" })}
-                  className="w-full block px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                  className="w-full block px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 cursor-pointer"
                 >
                   Se déconnecter
                 </button>
