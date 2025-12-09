@@ -332,6 +332,7 @@ export default function AdminUsersPage() {
                     variant="secondary"
                     size="sm"
                     onClick={() => handleEdit(user)}
+                    className="cursor-pointer"
                   >
                     ✏️ Modifier
                   </Button>
@@ -340,6 +341,7 @@ export default function AdminUsersPage() {
                     size="sm"
                     onClick={() => handleDelete(user)}
                     disabled={session.user.email === user.email}
+                    className="cursor-pointer"
                   >
                     🗑️
                   </Button>
@@ -473,7 +475,7 @@ export default function AdminUsersPage() {
                 <Button type="submit" className="cursor-pointer">
                   {editingUser ? "💾 Mettre à jour" : "➕ Créer"}
                 </Button>
-                <Button type="button" variant="secondary" onClick={closeModal}>
+                <Button type="button" variant="secondary" onClick={closeModal} className="cursor-pointer">
                   Annuler
                 </Button>
               </div>

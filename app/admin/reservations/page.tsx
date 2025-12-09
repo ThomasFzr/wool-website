@@ -553,7 +553,7 @@ function AdminReservationsContent() {
                                     <Button
                                         variant="danger"
                                         onClick={() => setShowDeleteConfirm(true)}
-                                        className="w-full bg-red-600 hover:bg-red-700"
+                                        className="w-full bg-red-600 hover:bg-red-700 cursor-pointer"
                                         size="sm"
                                     >
                                         🗑️ Supprimer définitivement
@@ -570,7 +570,7 @@ function AdminReservationsContent() {
                                             <Button
                                                 variant="danger"
                                                 onClick={() => deleteReservation(selected._id)}
-                                                className="flex-1"
+                                                className="flex-1 cursor-pointer"
                                                 size="sm"
                                             >
                                                 Supprimer
@@ -578,7 +578,7 @@ function AdminReservationsContent() {
                                             <Button
                                                 variant="secondary"
                                                 onClick={() => setShowDeleteConfirm(false)}
-                                                className="flex-1"
+                                                className="flex-1 cursor-pointer"
                                                 size="sm"
                                             >
                                                 Annuler

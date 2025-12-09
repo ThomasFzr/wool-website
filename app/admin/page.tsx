@@ -258,7 +258,7 @@ function AdminContent() {
                   />
                 </div>
 
-                <Button type="submit" disabled={savingSettings}>
+                <Button type="submit" disabled={savingSettings} className="cursor-pointer">
                   {savingSettings ? "⏳ Enregistrement..." : "💾 Enregistrer"}
                 </Button>
               </div>
@@ -306,6 +306,7 @@ function AdminContent() {
                         });
                       }
                     }}
+                    className="cursor-pointer"
                   >
                     + Ajouter
                   </Button>
@@ -331,7 +332,7 @@ function AdminContent() {
                             });
                           }
                         }}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700 cursor-pointer"
                       >
                         ×
                       </button>
@@ -382,6 +383,7 @@ function AdminContent() {
                       });
                     }
                   }}
+                  className="cursor-pointer"
                 >
                   + Ajouter
                 </Button>
@@ -407,7 +409,7 @@ function AdminContent() {
                           });
                         }
                       }}
-                      className="text-red-500 hover:text-red-700"
+                      className="text-red-500 hover:text-red-700 cursor-pointer"
                     >
                       ×
                     </button>

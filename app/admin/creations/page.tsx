@@ -322,6 +322,7 @@ function AdminCreationsContent() {
   }
 
   function removeImage(index: number) {
+    if (!confirm('Supprimer cette image ?')) return;
     setForm((f) => ({
       ...f,
       images: f.images.filter((_, i) => i !== index),
@@ -841,7 +842,7 @@ function AdminCreationsContent() {
                           <button
                             onClick={() => removeImage(i)}
                             type="button"
-                            className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600"
+                            className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600 cursor-pointer"
                           >
                             ✕
                           </button>
@@ -871,7 +872,7 @@ function AdminCreationsContent() {
                 <Button type="submit" disabled={uploading || !form.title} className="flex-1 cursor-pointer">
                   {uploading ? "⏳ Upload..." : "💾 Mettre à jour"}
                 </Button>
-                <Button type="button" variant="secondary" onClick={handleCancelEdit}>
+                <Button type="button" variant="secondary" onClick={handleCancelEdit} className="cursor-pointer">
                   Annuler
                 </Button>
               </div>
@@ -1030,7 +1031,7 @@ function AdminCreationsContent() {
                           <button
                             onClick={() => removeImage(i)}
                             type="button"
-                            className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600"
+                            className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600 cursor-pointer"
                           >
                             ✕
                           </button>
@@ -1060,7 +1061,7 @@ function AdminCreationsContent() {
                 <Button type="submit" disabled={uploading || !form.title} className="flex-1 cursor-pointer">
                   {uploading ? "⏳ Upload..." : "➕ Créer"}
                 </Button>
-                <Button type="button" variant="secondary" onClick={handleCancelEdit}>
+                <Button type="button" variant="secondary" onClick={handleCancelEdit} className="cursor-pointer">
                   Annuler
                 </Button>
               </div>

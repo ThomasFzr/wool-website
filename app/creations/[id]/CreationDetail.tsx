@@ -86,13 +86,16 @@ export function CreationDetail({ creation }: CreationDetailProps) {
     
     // Si l'image actuelle n'est pas dans la fenêtre visible (4 miniatures)
     if (currentIndex < thumbnailScroll) {
-      // Scroller vers le haut pour montrer l'image actuelle
+      // Scroller vers le haut pour montrer l'image actuelle en première position
       setThumbnailScroll(currentIndex);
     } else if (currentIndex >= thumbnailScroll + 4) {
-      // Scroller vers le bas pour montrer l'image actuelle
-      setThumbnailScroll(currentIndex - 3);
+      // Scroller vers le bas pour montrer l'image actuelle en dernière position
+      setThumbnailScroll(Math.max(0, currentIndex - 3));
+    } else if (currentIndex === thumbnailScroll + 3 && currentIndex < images.length - 1) {
+      // Si on est sur la 4ème miniature visible et qu'il y en a d'autres après, scroll d'un cran
+      setThumbnailScroll(thumbnailScroll + 1);
     }
-  }, [currentIndex, images.length]);
+  }, [currentIndex, images.length, thumbnailScroll]);
 
   function nextImage() {
     if (images.length <= 1) return;
@@ -323,10 +326,10 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
       <div className="grid gap-4 md:gap-8 md:grid-cols-2">
         {/* Galerie d'images */}
-        <div className="flex flex-col md:flex-row gap-2 md:gap-2">
+        <div className="flex flex-col md:flex-row gap-2 md:gap-2 md:items-center">
           {/* Miniatures - À gauche sur desktop uniquement */}
           {images.length > 1 && (
-            <div className="hidden md:flex md:flex-col md:w-20 relative items-center">
+            <div className="hidden md:flex md:flex-col md:w-24 relative items-center justify-center">
               {/* Flèche haut */}
               {images.length > 4 && (
                 <button
@@ -342,10 +345,10 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               )}
               
               {/* Container avec scroll */}
-              <div className="flex flex-col gap-1.5 overflow-hidden" style={{ height: '290px' }}>
+              <div className="flex flex-col gap-1.5 overflow-hidden px-1 py-1" style={{ height: '318px' }}>
                 <div 
                   className="flex flex-col gap-1.5 transition-transform duration-300"
-                  style={{ transform: `translateY(-${thumbnailScroll * 73.5}px)` }}
+                  style={{ transform: `translateY(-${thumbnailScroll * 77.5}px)` }}
                 >
                   {images.map((img, idx) => (
                     <button
@@ -356,10 +359,12 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                         setScale(1);
                         setOffset({ x: 0, y: 0 });
                       }}
-                      className={`aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${
-                        idx === currentIndex ? "ring-2 ring-slate-900" : "ring-1 ring-slate-200"
+                      className={`aspect-square overflow-hidden rounded-lg cursor-pointer transition-all ${
+                        idx === currentIndex 
+                          ? "ring-2 ring-slate-900 opacity-100" 
+                          : "ring-1 ring-slate-300 opacity-60 hover:opacity-100"
                       }`}
-                      style={{ width: '72px', height: '72px', flexShrink: 0 }}
+                      style={{ width: '76px', height: '76px', flexShrink: 0 }}
                     >
                       <img
                         src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })}
