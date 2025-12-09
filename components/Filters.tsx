@@ -11,6 +11,7 @@ interface FiltersProps {
   onTypeChange: (types: string[]) => void;
   showOnlyAvailable: boolean;
   onAvailabilityChange: (value: boolean) => void;
+  onClearAll?: () => void;
 }
 
 export function Filters({
@@ -22,6 +23,7 @@ export function Filters({
   onTypeChange,
   showOnlyAvailable,
   onAvailabilityChange,
+  onClearAll,
 }: FiltersProps) {
   const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
@@ -40,6 +42,17 @@ export function Filters({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  const hasActiveFilters = selectedColors.length > 0 || selectedTypes.length > 0 || showOnlyAvailable;
+
+  const handleClearAll = () => {
+    onColorChange([]);
+    onTypeChange([]);
+    onAvailabilityChange(false);
+    if (onClearAll) {
+      onClearAll();
+    }
+  };
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -161,6 +174,17 @@ export function Filters({
         />
         <span>Disponibles uniquement</span>
       </label>
+
+      {/* Bouton effacer tous les filtres */}
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={handleClearAll}
+          className="ml-auto cursor-pointer rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+        >
+          Effacer tous les filtres
+        </button>
+      )}
     </div>
   );
 }
