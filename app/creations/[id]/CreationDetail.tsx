@@ -20,13 +20,15 @@ export type Creation = {
   sold?: boolean;
   showAsNew?: boolean;
   createdAt?: string;
+  reservedByUserId?: string | null;
 };
 
 interface CreationDetailProps {
   creation: Creation;
+  currentUserId?: string;
 }
 
-export function CreationDetail({ creation }: CreationDetailProps) {
+export function CreationDetail({ creation, currentUserId }: CreationDetailProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -44,6 +46,9 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   const [hasDragged, setHasDragged] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
   const [thumbnailScroll, setThumbnailScroll] = useState(0);
+
+  // Vérifier si l'utilisateur connecté est celui qui a réservé l'article
+  const isReservedByCurrentUser = currentUserId && creation.reservedByUserId === currentUserId;
 
   const images = creation?.images && creation.images.length > 0 
     ? creation.images 
@@ -501,55 +506,118 @@ export function CreationDetail({ creation }: CreationDetailProps) {
           )}
 
           {/* Actions - Desktop */}
-          {!creation.sold && (
-            <div className="hidden md:block space-y-3">
-              {!creation.reserved && !justReserved ? (
-                <Button
-                  onClick={handleReserve}
-                  disabled={reserveLoading}
-                  className="w-full cursor-pointer"
-                  size="lg"
-                >
-                  {reserveLoading ? "Réservation..." : "Réserver"}
-                </Button>
-              ) : (
-                <div className="rounded-lg bg-red-50 p-4 text-center">
-                  <p className="font-medium text-red-900">
-                    {justReserved ? "Réservé avec succès !" : "Article déjà réservé"}
+          <div className="hidden md:block space-y-3">
+            {!creation.reserved && !creation.sold && !justReserved ? (
+              <Button
+                onClick={handleReserve}
+                disabled={reserveLoading}
+                className="w-full cursor-pointer"
+                size="lg"
+              >
+                {reserveLoading ? "Réservation..." : "Réserver"}
+              </Button>
+            ) : (
+              <>
+                <div className={`rounded-lg p-4 text-center ${
+                  creation.sold ? "bg-gray-100" :
+                  isReservedByCurrentUser ? "bg-blue-50" :
+                  justReserved ? "bg-green-50" : "bg-red-50"
+                }`}>
+                  <p className={`font-medium ${
+                    creation.sold ? "text-gray-900" :
+                    isReservedByCurrentUser ? "text-blue-900" :
+                    justReserved ? "text-green-900" : "text-red-900"
+                  }`}>
+                    {creation.sold ? "Article vendu" :
+                     isReservedByCurrentUser ? "Vous avez réservé cet article" :
+                     justReserved ? "Réservé avec succès !" : "Article déjà réservé"}
                   </p>
                   {justReserved && (
-                    <p className="mt-1 text-sm text-red-700">
+                    <p className="mt-1 text-sm text-green-700">
                       Vous recevrez un email de confirmation.
                     </p>
                   )}
+                  {isReservedByCurrentUser && (
+                    <p className="mt-1 text-sm text-blue-700">
+                      Nous vous contacterons pour finaliser la vente.
+                    </p>
+                  )}
+                  {(creation.sold || (creation.reserved && !isReservedByCurrentUser)) && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      Cet article n'est plus disponible
+                    </p>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+                {(creation.sold || (creation.reserved && !isReservedByCurrentUser)) && (
+                  <Button
+                    onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)}
+                    className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
+                    size="lg"
+                  >
+                    Commander un article similaire
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Sticky Button - Mobile */}
-      {!creation.sold && (
-        <div className="fixed bottom-0 left-0 right-0 md:hidden p-4 z-50">
-          {!creation.reserved && !justReserved ? (
-            <Button
-              onClick={handleReserve}
-              disabled={reserveLoading}
-              className="w-full cursor-pointer"
-              size="lg"
-            >
-              {reserveLoading ? "Réservation..." : "Réserver"}
-            </Button>
-          ) : (
-            <div className="rounded-lg bg-red-50 p-3 text-center">
-              <p className="text-sm font-medium text-red-900">
-                {justReserved ? "Réservé avec succès !" : "Article déjà réservé"}
+      <div className="fixed bottom-0 left-0 right-0 md:hidden p-4 z-50 space-y-2">
+        {!creation.reserved && !creation.sold && !justReserved ? (
+          <Button
+            onClick={handleReserve}
+            disabled={reserveLoading}
+            className="w-full cursor-pointer"
+            size="lg"
+          >
+            {reserveLoading ? "Réservation..." : "Réserver"}
+          </Button>
+        ) : (
+          <>
+            <div className={`rounded-lg p-3 text-center ${
+              creation.sold ? "bg-gray-100" :
+              isReservedByCurrentUser ? "bg-blue-50" :
+              justReserved ? "bg-green-50" : "bg-red-50"
+            }`}>
+              <p className={`text-sm font-medium ${
+                creation.sold ? "text-gray-900" :
+                isReservedByCurrentUser ? "text-blue-900" :
+                justReserved ? "text-green-900" : "text-red-900"
+              }`}>
+                {creation.sold ? "Article vendu" :
+                 isReservedByCurrentUser ? "Vous avez réservé cet article" :
+                 justReserved ? "Réservé avec succès !" : "Article déjà réservé"}
               </p>
+              {justReserved && (
+                <p className="mt-1 text-xs text-green-700">
+                  Vous recevrez un email de confirmation.
+                </p>
+              )}
+              {isReservedByCurrentUser && (
+                <p className="mt-1 text-xs text-blue-700">
+                  Nous vous contacterons pour finaliser la vente.
+                </p>
+              )}
+              {(creation.sold || (creation.reserved && !isReservedByCurrentUser)) && (
+                <p className="mt-1 text-xs text-gray-600">
+                  Cet article n'est plus disponible
+                </p>
+              )}
             </div>
-          )}
-        </div>
-      )}
+            {(creation.sold || (creation.reserved && !isReservedByCurrentUser)) && (
+              <Button
+                onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)}
+                className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
+                size="lg"
+              >
+                Commander un article similaire
+              </Button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

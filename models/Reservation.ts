@@ -6,6 +6,10 @@ const schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Creation",
     },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
     name: String,
     contact: String,
 

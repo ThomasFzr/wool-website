@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, Suspense } from "react";
+import { FormEvent, useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -11,11 +11,22 @@ function ContactForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const creationId = searchParams.get("creation");
+  const subjectParam = searchParams.get("subject");
+
+  // Initialiser le sujet en fonction des paramètres URL
+  const getInitialSubject = () => {
+    if (subjectParam === "commande") {
+      return "Commander un article similaire";
+    } else if (creationId) {
+      return "Question sur une création";
+    }
+    return "";
+  };
 
   const [form, setForm] = useState({
     name: session?.user?.name || "",
     email: session?.user?.email || "",
-    subject: creationId ? "Question sur une création" : "",
+    subject: getInitialSubject(),
     message: "",
     website: "", // Honeypot
   });
@@ -108,7 +119,9 @@ function ContactForm() {
         {creationId && (
           <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-4">
             <p className="text-sm text-blue-800">
-              📦 Votre message concerne une création spécifique.
+              📦 {subjectParam === "commande" 
+                ? "L'article que vous souhaitez commander est indiqué en pièce jointe. Décrivez-nous vos préférences (couleur, taille, modifications...)" 
+                : "Votre message concerne une création spécifique."}
             </p>
           </div>
         )}
@@ -132,13 +145,24 @@ function ContactForm() {
               required
             />
 
-            <Input
-              label="Sujet *"
-              placeholder="L'objet de votre message"
-              value={form.subject}
-              onChange={(e) => setForm({ ...form, subject: e.target.value })}
-              required
-            />
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">
+                Sujet *
+              </label>
+              <select
+                value={form.subject}
+                onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                required
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 cursor-pointer"
+              >
+                <option value="">Sélectionnez un sujet</option>
+                <option value="Commander un article similaire">Commander un article similaire</option>
+                <option value="Question sur une création">Question sur une création</option>
+                <option value="Demande de personnalisation">Demande de personnalisation</option>
+                <option value="Question générale">Question générale</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
 
             {/* Honeypot - champ invisible pour les bots */}
             <input
@@ -178,13 +202,14 @@ function ContactForm() {
             )}
 
             <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="cursor-pointer">
                 {loading ? "Envoi..." : "📧 Envoyer le message"}
               </Button>
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => router.back()}
+                className="cursor-pointer"
               >
                 Annuler
               </Button>
