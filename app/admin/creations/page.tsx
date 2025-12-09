@@ -62,6 +62,7 @@ function AdminCreationsContent() {
   const [statusFilter, setStatusFilter] = useState<string>("tous");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   
   const formRef = useRef<HTMLDivElement>(null);
   const hasLoadedCreations = useRef(false);
@@ -79,10 +80,21 @@ function AdminCreationsContent() {
   });
 
   const filteredCreations = creations.filter((c) => {
-    if (statusFilter === "tous") return true;
-    if (statusFilter === "disponible") return !c.reserved && !c.sold;
-    if (statusFilter === "reserve") return c.reserved && !c.sold;
-    if (statusFilter === "vendu") return c.sold;
+    // Filtre par statut
+    if (statusFilter === "disponible" && (c.reserved || c.sold)) return false;
+    if (statusFilter === "reserve" && (!c.reserved || c.sold)) return false;
+    if (statusFilter === "vendu" && !c.sold) return false;
+    
+    // Filtre par recherche
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchTitle = c.title?.toLowerCase().includes(query);
+      const matchColor = c.color?.toLowerCase().includes(query);
+      const matchType = c.type?.toLowerCase().includes(query);
+      const matchPrice = c.price?.toString().includes(query);
+      return matchTitle || matchColor || matchType || matchPrice;
+    }
+    
     return true;
   });
 
@@ -615,6 +627,17 @@ function AdminCreationsContent() {
                 <p className="text-xs text-slate-500 mb-3">
                   💡 Glissez les créations pour réorganiser l&apos;ordre d&apos;affichage sur la page d&apos;accueil
                 </p>
+                
+                {/* Barre de recherche */}
+                <div className="mb-4">
+                  <Input
+                    type="text"
+                    placeholder="🔍 Rechercher par titre, couleur, type ou prix..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
                 
                 {/* Filtres de statut */}
                 <div className="flex flex-wrap gap-2 mb-4 pb-4 pt-2 border-b border-slate-200">
