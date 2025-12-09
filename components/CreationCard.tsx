@@ -54,7 +54,7 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
     <Link href={`/creations/${creation.slug || creation._id}`}>
       <article
         id={`creation-${creation.slug || creation._id}`}
-        className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md scroll-mt-32"
+        className="relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-md scroll-mt-32"
         onMouseEnter={handleMouseEnter}
       >
         {creation.sold ? (
