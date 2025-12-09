@@ -554,7 +554,7 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
                     className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
                     size="lg"
                   >
-                    Commander un article similaire
+                    Commander un article identique
                   </Button>
                 )}
               </>
@@ -612,7 +612,7 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
                 className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
                 size="lg"
               >
-                Commander un article similaire
+                Commander un article identique
               </Button>
             )}
           </>

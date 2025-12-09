@@ -16,7 +16,7 @@ function ContactForm() {
   // Initialiser le sujet en fonction des paramètres URL
   const getInitialSubject = () => {
     if (subjectParam === "commande") {
-      return "Commander un article similaire";
+      return "Commander un article identique";
     } else if (creationId) {
       return "Question sur une création";
     }
@@ -156,7 +156,7 @@ function ContactForm() {
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 cursor-pointer"
               >
                 <option value="">Sélectionnez un sujet</option>
-                <option value="Commander un article similaire">Commander un article similaire</option>
+                <option value="Commander un article identique">Commander un article identique</option>
                 <option value="Question sur une création">Question sur une création</option>
                 <option value="Demande de personnalisation">Demande de personnalisation</option>
                 <option value="Question générale">Question générale</option>

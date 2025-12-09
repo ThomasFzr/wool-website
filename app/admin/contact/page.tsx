@@ -447,6 +447,7 @@ export default function AdminContactPage() {
             setShowCreationModal(false);
             setSelectedCreation(null);
           }}
+          hideActions={true}
         />
       )}
     </main>

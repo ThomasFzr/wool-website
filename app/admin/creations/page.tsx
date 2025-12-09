@@ -5,6 +5,7 @@ import { FormEvent, useState, ChangeEvent, useEffect, useRef, Suspense } from "r
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Input, Textarea, Card, Badge } from "@/components";
+import { CreationModal } from "@/components/CreationModal";
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -18,11 +19,13 @@ type Creation = {
   imagePublicIds?: string[];
   price?: number;
   color?: string;
-  type?: string;
+  type?: "bonnet" | "tour de cou" | "bandeau";
   showAsNew?: boolean;
   displayOrder?: number;
   reserved?: boolean;
   sold?: boolean;
+  slug?: string;
+  createdAt?: string;
 };
 
 function AdminCreationsContent() {
@@ -56,6 +59,9 @@ function AdminCreationsContent() {
   const [savingOrder, setSavingOrder] = useState(false);
   const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>("tous");
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
   
   const formRef = useRef<HTMLDivElement>(null);
   const hasLoadedCreations = useRef(false);
@@ -70,6 +76,14 @@ function AdminCreationsContent() {
     if (a.toLowerCase() === "multicolore") return 1;
     if (b.toLowerCase() === "multicolore") return -1;
     return a.localeCompare(b);
+  });
+
+  const filteredCreations = creations.filter((c) => {
+    if (statusFilter === "tous") return true;
+    if (statusFilter === "disponible") return !c.reserved && !c.sold;
+    if (statusFilter === "reserve") return c.reserved && !c.sold;
+    if (statusFilter === "vendu") return c.sold;
+    return true;
   });
 
   useEffect(() => {
@@ -597,13 +611,51 @@ function AdminCreationsContent() {
             )}
 
             {creations.length > 1 && (
-              <p className="text-xs text-slate-500 mb-3">
-                💡 Glissez les créations pour réorganiser l&apos;ordre d&apos;affichage sur la page d&apos;accueil
-              </p>
+              <>
+                <p className="text-xs text-slate-500 mb-3">
+                  💡 Glissez les créations pour réorganiser l&apos;ordre d&apos;affichage sur la page d&apos;accueil
+                </p>
+                
+                {/* Filtres de statut */}
+                <div className="flex flex-wrap gap-2 mb-4 pb-4 pt-2 border-b border-slate-200">
+                  <Button
+                    size="sm"
+                    variant={statusFilter === "tous" ? "primary" : "secondary"}
+                    onClick={() => setStatusFilter("tous")}
+                    className="cursor-pointer"
+                  >
+                    Tous ({creations.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={statusFilter === "disponible" ? "primary" : "secondary"}
+                    onClick={() => setStatusFilter("disponible")}
+                    className="cursor-pointer"
+                  >
+                    ✅ Disponible ({creations.filter(c => !c.reserved && !c.sold).length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={statusFilter === "reserve" ? "primary" : "secondary"}
+                    onClick={() => setStatusFilter("reserve")}
+                    className="cursor-pointer"
+                  >
+                    🔵 Réservé ({creations.filter(c => c.reserved && !c.sold).length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={statusFilter === "vendu" ? "primary" : "secondary"}
+                    onClick={() => setStatusFilter("vendu")}
+                    className="cursor-pointer"
+                  >
+                    ⚫ Vendu ({creations.filter(c => c.sold).length})
+                  </Button>
+                </div>
+              </>
             )}
 
             <div className="space-y-2">
-              {creations.map((c, index) => (
+              {filteredCreations.map((c, index) => (
                 <div
                   key={c._id}
                   data-creation-index={index}
@@ -614,7 +666,7 @@ function AdminCreationsContent() {
                   onTouchStart={() => handleListTouchStart(index)}
                   onTouchMove={handleListTouchMove}
                   onTouchEnd={handleListTouchEnd}
-                  className={`flex flex-col gap-3 rounded-xl border bg-white p-3 transition hover:shadow-sm sm:flex-row sm:items-center sm:justify-between cursor-move ${
+                  className={`relative flex flex-col gap-3 rounded-xl border bg-white p-3 transition hover:shadow-sm sm:flex-row sm:items-center sm:justify-between cursor-move ${
                     listDragIndex === index
                       ? "border-blue-500 ring-2 ring-blue-200"
                       : "border-slate-200"
@@ -626,12 +678,24 @@ function AdminCreationsContent() {
                       {index + 1}
                     </div>
                     {c.imageUrl && (
-                      <img
-                        src={c.imageUrl}
-                        alt={c.title}
-                        className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                        draggable={false}
-                      />
+                      <div className="relative">
+                        {c.sold && (
+                          <span className="absolute left-1 top-1 z-10 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                            Vendu
+                          </span>
+                        )}
+                        {c.reserved && !c.sold && (
+                          <span className="absolute left-1 top-1 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                            Réservé
+                          </span>
+                        )}
+                        <img
+                          src={c.imageUrl}
+                          alt={c.title}
+                          className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                          draggable={false}
+                        />
+                      </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -668,6 +732,36 @@ function AdminCreationsContent() {
                         ↻ Disponible
                       </Button>
                     )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCreation(c);
+                        setShowDetailModal(true);
+                      }}
+                      className="cursor-pointer flex items-center gap-1"
+                      title="Voir les détails"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                    </Button>
                     <Button
                       variant="secondary"
                       size="sm"
@@ -1068,6 +1162,19 @@ function AdminCreationsContent() {
             </form>
           </div>
         </>
+      )}
+
+      {/* Modale de détails */}
+      {showDetailModal && selectedCreation && (
+        <CreationModal
+          creation={selectedCreation}
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedCreation(null);
+          }}
+          hideActions={true}
+        />
       )}
     </main>
   );

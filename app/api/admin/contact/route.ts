@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const query = status && status !== "all" ? { status } : {};
 
     const contacts = await Contact.find(query)
-      .populate("creationId", "title imageUrl images")
+      .populate("creationId", "title imageUrl images description price color type reserved sold slug createdAt showAsNew")
       .sort({ createdAt: -1 })
       .lean();
 
