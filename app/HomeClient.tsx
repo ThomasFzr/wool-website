@@ -32,7 +32,7 @@ export function HomeClient({ initialCreations, availableColors = [], availableTy
 
   return (
     <>
-      <div className="mx-auto max-w-5xl px-4 py-8">
+      <div id="creations" className="mx-auto max-w-5xl px-4 py-8">
         {creations.length === 0 && (
           <p className="text-sm text-slate-500">
             Aucune création pour le moment.
