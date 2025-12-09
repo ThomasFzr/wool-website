@@ -28,7 +28,7 @@ async function getCreation(slug: string) {
   // Récupérer la réservation pour savoir qui l'a réservée
   let reservedByUserId = null;
   if (creationData.reserved) {
-    const reservation = await ReservationModel.findOne({ 
+    const reservation: any = await ReservationModel.findOne({ 
       creationId: creationData._id,
       status: { $ne: 'cancelled' }
     }).lean();
