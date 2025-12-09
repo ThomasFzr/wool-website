@@ -563,8 +563,8 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
         </div>
       </div>
 
-      {/* Sticky Button - Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 md:hidden p-4 z-50 space-y-2">
+      {/* Mobile Actions */}
+      <div className="md:hidden p-4 space-y-2">
         {!creation.reserved && !creation.sold && !justReserved ? (
           <Button
             onClick={handleReserve}

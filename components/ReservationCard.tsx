@@ -156,6 +156,7 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
                 setCancelReason("");
                 setInfo(null);
               }}
+              className="cursor-pointer"
             >
               Annuler ma réservation
             </Button>
@@ -173,6 +174,7 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
                   size="sm"
                   onClick={handleCancelReservation}
                   disabled={cancelLoading}
+                  className="cursor-pointer"
                 >
                   {cancelLoading ? "Annulation..." : "Confirmer l'annulation"}
                 </Button>
@@ -183,7 +185,7 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
                     setCancelReason("");
                     setInfo(null);
                   }}
-                  className="text-[11px] text-slate-500 hover:underline"
+                  className="text-[11px] text-slate-500 hover:underline cursor-pointer"
                 >
                   Garder ma réservation
                 </button>
