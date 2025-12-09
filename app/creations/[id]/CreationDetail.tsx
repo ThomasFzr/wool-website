@@ -311,7 +311,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                     setScale(1);
                     setOffset({ x: 0, y: 0 });
                   }}
-                  className={`aspect-square overflow-hidden rounded-lg ${
+                  className={`aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${
                     idx === currentIndex ? "ring-2 ring-slate-900" : "ring-1 ring-slate-200"
                   }`}
                 >
@@ -385,7 +385,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               <>
                 <button
                   onClick={prevImage}
-                  className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white items-center justify-center"
+                  className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white cursor-pointer transition-all hover:scale-110 items-center justify-center"
                   aria-label="Image précédente"
                 >
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -394,7 +394,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 </button>
                 <button
                   onClick={nextImage}
-                  className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white items-center justify-center"
+                  className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white cursor-pointer transition-all hover:scale-110 items-center justify-center"
                   aria-label="Image suivante"
                 >
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
