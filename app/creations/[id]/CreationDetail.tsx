@@ -379,7 +379,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
             {creation.price && (
               <div className="mt-3">
                 <span className="text-3xl font-bold text-slate-900">
-                  {creation.price.toFixed(2)} €
+                  {Number.isInteger(creation.price) ? creation.price : creation.price.toFixed(2)} €
                 </span>
               </div>
             )}
