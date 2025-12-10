@@ -84,36 +84,43 @@ export function CartModal() {
     setIsProcessing(true);
 
     try {
-      // Créer une réservation pour chaque article du panier
-      const reservations = await Promise.all(
-        items.map((item) =>
-          fetch(`/api/creations/${item.creationId}/reserve`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: session.user?.name || "",
-              contact: session.user?.email || "",
-            }),
-          })
-        )
-      );
+      // Créer une session de checkout Stripe
+      const response = await fetch("/api/stripe/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
 
-      // Vérifier si toutes les réservations ont réussi
-      const failed = reservations.some((res) => !res.ok);
-      if (failed) {
-        alert(
-          "Certains articles n'ont pas pu être réservés. Veuillez réessayer."
-        );
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = "Erreur lors de la création de la session de paiement";
+        
+        // Messages d'erreur plus clairs
+        if (errorText.includes("STRIPE_SECRET_KEY")) {
+          errorMessage = "Stripe n'est pas configuré. Veuillez contacter l'administrateur.";
+        } else if (errorText.includes("Panier vide")) {
+          errorMessage = "Votre panier est vide.";
+        } else if (errorText.includes("déjà réservées")) {
+          errorMessage = "Certains articles ont déjà été réservés. Veuillez actualiser la page.";
+        } else if (errorText) {
+          errorMessage = errorText;
+        }
+        
+        alert(errorMessage);
         setIsProcessing(false);
         return;
       }
 
-      // Vider le panier et rediriger vers la page de confirmation
-      clearCart();
-      handleClose();
-      router.push("/account/orders?reserved=true");
+      const data = await response.json();
+
+      if (data.url) {
+        // Rediriger vers Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error("URL de checkout non reçue");
+      }
     } catch (error) {
-      console.error("Erreur lors de la réservation:", error);
+      console.error("Erreur lors du checkout:", error);
       alert("Une erreur est survenue. Veuillez réessayer.");
       setIsProcessing(false);
     }
@@ -290,8 +297,8 @@ export function CartModal() {
                   {isProcessing
                     ? "Traitement..."
                     : session
-                    ? "Réserver les articles"
-                    : "Se connecter pour réserver"}
+                    ? "Procéder au paiement"
+                    : "Se connecter pour payer"}
                 </Button>
 
                 <Link href="/cart" onClick={handleClose}>

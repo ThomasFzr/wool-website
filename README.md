@@ -133,7 +133,13 @@ CLOUDINARY_API_SECRET=your-api-secret
 
 # Resend (for password reset emails)
 RESEND_API_KEY=your-resend-api-key
-FROM_EMAIL=noreply@yourdomain.com
+EMAIL_FROM=noreply@yourdomain.com
+SELLER_EMAIL=your-email@yourdomain.com
+
+# Stripe (for payments)
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 4. **Run the development server**
@@ -240,9 +246,22 @@ See `components/README.md` for detailed component documentation.
 - Admin-only routes protection
 - CSRF protection via NextAuth
 
+## 💳 Stripe Payment Setup
+
+1. Create a [Stripe account](https://stripe.com/)
+2. Get your API keys from the [Stripe Dashboard](https://dashboard.stripe.com/apikeys)
+   - Use test keys for development (`sk_test_...`)
+   - Use live keys for production (`sk_live_...`)
+3. Set up webhooks:
+   - Go to [Webhooks](https://dashboard.stripe.com/webhooks) in Stripe Dashboard
+   - Add endpoint: `https://yourdomain.com/api/stripe/webhook`
+   - Select event: `checkout.session.completed`
+   - Copy the webhook signing secret (`whsec_...`)
+4. Add credentials to `.env.local`
+
 ## 🚧 Roadmap
 
-- [ ] Payment integration (Stripe/PayPal)
+- [x] Payment integration (Stripe)
 - [ ] Order history and tracking
 - [ ] Email notifications for reservation status
 - [ ] Product categories and tags
