@@ -6,7 +6,7 @@ import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export function CartModal() {
   const {
@@ -21,6 +21,7 @@ export function CartModal() {
   const { data: session } = useSession();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   const totalPrice = getTotalPrice();
 
@@ -33,6 +34,16 @@ export function CartModal() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+
+  // Gérer l'animation de fermeture
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    setTimeout(() => {
+      closeCart();
+      setIsClosing(false);
+    }, 300); // Durée de l'animation
+  }, [closeCart]);
 
   // Empêcher le scroll du body quand la modale est ouverte
   useEffect(() => {
@@ -48,14 +59,16 @@ export function CartModal() {
 
   // Fermer avec la touche Escape
   useEffect(() => {
+    if (!isOpen) return;
+    
     function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
-        closeCart();
+      if (e.key === "Escape") {
+        handleClose();
       }
     }
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isOpen, closeCart]);
+  }, [isOpen, handleClose]);
 
   const handleCheckout = async () => {
     if (!session?.user) {
@@ -97,7 +110,7 @@ export function CartModal() {
 
       // Vider le panier et rediriger vers la page de confirmation
       clearCart();
-      closeCart();
+      handleClose();
       router.push("/account/orders?reserved=true");
     } catch (error) {
       console.error("Erreur lors de la réservation:", error);
@@ -107,24 +120,35 @@ export function CartModal() {
   };
 
   // Ne pas afficher la modale sur mobile
-  if (!isOpen || isMobile) return null;
+  if (isMobile) return null;
+
+  // Ne pas rendre si jamais ouvert sur desktop
+  if (!isOpen && !isClosing) return null;
 
   return (
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 z-50 bg-black/50 transition-opacity"
-        onClick={closeCart}
+        className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${
+          isClosing ? "opacity-0" : "opacity-100"
+        }`}
+        onClick={handleClose}
       />
 
       {/* Modale */}
-      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md overflow-y-auto bg-white shadow-xl transition-transform">
+      <div
+        className={`fixed right-0 top-0 z-50 h-full w-full max-w-md overflow-y-auto bg-white shadow-xl will-change-transform ${
+          isClosing
+            ? "animate-[slideOutRight_300ms_ease-out]"
+            : "animate-[slideInRight_300ms_ease-out]"
+        }`}
+      >
         <div className="flex h-full flex-col">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
             <h2 className="text-lg font-semibold text-slate-900">Panier</h2>
             <button
-              onClick={closeCart}
+              onClick={handleClose}
               className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
               aria-label="Fermer le panier"
             >
@@ -183,7 +207,7 @@ export function CartModal() {
                     >
                       <Link
                         href={`/creations/${item.slug || item.creationId}`}
-                        onClick={closeCart}
+                        onClick={handleClose}
                         className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100"
                       >
                         {imageUrl ? (
@@ -204,7 +228,7 @@ export function CartModal() {
                           <div className="flex-1">
                             <Link
                               href={`/creations/${item.slug || item.creationId}`}
-                              onClick={closeCart}
+                              onClick={handleClose}
                               className="text-sm font-semibold text-slate-900 hover:text-slate-700"
                             >
                               {item.title}
@@ -270,7 +294,7 @@ export function CartModal() {
                     : "Se connecter pour réserver"}
                 </Button>
 
-                <Link href="/cart" onClick={closeCart}>
+                <Link href="/cart" onClick={handleClose}>
                   <Button
                     variant="secondary"
                     className="w-full cursor-pointer"

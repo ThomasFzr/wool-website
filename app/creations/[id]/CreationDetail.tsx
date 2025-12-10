@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button, Badge } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import { useCart } from "@/contexts/CartContext";
+import { Toast } from "@/components/Toast";
 
 export type Creation = {
   _id: string;
@@ -51,6 +52,8 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
   const [hasDragged, setHasDragged] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
   const [thumbnailScroll, setThumbnailScroll] = useState(0);
+  const [showToast, setShowToast] = useState(false);
+  const [justAddedToCart, setJustAddedToCart] = useState(false);
 
   // Vérifier si l'utilisateur connecté est celui qui a réservé l'article
   const isReservedByCurrentUser = currentUserId && creation.reservedByUserId === currentUserId;
@@ -280,7 +283,7 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
   }
 
   function handleAddToCart() {
-    if (creation.reserved || creation.sold) {
+    if (creation.reserved || creation.sold || isInCart) {
       return;
     }
 
@@ -294,11 +297,14 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
       price: creation.price,
     });
 
-    // Afficher une notification (optionnel, peut être amélioré avec un toast)
-    const event = new CustomEvent("cart:added", {
-      detail: { title: creation.title },
-    });
-    window.dispatchEvent(event);
+    // Feedback visuel sur mobile
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setShowToast(true);
+      setJustAddedToCart(true);
+      setTimeout(() => {
+        setJustAddedToCart(false);
+      }, 2000);
+    }
   }
 
   async function handleReserve() {
@@ -607,11 +613,19 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
           <div className="space-y-2">
             <Button
               onClick={handleAddToCart}
-              disabled={isInCart}
-              className="w-full cursor-pointer"
+              disabled={isInCart || justAddedToCart}
+              className={`w-full cursor-pointer transition-all duration-300 ${
+                justAddedToCart
+                  ? "bg-green-500 hover:bg-green-500 scale-105"
+                  : ""
+              }`}
               size="lg"
             >
-              {isInCart ? "Déjà dans le panier" : "Ajouter au panier"}
+              {justAddedToCart
+                ? "✓ Ajouté !"
+                : isInCart
+                ? "Déjà dans le panier"
+                : "Ajouter au panier"}
             </Button>
             <Button
               onClick={handleReserve}
@@ -667,6 +681,13 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
           </>
         )}
       </div>
+
+      {/* Toast pour mobile */}
+      <Toast
+        message="Article ajouté au panier ✓"
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   );
 }
