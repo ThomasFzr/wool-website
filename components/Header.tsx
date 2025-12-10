@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Badge } from "./ui";
+import { CartIcon } from "./CartIcon";
 
 interface HeaderProps {
   title?: string;
@@ -87,8 +88,12 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
             {title || "MailleMum - Créations artisanales en laine"}
           </h1>
 
-          {/* Bouton Mon compte */}
-          <div ref={menuRef}>
+          {/* Panier et compte */}
+          <div className="flex items-center gap-3">
+            <CartIcon />
+            
+            {/* Bouton Mon compte */}
+            <div ref={menuRef}>
             <button
               type="button"
               onClick={() => {
@@ -172,6 +177,7 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
                 </button>
               </div>
             )}
+            </div>
           </div>
         </div>
       </header>

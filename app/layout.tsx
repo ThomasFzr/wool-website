@@ -1,5 +1,6 @@
 import "./globals.css";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
+import { CartProvider } from "@/contexts/CartContext";
 import { Analytics } from "@vercel/analytics/react";
 import { Metadata } from "next";
 
@@ -49,7 +50,9 @@ export default function RootLayout({
         <link rel="preload" href="/fonts/ClashDisplay-Variable.ttf" as="font" type="font/ttf" crossOrigin="anonymous" />
       </head>
       <body className="font-sans bg-slate-50 text-slate-900">
-        <AuthSessionProvider>{children}</AuthSessionProvider>
+        <AuthSessionProvider>
+          <CartProvider>{children}</CartProvider>
+        </AuthSessionProvider>
         <Analytics />
       </body>
     </html>

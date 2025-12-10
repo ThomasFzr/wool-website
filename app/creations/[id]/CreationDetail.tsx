@@ -5,6 +5,7 @@ import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button, Badge } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
+import { useCart } from "@/contexts/CartContext";
 
 export type Creation = {
   _id: string;
@@ -31,6 +32,7 @@ interface CreationDetailProps {
 export function CreationDetail({ creation, currentUserId }: CreationDetailProps) {
   const { data: session } = useSession();
   const router = useRouter();
+  const { addItem } = useCart();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [zoomed, setZoomed] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -274,6 +276,28 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
     }
   }
 
+  function handleAddToCart() {
+    if (creation.reserved || creation.sold) {
+      return;
+    }
+
+    addItem({
+      creationId: creation._id,
+      slug: creation.slug,
+      title: creation.title,
+      imageUrl: creation.images && creation.images.length > 0 
+        ? creation.images[0] 
+        : creation.imageUrl,
+      price: creation.price,
+    });
+
+    // Afficher une notification (optionnel, peut être amélioré avec un toast)
+    const event = new CustomEvent("cart:added", {
+      detail: { title: creation.title },
+    });
+    window.dispatchEvent(event);
+  }
+
   async function handleReserve() {
     if (!session?.user) {
       signIn();
@@ -508,14 +532,24 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
           {/* Actions - Desktop */}
           <div className="hidden md:block space-y-3">
             {!creation.reserved && !creation.sold && !justReserved ? (
-              <Button
-                onClick={handleReserve}
-                disabled={reserveLoading}
-                className="w-full cursor-pointer"
-                size="lg"
-              >
-                {reserveLoading ? "Réservation..." : "Réserver"}
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  onClick={handleAddToCart}
+                  className="w-full cursor-pointer"
+                  size="lg"
+                >
+                  Ajouter au panier
+                </Button>
+                <Button
+                  onClick={handleReserve}
+                  disabled={reserveLoading}
+                  variant="secondary"
+                  className="w-full cursor-pointer"
+                  size="lg"
+                >
+                  {reserveLoading ? "Réservation..." : "Réserver directement"}
+                </Button>
+              </div>
             ) : (
               <>
                 <div className={`rounded-lg p-4 text-center ${
@@ -566,14 +600,24 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
       {/* Mobile Actions */}
       <div className="md:hidden p-4 space-y-2">
         {!creation.reserved && !creation.sold && !justReserved ? (
-          <Button
-            onClick={handleReserve}
-            disabled={reserveLoading}
-            className="w-full cursor-pointer"
-            size="lg"
-          >
-            {reserveLoading ? "Réservation..." : "Réserver"}
-          </Button>
+          <div className="space-y-2">
+            <Button
+              onClick={handleAddToCart}
+              className="w-full cursor-pointer"
+              size="lg"
+            >
+              Ajouter au panier
+            </Button>
+            <Button
+              onClick={handleReserve}
+              disabled={reserveLoading}
+              variant="secondary"
+              className="w-full cursor-pointer"
+              size="lg"
+            >
+              {reserveLoading ? "Réservation..." : "Réserver directement"}
+            </Button>
+          </div>
         ) : (
           <>
             <div className={`rounded-lg p-3 text-center ${
