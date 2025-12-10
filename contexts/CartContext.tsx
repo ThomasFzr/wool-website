@@ -13,6 +13,9 @@ export type CartItem = {
 
 type CartContextType = {
   items: CartItem[];
+  isOpen: boolean;
+  openCart: () => void;
+  closeCart: () => void;
   addItem: (item: Omit<CartItem, "quantity">) => void;
   removeItem: (creationId: string) => void;
   updateQuantity: (creationId: string, quantity: number) => void;
@@ -27,6 +30,7 @@ const STORAGE_KEY = "wool-starter-cart";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // Charger le panier depuis localStorage au montage
@@ -53,6 +57,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items, mounted]);
 
+  const openCart = () => setIsOpen(true);
+  const closeCart = () => setIsOpen(false);
+
   const addItem = (newItem: Omit<CartItem, "quantity">) => {
     setItems((prevItems) => {
       const existingItem = prevItems.find(
@@ -60,17 +67,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
 
       if (existingItem) {
-        // Si l'article existe déjà, augmenter la quantité
-        return prevItems.map((item) =>
-          item.creationId === newItem.creationId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
+        // Si l'article existe déjà, ne rien faire (un seul exemplaire par article)
+        return prevItems;
       } else {
         // Sinon, ajouter l'article avec quantité 1
         return [...prevItems, { ...newItem, quantity: 1 }];
       }
     });
+    // Ouvrir la modale après ajout (sur desktop)
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setIsOpen(true);
+    }
   };
 
   const removeItem = (creationId: string) => {
@@ -97,13 +104,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const getTotalItems = () => {
-    return items.reduce((total, item) => total + item.quantity, 0);
+    return items.length;
   };
 
   const getTotalPrice = () => {
     return items.reduce((total, item) => {
       const itemPrice = item.price || 0;
-      return total + itemPrice * item.quantity;
+      return total + itemPrice;
     }, 0);
   };
 
@@ -111,6 +118,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     <CartContext.Provider
       value={{
         items,
+        isOpen,
+        openCart,
+        closeCart,
         addItem,
         removeItem,
         updateQuantity,

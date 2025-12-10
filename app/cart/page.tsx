@@ -10,8 +10,7 @@ import { useSession, signIn } from "next-auth/react";
 import { useState } from "react";
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, clearCart, getTotalPrice } =
-    useCart();
+  const { items, removeItem, clearCart, getTotalPrice } = useCart();
   const router = useRouter();
   const { data: session } = useSession();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -151,11 +150,6 @@ export default function CartPage() {
                         >
                           {item.title}
                         </Link>
-                        {item.price != null && (
-                          <p className="mt-1 text-sm text-slate-600">
-                            {item.price} €
-                          </p>
-                        )}
                       </div>
                       <button
                         onClick={() => removeItem(item.creationId)}
@@ -178,61 +172,10 @@ export default function CartPage() {
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            updateQuantity(item.creationId, item.quantity - 1)
-                          }
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
-                          aria-label="Diminuer la quantité"
-                        >
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M20 12H4"
-                            />
-                          </svg>
-                        </button>
-                        <span className="w-8 text-center text-sm font-medium text-slate-900">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() =>
-                            updateQuantity(item.creationId, item.quantity + 1)
-                          }
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
-                          aria-label="Augmenter la quantité"
-                        >
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 4v16m8-8H4"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-
+                    <div className="flex items-center justify-end">
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {item.price != null
-                            ? (item.price * item.quantity).toFixed(2)
-                            : "—"}{" "}
-                          €
+                        <p className="text-base font-semibold text-slate-900">
+                          {item.price != null ? item.price.toFixed(2) : "—"} €
                         </p>
                       </div>
                     </div>

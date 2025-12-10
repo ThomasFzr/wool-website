@@ -2,15 +2,34 @@
 
 import Link from "next/link";
 import { useCart } from "@/contexts/CartContext";
+import { useEffect, useState } from "react";
 
 export function CartIcon() {
-  const { getTotalItems } = useCart();
+  const { getTotalItems, openCart } = useCart();
   const totalItems = getTotalItems();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isMobile) {
+      e.preventDefault();
+      openCart();
+    }
+  };
 
   return (
     <Link
       href="/cart"
-      className="relative flex items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+      onClick={handleClick}
+      className="relative flex items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-700 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
       aria-label="Panier"
     >
       <svg

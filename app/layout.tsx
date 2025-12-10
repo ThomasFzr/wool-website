@@ -1,6 +1,7 @@
 import "./globals.css";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { CartProvider } from "@/contexts/CartContext";
+import { CartModal } from "@/components/CartModal";
 import { Analytics } from "@vercel/analytics/react";
 import { Metadata } from "next";
 
@@ -51,7 +52,10 @@ export default function RootLayout({
       </head>
       <body className="font-sans bg-slate-50 text-slate-900">
         <AuthSessionProvider>
-          <CartProvider>{children}</CartProvider>
+          <CartProvider>
+            {children}
+            <CartModal />
+          </CartProvider>
         </AuthSessionProvider>
         <Analytics />
       </body>

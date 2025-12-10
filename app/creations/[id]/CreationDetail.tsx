@@ -32,8 +32,11 @@ interface CreationDetailProps {
 export function CreationDetail({ creation, currentUserId }: CreationDetailProps) {
   const { data: session } = useSession();
   const router = useRouter();
-  const { addItem } = useCart();
+  const { addItem, items } = useCart();
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // Vérifier si l'article est déjà dans le panier
+  const isInCart = items.some((item) => item.creationId === creation._id);
   const [zoomed, setZoomed] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -535,10 +538,11 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
               <div className="space-y-3">
                 <Button
                   onClick={handleAddToCart}
+                  disabled={isInCart}
                   className="w-full cursor-pointer"
                   size="lg"
                 >
-                  Ajouter au panier
+                  {isInCart ? "Déjà dans le panier" : "Ajouter au panier"}
                 </Button>
                 <Button
                   onClick={handleReserve}
@@ -603,10 +607,11 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
           <div className="space-y-2">
             <Button
               onClick={handleAddToCart}
+              disabled={isInCart}
               className="w-full cursor-pointer"
               size="lg"
             >
-              Ajouter au panier
+              {isInCart ? "Déjà dans le panier" : "Ajouter au panier"}
             </Button>
             <Button
               onClick={handleReserve}
