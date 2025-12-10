@@ -19,7 +19,16 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [pendingReservations, setPendingReservations] = useState(initialPending);
   const [newMessages, setNewMessages] = useState(initialMessages);
+  const [isLocalhost, setIsLocalhost] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsLocalhost(
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1")
+    );
+  }, []);
 
   const totalNotifications = pendingReservations + newMessages;
 
@@ -70,7 +79,10 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
   return (
     <>
       {/* Header sticky avec logo et bouton alignés */}
-      <header className="fixed top-0 left-0 right-0 z-30 h-24 sm:h-32">
+      <header
+        className="fixed left-0 right-0 z-30 h-24 sm:h-32"
+        style={{ top: isLocalhost ? "28px" : "0" }}
+      >
         <div className="h-full flex items-center justify-between px-4">
           {/* Logo */}
           <Link href="/">
@@ -184,8 +196,11 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
         </div>
       </header>
 
-      {/* Spacer pour compenser le header fixe */}
-      <div className="h-24 sm:h-32"></div>
+      {/* Spacer pour compenser le header fixe + banner d'environnement */}
+      <div
+        className="h-24 sm:h-32"
+        style={{ marginTop: isLocalhost ? "28px" : "0" }}
+      ></div>
 
       {/* Sous-titre */}
       {subtitle && (
