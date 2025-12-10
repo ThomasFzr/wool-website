@@ -153,7 +153,7 @@ export default function CartPage() {
                       </div>
                       <button
                         onClick={() => removeItem(item.creationId)}
-                        className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                        className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
                         aria-label="Retirer du panier"
                       >
                         <svg

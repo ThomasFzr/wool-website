@@ -1,15 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface ToastProps {
   message: string;
   isVisible: boolean;
   onClose: () => void;
   duration?: number;
+  cartUrl?: string;
 }
 
-export function Toast({ message, isVisible, onClose, duration = 3000 }: ToastProps) {
+export function Toast({
+  message,
+  isVisible,
+  onClose,
+  duration = 4000,
+  cartUrl,
+}: ToastProps) {
   const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
@@ -33,27 +41,59 @@ export function Toast({ message, isVisible, onClose, duration = 3000 }: ToastPro
 
   return (
     <div
-      className={`fixed bottom-4 left-1/2 z-50 -translate-x-1/2 transform transition-all duration-300 ${
+      className={`fixed bottom-6 left-4 right-4 z-50 transform transition-all duration-300 ease-out ${
         isVisible
-          ? "translate-y-0 opacity-100"
-          : "translate-y-4 opacity-0"
+          ? "translate-y-0 opacity-100 scale-100"
+          : "translate-y-8 opacity-0 scale-95"
       }`}
     >
-      <div className="flex items-center gap-3 rounded-full bg-slate-900 px-6 py-3 shadow-lg">
-        <svg
-          className="h-5 w-5 text-green-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      <div className="flex items-center gap-4 rounded-2xl bg-white px-4 py-4 shadow-2xl ring-1 ring-slate-200">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100">
+          <svg
+            className="h-6 w-6 text-green-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2.5}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-slate-900">{message}</p>
+          {cartUrl && (
+            <Link
+              href={cartUrl}
+              onClick={onClose}
+              className="mt-1 text-xs font-medium text-slate-600 underline"
+            >
+              Voir le panier
+            </Link>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+          aria-label="Fermer"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-        <span className="text-sm font-medium text-white">{message}</span>
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
       </div>
     </div>
   );

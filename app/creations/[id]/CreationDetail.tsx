@@ -297,13 +297,15 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
       price: creation.price,
     });
 
-    // Feedback visuel sur mobile
+    // Feedback visuel sur le bouton (tous les écrans)
+    setJustAddedToCart(true);
+    setTimeout(() => {
+      setJustAddedToCart(false);
+    }, 2000);
+
+    // Toast uniquement sur mobile
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setShowToast(true);
-      setJustAddedToCart(true);
-      setTimeout(() => {
-        setJustAddedToCart(false);
-      }, 2000);
     }
   }
 
@@ -544,11 +546,19 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
               <div className="space-y-3">
                 <Button
                   onClick={handleAddToCart}
-                  disabled={isInCart}
-                  className="w-full cursor-pointer"
+                  disabled={isInCart || justAddedToCart}
+                  className={`w-full cursor-pointer transition-all duration-300 ${
+                    justAddedToCart
+                      ? "bg-green-500 hover:bg-green-500 scale-105"
+                      : ""
+                  }`}
                   size="lg"
                 >
-                  {isInCart ? "Déjà dans le panier" : "Ajouter au panier"}
+                  {justAddedToCart
+                    ? "✓ Ajouté !"
+                    : isInCart
+                    ? "Déjà dans le panier"
+                    : "Ajouter au panier"}
                 </Button>
                 <Button
                   onClick={handleReserve}
@@ -684,9 +694,10 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
 
       {/* Toast pour mobile */}
       <Toast
-        message="Article ajouté au panier ✓"
+        message="Article ajouté au panier"
         isVisible={showToast}
         onClose={() => setShowToast(false)}
+        cartUrl="/cart"
       />
     </div>
   );
