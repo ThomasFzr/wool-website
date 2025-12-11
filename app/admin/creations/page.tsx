@@ -66,6 +66,7 @@ function AdminCreationsContent() {
   const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [availableTypes, setAvailableTypes] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("tous");
+  const [yarnBrandFilter, setYarnBrandFilter] = useState<string>("toutes");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -85,11 +86,22 @@ function AdminCreationsContent() {
     return a.localeCompare(b);
   });
 
+  const yarnBrandOptions = Array.from(
+    new Set(
+      creations
+        .map((c) => c.yarnBrand?.trim())
+        .filter((c): c is string => Boolean(c))
+    )
+  ).sort((a, b) => a.localeCompare(b, 'fr'));
+
   const filteredCreations = creations.filter((c) => {
     // Filtre par statut
     if (statusFilter === "disponible" && (c.reserved || c.sold)) return false;
     if (statusFilter === "reserve" && (!c.reserved || c.sold)) return false;
     if (statusFilter === "vendu" && !c.sold) return false;
+    
+    // Filtre par marque de laine
+    if (yarnBrandFilter !== "toutes" && c.yarnBrand !== yarnBrandFilter) return false;
     
     // Filtre par recherche
     if (searchQuery.trim()) {
@@ -99,7 +111,8 @@ function AdminCreationsContent() {
       const matchColor = c.color?.toLowerCase().includes(query);
       const matchType = c.type?.toLowerCase().includes(query);
       const matchPrice = c.price?.toString().includes(query);
-      return matchTitle || matchDescription || matchColor || matchType || matchPrice;
+      const matchYarnBrand = c.yarnBrand?.toLowerCase().includes(query);
+      return matchTitle || matchDescription || matchColor || matchType || matchPrice || matchYarnBrand;
     }
     
     return true;
@@ -657,7 +670,7 @@ function AdminCreationsContent() {
                 <div className="mb-4">
                   <Input
                     type="text"
-                    placeholder="🔍 Rechercher par titre, couleur, type ou prix..."
+                    placeholder="🔍 Rechercher par titre, couleur, type, prix ou marque de laine..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full"
@@ -699,6 +712,39 @@ function AdminCreationsContent() {
                     ⚫ Vendu ({creations.filter(c => c.sold).length})
                   </Button>
                 </div>
+
+                {/* Filtre par marque de laine */}
+                {yarnBrandOptions.length > 0 && (
+                  <div className="mb-4 pb-4 pt-2 border-b border-slate-200">
+                    <label className="text-xs font-medium text-slate-700 mb-2 block">
+                      🧶 Filtrer par marque de laine
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant={yarnBrandFilter === "toutes" ? "primary" : "secondary"}
+                        onClick={() => setYarnBrandFilter("toutes")}
+                        className="cursor-pointer"
+                      >
+                        Toutes ({creations.length})
+                      </Button>
+                      {yarnBrandOptions.map((brand) => {
+                        const count = creations.filter(c => c.yarnBrand === brand).length;
+                        return (
+                          <Button
+                            key={brand}
+                            size="sm"
+                            variant={yarnBrandFilter === brand ? "primary" : "secondary"}
+                            onClick={() => setYarnBrandFilter(brand)}
+                            className="cursor-pointer"
+                          >
+                            {brand} ({count})
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
