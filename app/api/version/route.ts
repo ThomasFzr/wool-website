@@ -4,6 +4,23 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { checkAdminAuth } from "@/lib/auth";
 
+// Fonction helper pour normaliser une date en format ISO
+function normalizeDate(dateString: string | undefined): string {
+  if (!dateString) {
+    return new Date().toISOString();
+  }
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return new Date().toISOString();
+    }
+    return date.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
 export async function GET() {
   try {
     // Vérifier que l'utilisateur est admin en production
@@ -37,49 +54,101 @@ export async function GET() {
     } | null = null;
 
     try {
-      // Récupérer le hash du dernier commit
-      const commit = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
-      const shortCommit = execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
-      
-      // Récupérer la date du commit
-      const date = execSync("git log -1 --format=%ci", { encoding: "utf-8" }).trim();
-      
-      // Récupérer le message du commit
-      const message = execSync("git log -1 --format=%s", { encoding: "utf-8" }).trim();
-      
-      // Récupérer la branche actuelle
-      let branch = "unknown";
-      try {
-        branch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf-8" }).trim();
-      } catch {
-        // Si on est dans un état détaché, essayer de récupérer le tag ou la branche
-        try {
-          branch = execSync("git describe --tags --exact-match HEAD 2>/dev/null || git describe --all HEAD", { encoding: "utf-8" }).trim();
-        } catch {
-          branch = "detached";
+      // Priorité 1: Utiliser les variables d'environnement Vercel (disponibles en production/staging)
+      if (process.env.VERCEL_GIT_COMMIT_SHA) {
+        const commit = process.env.VERCEL_GIT_COMMIT_SHA;
+        const shortCommit = commit.substring(0, 7);
+        const message = process.env.VERCEL_GIT_COMMIT_MESSAGE || "N/A";
+        const branch = process.env.VERCEL_GIT_COMMIT_REF || "unknown";
+        const author = process.env.VERCEL_GIT_COMMIT_AUTHOR_NAME || process.env.VERCEL_GIT_COMMIT_AUTHOR_LOGIN || "unknown";
+        
+        // Pour la date, essayer plusieurs sources dans l'ordre de priorité
+        let date: string;
+        
+        // 1. Essayer une variable d'environnement personnalisée (si définie dans le build)
+        if (process.env.VERCEL_GIT_COMMIT_DATE) {
+          date = normalizeDate(process.env.VERCEL_GIT_COMMIT_DATE);
+        } else {
+          // 2. Essayer de récupérer depuis Git si disponible (peut fonctionner dans certains contextes)
+          try {
+            const gitDate = execSync("git log -1 --format=%ci", { encoding: "utf-8" }).trim();
+            if (gitDate) {
+              date = normalizeDate(gitDate);
+            } else {
+              date = new Date().toISOString();
+            }
+          } catch {
+            // Si Git n'est pas disponible, on garde la date actuelle comme fallback
+            // Note: En production/staging sur Vercel, Git n'est généralement pas disponible
+            // La date sera donc la date actuelle, ce qui n'est pas idéal mais fonctionnel
+            date = new Date().toISOString();
+          }
         }
-      }
-      
-      // Récupérer l'auteur du commit
-      const author = execSync("git log -1 --format=%an", { encoding: "utf-8" }).trim();
-      
-      // Récupérer le tag s'il existe
-      let tag: string | undefined;
-      try {
-        tag = execSync("git describe --tags --exact-match HEAD 2>/dev/null", { encoding: "utf-8" }).trim() || undefined;
-      } catch {
-        // Pas de tag
-      }
 
-      gitInfo = {
-        commit,
-        shortCommit,
-        date,
-        message,
-        branch,
-        author,
-        tag,
-      };
+        // Récupérer le tag s'il existe
+        let tag: string | undefined;
+        try {
+          tag = execSync("git describe --tags --exact-match HEAD 2>/dev/null", { encoding: "utf-8" }).trim() || undefined;
+        } catch {
+          // Pas de tag
+        }
+
+        gitInfo = {
+          commit,
+          shortCommit,
+          date,
+          message,
+          branch,
+          author,
+          tag,
+        };
+      } else {
+        // Priorité 2: Utiliser les commandes Git (pour le développement local)
+        // Récupérer le hash du dernier commit
+        const commit = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
+        const shortCommit = execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
+        
+        // Récupérer la date du commit
+        const gitDate = execSync("git log -1 --format=%ci", { encoding: "utf-8" }).trim();
+        const date = normalizeDate(gitDate);
+        
+        // Récupérer le message du commit
+        const message = execSync("git log -1 --format=%s", { encoding: "utf-8" }).trim();
+        
+        // Récupérer la branche actuelle
+        let branch = "unknown";
+        try {
+          branch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf-8" }).trim();
+        } catch {
+          // Si on est dans un état détaché, essayer de récupérer le tag ou la branche
+          try {
+            branch = execSync("git describe --tags --exact-match HEAD 2>/dev/null || git describe --all HEAD", { encoding: "utf-8" }).trim();
+          } catch {
+            branch = "detached";
+          }
+        }
+        
+        // Récupérer l'auteur du commit
+        const author = execSync("git log -1 --format=%an", { encoding: "utf-8" }).trim();
+        
+        // Récupérer le tag s'il existe
+        let tag: string | undefined;
+        try {
+          tag = execSync("git describe --tags --exact-match HEAD 2>/dev/null", { encoding: "utf-8" }).trim() || undefined;
+        } catch {
+          // Pas de tag
+        }
+
+        gitInfo = {
+          commit,
+          shortCommit,
+          date,
+          message,
+          branch,
+          author,
+          tag,
+        };
+      }
     } catch (error) {
       // Si Git n'est pas disponible (par exemple en production sur certaines plateformes)
       console.warn("Impossible de récupérer les informations Git:", error);

@@ -43,15 +43,9 @@ export default function VersionPage() {
         return; // Attendre que la session soit chargée
       }
 
-      if (status === "unauthenticated") {
-        router.push("/login?error=admin_required");
-        return;
-      }
-
-      if (session?.user?.role !== "admin") {
-        setError("Accès non autorisé. Cette page est réservée aux administrateurs.");
-        setIsCheckingAuth(false);
-        setIsLoading(false);
+      // Rediriger vers la home si non authentifié ou non admin (comme sur /admin)
+      if (status === "unauthenticated" || session?.user?.role !== "admin") {
+        router.push("/");
         return;
       }
 
@@ -92,7 +86,17 @@ export default function VersionPage() {
 
   const formatDate = (dateString: string) => {
     try {
+      if (!dateString) {
+        return "Date non disponible";
+      }
+      
       const date = new Date(dateString);
+      
+      // Vérifier si la date est valide
+      if (isNaN(date.getTime())) {
+        return "Date invalide";
+      }
+      
       return date.toLocaleString("fr-FR", {
         day: "2-digit",
         month: "long",
@@ -101,8 +105,9 @@ export default function VersionPage() {
         minute: "2-digit",
         timeZoneName: "short",
       });
-    } catch {
-      return dateString;
+    } catch (error) {
+      console.error("Erreur lors du formatage de la date:", error, dateString);
+      return dateString || "Date non disponible";
     }
   };
 
