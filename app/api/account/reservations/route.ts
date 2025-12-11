@@ -47,8 +47,7 @@ export async function GET(req: NextRequest) {
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("creationId", "title description images imageUrl price color")
-      .select("+stripeCheckoutSessionId +deliveryMode +paidAt");
+      .populate("creationId", "title description images imageUrl price color");
 
     return NextResponse.json({
       reservations,

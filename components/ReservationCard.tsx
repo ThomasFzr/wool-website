@@ -13,8 +13,17 @@ export type Reservation = {
   cancelReason?: string;
   cancelledBy?: "admin" | "user";
   deliveryMode?: "pickup" | "shipping";
+  shippingCost?: number;
   stripeCheckoutSessionId?: string;
   paidAt?: string;
+  shippingAddress?: {
+    name: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
   creationId?: {
     _id: string;
     title: string;

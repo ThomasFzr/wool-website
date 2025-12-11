@@ -74,6 +74,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Calculer les frais de livraison par article (répartis équitablement)
+    const shippingPerItem = deliveryMode === "shipping" ? shippingCost / items.length : 0;
+
     // Créer des commandes temporaires (pending)
     const reservations = await Promise.all(
       items.map(async (item: any) => {
@@ -90,6 +93,7 @@ export async function POST(req: NextRequest) {
           status: "pending",
           paymentStatus: "pending",
           deliveryMode,
+          shippingCost: shippingPerItem,
         });
       })
     );
@@ -152,12 +156,19 @@ export async function POST(req: NextRequest) {
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/checkout/cancel`,
       customer_email: session.user.email,
+      // Collecter l'adresse de livraison si mode shipping
+      ...(deliveryMode === "shipping" && {
+        shipping_address_collection: {
+          allowed_countries: ["FR", "BE", "CH", "LU", "MC"],
+        },
+      }),
       metadata: {
         userId: (session.user as any).id,
         reservationIds: JSON.stringify(
           reservations.map((r) => r._id.toString())
         ),
         deliveryMode,
+        shippingCost: shippingCost.toString(),
       },
     });
 

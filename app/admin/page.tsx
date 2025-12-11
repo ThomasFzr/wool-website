@@ -77,7 +77,8 @@ function AdminContent() {
       const res = await fetch("/api/admin/reservations/count");
       if (!res.ok) return;
       const data = await res.json();
-      setPendingReservations(data.pending || 0);
+      // Afficher le nombre de nouvelles commandes non vues
+      setPendingReservations(data.new || 0);
     } catch (err) {
       console.error(err);
     }
@@ -211,9 +212,9 @@ function AdminContent() {
               className="relative inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200 transition"
               onClick={loadPendingReservations}
             >
-              <span>📋 Réservations</span>
+              <span>📋 Commandes</span>
               {pendingReservations > 0 && (
-                <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-blue-500 text-white text-[10px] font-semibold animate-pulse">
                   {pendingReservations}
                 </span>
               )}

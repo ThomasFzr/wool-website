@@ -16,6 +16,16 @@ type Reservation = {
     cancelReason?: string;
     cancelledBy?: "admin" | "user";
     deliveryMode?: "pickup" | "shipping";
+    shippingCost?: number;
+    seenByAdmin?: boolean;
+    shippingAddress?: {
+        name: string;
+        line1: string;
+        line2?: string;
+        city: string;
+        postalCode: string;
+        country: string;
+    };
     creationId?: Creation | null;
 };
 
@@ -122,7 +132,7 @@ function AdminReservationsContent() {
     };
 
     const getStatusLabel = (status: string) => {
-        if (status === "pending") return "En attente de paiement";
+        if (status === "pending") return "En cours de préparation";
         if (status === "validated") return "Confirmée";
         return "Annulée";
     };
@@ -203,8 +213,18 @@ function AdminReservationsContent() {
                         {reservations.map((r) => (
                             <Card
                                 key={r._id}
-                                className="p-4 cursor-pointer transition hover:shadow-md hover:scale-[1.01]"
-                                onClick={() => setSelected(r)}
+                                className={`p-4 cursor-pointer transition hover:shadow-md hover:scale-[1.01] ${!r.seenByAdmin ? 'ring-2 ring-blue-500 bg-blue-50/50' : ''}`}
+                                onClick={() => {
+                                    setSelected(r);
+                                    // Marquer comme vue
+                                    if (!r.seenByAdmin) {
+                                        fetch(`/api/admin/reservations/${r._id}`, {
+                                            method: "PATCH",
+                                            body: JSON.stringify({ seenByAdmin: true }),
+                                            headers: { "Content-Type": "application/json" },
+                                        });
+                                    }
+                                }}
                             >
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                                     <div className="flex gap-3 flex-1 min-w-0">
@@ -220,7 +240,14 @@ function AdminReservationsContent() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between gap-2 mb-1">
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-slate-900 truncate">{r.name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-semibold text-slate-900 truncate">{r.name}</p>
+                                                        {!r.seenByAdmin && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500 text-white animate-pulse">
+                                                                NOUVELLE
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className="text-xs text-slate-500 truncate">{r.contact}</p>
                                                 </div>
                                                 <Badge variant={getStatusBadgeVariant(r.status) as any} className="shrink-0">
@@ -355,12 +382,62 @@ function AdminReservationsContent() {
                                             </Card>
                                         )}
 
-{/* Mode de livraison */}
+{/* Mode de livraison et adresse */}
                                         <Card className="p-4 mb-4 bg-slate-50">
                                             <p className="text-xs font-semibold text-slate-700 mb-2">📦 Mode de livraison</p>
-                                            <p className="text-sm font-medium text-slate-900">
+                                            <p className="text-sm font-medium text-slate-900 mb-2">
                                                 {getDeliveryLabel(selected.deliveryMode)}
                                             </p>
+                                            
+                                            {/* Adresse de livraison */}
+                                            {selected.deliveryMode === "shipping" && selected.shippingAddress && (
+                                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-xs font-semibold text-slate-700">📍 Adresse de livraison</p>
+                                                        <button
+                                                            onClick={() => {
+                                                                const addr = selected.shippingAddress!;
+                                                                const text = `${addr.name}\n${addr.line1}${addr.line2 ? '\n' + addr.line2 : ''}\n${addr.postalCode} ${addr.city}\n${addr.country}`;
+                                                                navigator.clipboard.writeText(text);
+                                                                alert('Adresse copiée !');
+                                                            }}
+                                                            className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer flex items-center gap-1"
+                                                        >
+                                                            📋 Copier
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-sm text-slate-900 bg-white rounded-lg p-3 border border-slate-200">
+                                                        <p className="font-medium">{selected.shippingAddress.name}</p>
+                                                        <p>{selected.shippingAddress.line1}</p>
+                                                        {selected.shippingAddress.line2 && (
+                                                            <p>{selected.shippingAddress.line2}</p>
+                                                        )}
+                                                        <p>{selected.shippingAddress.postalCode} {selected.shippingAddress.city}</p>
+                                                        <p className="text-slate-600">{selected.shippingAddress.country}</p>
+                                                    </div>
+                                                    
+                                                    {/* Bouton pour copier le bordereau */}
+                                                    <button
+                                                        onClick={() => {
+                                                            const addr = selected.shippingAddress!;
+                                                            const creation = selected.creationId;
+                                                            const bordereau = `EXPÉDITEUR:\nMailleMum\n[Votre adresse]\n\nDESTINATAIRE:\n${addr.name}\n${addr.line1}${addr.line2 ? '\n' + addr.line2 : ''}\n${addr.postalCode} ${addr.city}\n${addr.country}\n\nCONTENU:\n${creation?.title || 'Article'}\nPrix: ${creation?.price || 0}€`;
+                                                            navigator.clipboard.writeText(bordereau);
+                                                            alert('Infos bordereau copiées !');
+                                                        }}
+                                                        className="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg cursor-pointer flex items-center justify-center gap-2"
+                                                    >
+                                                        🏷️ Copier pour bordereau d&apos;envoi
+                                                    </button>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Frais de livraison */}
+                                            {selected.shippingCost != null && selected.shippingCost > 0 && (
+                                                <p className="mt-2 text-xs text-slate-600">
+                                                    Frais de livraison : <span className="font-semibold">{selected.shippingCost} €</span>
+                                                </p>
+                                            )}
                                         </Card>
 
                                         {/* Article commandé */}

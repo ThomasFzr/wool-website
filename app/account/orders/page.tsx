@@ -29,7 +29,9 @@ export default function OrdersPage() {
     const orderList: Order[] = [];
     grouped.forEach((items, id) => {
       const firstItem = items[0];
-      const totalPrice = items.reduce((sum, item) => sum + (item.creationId?.price || 0), 0);
+      const subtotal = items.reduce((sum, item) => sum + (item.creationId?.price || 0), 0);
+      const shippingCost = items.reduce((sum, item) => sum + (item.shippingCost || 0), 0);
+      const totalPrice = subtotal + shippingCost;
       
       // Déterminer le statut global de la commande
       const hasValidated = items.some(i => i.status === "validated");
@@ -49,6 +51,8 @@ export default function OrdersPage() {
         createdAt: firstItem.paidAt || firstItem.createdAt,
         status: orderStatus,
         deliveryMode: firstItem.deliveryMode,
+        subtotal,
+        shippingCost,
         totalPrice,
       });
     });

@@ -59,6 +59,17 @@ export async function GET(req: NextRequest) {
           _id: { $in: reservationIds },
         });
 
+        // Récupérer l'adresse de livraison si disponible
+        const shippingDetails = checkoutSession.shipping_details;
+        const shippingAddress = shippingDetails?.address ? {
+          name: shippingDetails.name || "",
+          line1: shippingDetails.address.line1 || "",
+          line2: shippingDetails.address.line2 || "",
+          city: shippingDetails.address.city || "",
+          postalCode: shippingDetails.address.postal_code || "",
+          country: shippingDetails.address.country || "",
+        } : null;
+
         await Promise.all(
           reservations.map(async (reservation: any) => {
             // Vérifier si déjà traité
@@ -72,6 +83,12 @@ export async function GET(req: NextRequest) {
             reservation.paymentStatus = "paid";
             reservation.status = "validated";
             reservation.paidAt = new Date();
+            
+            // Ajouter l'adresse de livraison si disponible
+            if (shippingAddress) {
+              reservation.shippingAddress = shippingAddress;
+            }
+            
             await reservation.save();
 
             // Mettre à jour la création - marquer comme vendue

@@ -38,6 +38,28 @@ const schema = new Schema(
       enum: ["pickup", "shipping"],
       default: "pickup",
     },
+    
+    // 💰 Frais de livraison (en euros)
+    shippingCost: {
+      type: Number,
+      default: 0,
+    },
+    
+    // 📍 Adresse de livraison (pour les bordereaux)
+    shippingAddress: {
+      name: String,
+      line1: String,
+      line2: String,
+      city: String,
+      postalCode: String,
+      country: String,
+    },
+    
+    // 🆕 Commande vue par l'admin
+    seenByAdmin: {
+      type: Boolean,
+      default: false,
+    },
 
     // 💳 Informations Stripe
     stripeCheckoutSessionId: String,

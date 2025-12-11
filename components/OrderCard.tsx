@@ -11,6 +11,8 @@ export type Order = {
   status: "pending" | "validated" | "cancelled";
   deliveryMode?: "pickup" | "shipping";
   totalPrice: number;
+  shippingCost: number;
+  subtotal: number;
 };
 
 interface OrderCardProps {
@@ -90,13 +92,26 @@ export function OrderCard({ order }: OrderCardProps) {
       </div>
 
       {/* Pied de la commande */}
-      <div className="bg-slate-50 px-4 py-3 border-t border-slate-200 flex items-center justify-between">
-        <p className="text-xs text-slate-600">
-          📦 {deliveryLabel}
-        </p>
-        <p className="text-sm font-semibold text-slate-900">
-          Total : {order.totalPrice} €
-        </p>
+      <div className="bg-slate-50 px-4 py-3 border-t border-slate-200">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-slate-600">
+            📦 {deliveryLabel}
+          </p>
+        </div>
+        <div className="flex justify-between text-xs text-slate-600">
+          <span>Sous-total articles</span>
+          <span>{order.subtotal} €</span>
+        </div>
+        {order.shippingCost > 0 && (
+          <div className="flex justify-between text-xs text-slate-600">
+            <span>Frais de livraison</span>
+            <span>{order.shippingCost} €</span>
+          </div>
+        )}
+        <div className="flex justify-between text-sm font-semibold text-slate-900 mt-2 pt-2 border-t border-slate-200">
+          <span>Total</span>
+          <span>{order.totalPrice} €</span>
+        </div>
       </div>
     </div>
   );

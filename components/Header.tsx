@@ -45,7 +45,8 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
 
         if (reservationsRes.ok) {
           const data = await reservationsRes.json();
-          setPendingReservations(data.pending || 0);
+          // Utiliser le nombre de nouvelles commandes non vues
+          setPendingReservations(data.new || 0);
         }
 
         if (messagesRes.ok) {

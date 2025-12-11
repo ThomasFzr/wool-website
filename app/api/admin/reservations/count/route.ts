@@ -12,9 +12,22 @@ export async function GET() {
 
     await connectToDatabase();
 
-    const pendingCount = await Reservation.countDocuments({ status: "pending" });
+    // Compter les nouvelles commandes payées non vues
+    const newCount = await Reservation.countDocuments({ 
+      paymentStatus: "paid",
+      seenByAdmin: { $ne: true }
+    });
 
-    return NextResponse.json({ pending: pendingCount });
+    // Compter les commandes en cours de préparation (payées mais pas encore expédiées)
+    const pendingCount = await Reservation.countDocuments({ 
+      paymentStatus: "paid",
+      status: "pending"
+    });
+
+    return NextResponse.json({ 
+      pending: pendingCount,
+      new: newCount
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
