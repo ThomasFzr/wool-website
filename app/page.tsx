@@ -6,6 +6,9 @@ import CreationModel from "@/models/Creation";
 import Settings from "@/models/Settings";
 import { Metadata } from "next";
 
+// Désactiver le cache pour toujours avoir les données fraîches
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "MailleMum - Créations artisanales en laine",
   description: "Découvrez nos créations artisanales en laine : tours de cou, bandeaux et bonnets faits main avec passion.",
