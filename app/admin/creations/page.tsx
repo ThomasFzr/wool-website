@@ -606,6 +606,9 @@ function AdminCreationsContent() {
                   color: "",
                   type: "",
                   showAsNew: true,
+                  yarnBrand: "",
+                  weight: "",
+                  yarnPrice: "",
                 });
                 setShowCreateModal(true);
               }}
