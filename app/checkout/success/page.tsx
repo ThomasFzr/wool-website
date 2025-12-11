@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui";
@@ -23,7 +23,7 @@ interface SessionDetails {
   }>;
 }
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { clearCart } = useCart();
@@ -244,5 +244,27 @@ export default function CheckoutSuccessPage() {
         </div>
       </main>
     </>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <Header />
+          <main className="min-h-screen bg-linear-to-br from-slate-50 via-pink-50/30 to-slate-50">
+            <div className="mx-auto max-w-2xl px-4 py-16">
+              <div className="text-center">
+                <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900"></div>
+                <p className="mt-4 text-slate-600">Chargement...</p>
+              </div>
+            </div>
+          </main>
+        </>
+      }
+    >
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }
