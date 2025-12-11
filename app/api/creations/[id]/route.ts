@@ -4,7 +4,7 @@ import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 /**
  * Génère un slug à partir d'un titre
@@ -129,18 +129,23 @@ export async function PATCH(
 
     // Vérifier qu'il y a au moins une opération à effectuer
     if (Object.keys(update).length === 0) {
-      console.warn("⚠️ Aucune mise à jour à effectuer");
       const creation = await Creation.findById(id);
       return NextResponse.json(creation);
     }
 
-    console.log("🔧 Update object:", JSON.stringify(update, null, 2));
+    // Utiliser updateOne pour forcer la mise à jour, puis relire le document
+    const updateResult = await Creation.updateOne(
+      { _id: id },
+      update,
+      { runValidators: false }
+    );
 
-    const creation = await Creation.findByIdAndUpdate(id, update, {
-      new: true,
-      runValidators: false, // Désactiver les validations pour éviter les problèmes
-    });
+    if (updateResult.matchedCount === 0) {
+      return new NextResponse("Not found", { status: 404 });
+    }
 
+    // Relire le document mis à jour
+    const creation = await Creation.findById(id);
     if (!creation) {
       return new NextResponse("Not found", { status: 404 });
     }
@@ -148,6 +153,7 @@ export async function PATCH(
     // 🔄 Invalider le cache après modification
     revalidatePath('/');
     revalidatePath('/api/creations');
+    revalidateTag('creations');
 
     return NextResponse.json(creation);
   } catch (err) {

@@ -4,7 +4,9 @@ import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export const revalidate = 300; // Cache avec revalidation toutes les 5 minutes
+// Désactiver le cache pour cette route API pour éviter les problèmes de synchronisation
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
  * Génère un slug à partir d'un titre
@@ -18,12 +20,22 @@ function generateSlug(title: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
+    
+    // Vérifier si l'utilisateur est admin pour inclure les champs admin
+    const session = await checkAdminAuth();
+    const isAdmin = session !== null;
+    
     // Exclure les champs admin (yarnBrand, weight, yarnPrice) pour les utilisateurs publics
-    const creations = await Creation.find()
-      .select("-yarnBrand -weight -yarnPrice")
+    // Les admins voient tous les champs
+    let query = Creation.find();
+    if (!isAdmin) {
+      query = query.select("-yarnBrand -weight -yarnPrice");
+    }
+    
+    const creations = await query
       .sort({ displayOrder: -1, createdAt: -1 })
       .lean();
     return NextResponse.json(creations);
