@@ -91,8 +91,19 @@ export async function POST(req: NextRequest) {
         : 0;
       
       // Récupérer l'adresse de livraison depuis Stripe
-      // Stripe stocke l'adresse dans shipping (pas shipping_details pour checkout sessions)
-      const shippingInfo = (fullSession as any).shipping;
+      // Essayer d'abord dans la Checkout Session (shipping_details)
+      let shippingInfo = (fullSession as any).shipping_details || (fullSession as any).shipping;
+      
+      // Si pas trouvé dans la session, essayer dans le PaymentIntent
+      if (!shippingInfo?.address && paymentIntentId) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+          shippingInfo = (paymentIntent as any).shipping || (paymentIntent as any).shipping_details;
+        } catch (err) {
+          console.log("Impossible de récupérer le PaymentIntent pour l'adresse:", err);
+        }
+      }
+      
       const shippingAddress = shippingInfo?.address ? {
         name: shippingInfo.name || "",
         line1: shippingInfo.address.line1 || "",
@@ -104,12 +115,19 @@ export async function POST(req: NextRequest) {
       
       // Log pour déboguer
       if (fullSession.metadata?.deliveryMode === "shipping") {
+        console.log("=== DEBUG ADRESSE LIVRAISON (WEBHOOK) ===");
+        console.log("Session ID:", fullSession.id);
+        console.log("Payment Intent ID:", paymentIntentId);
+        console.log("Shipping details (session):", (fullSession as any).shipping_details);
+        console.log("Shipping (session):", (fullSession as any).shipping);
+        console.log("Shipping info final:", shippingInfo);
         console.log("Adresse de livraison récupérée:", shippingAddress ? "OUI" : "NON");
         if (shippingAddress) {
-          console.log("Détails:", shippingAddress);
+          console.log("Détails:", JSON.stringify(shippingAddress, null, 2));
         } else {
-          console.log("Shipping info disponible:", shippingInfo ? "OUI" : "NON");
+          console.log("⚠️  ATTENTION: Adresse non trouvée dans la session ni dans le PaymentIntent");
         }
+        console.log("==========================================");
       }
 
       await Promise.all(

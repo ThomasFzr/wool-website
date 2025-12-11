@@ -41,12 +41,35 @@ export async function GET(req: NextRequest, context: AdminRouteContext) {
     const addr = reservation.shippingAddress || 
                  allReservations.find((r: any) => r.shippingAddress)?.shippingAddress;
 
+    // Log pour déboguer
+    console.log("=== DEBUG BORDEREAU ===");
+    console.log("Reservation ID:", reservation._id);
+    console.log("Delivery mode:", reservation.deliveryMode);
+    console.log("Shipping address trouvée:", addr ? "OUI" : "NON");
+    if (addr) {
+      console.log("Détails adresse:", JSON.stringify(addr, null, 2));
+    }
+    console.log("======================");
+
     // Récupérer l'adresse de l'expéditeur depuis les variables d'environnement ou utiliser des valeurs par défaut
     const senderName = process.env.SHIPPING_SENDER_NAME || "MailleMum";
     const senderAddress = process.env.SHIPPING_SENDER_ADDRESS || "";
     const senderCity = process.env.SHIPPING_SENDER_CITY || "";
     const senderPostalCode = process.env.SHIPPING_SENDER_POSTAL_CODE || "";
     const senderCountry = process.env.SHIPPING_SENDER_COUNTRY || "France";
+
+    // Formater l'adresse du destinataire
+    let recipientAddress = "Adresse non disponible";
+    if (addr) {
+      const parts = [];
+      if (addr.name) parts.push(addr.name);
+      if (addr.line1) parts.push(addr.line1);
+      if (addr.line2) parts.push(addr.line2);
+      const cityLine = [addr.postalCode, addr.city].filter(Boolean).join(" ");
+      if (cityLine) parts.push(cityLine);
+      if (addr.country) parts.push(addr.country);
+      recipientAddress = parts.length > 0 ? parts.join("\n") : "Adresse incomplète";
+    }
 
     // Générer le bordereau au format texte
     const label = `
@@ -61,7 +84,7 @@ ${senderPostalCode} ${senderCity}
 ${senderCountry}
 
 📬 DESTINATAIRE :
-${addr ? `${addr.name}\n${addr.line1}${addr.line2 ? `\n${addr.line2}` : ""}\n${addr.postalCode} ${addr.city}\n${addr.country}` : "Adresse non disponible"}
+${recipientAddress}
 
 ═══════════════════════════════════════════════════════════
 

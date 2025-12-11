@@ -66,8 +66,20 @@ export async function GET(req: NextRequest) {
           : 0;
         
         // Récupérer l'adresse de livraison si disponible
-        // Stripe stocke l'adresse dans shipping pour les checkout sessions
-        const shippingInfo = (checkoutSession as any).shipping;
+        // Essayer d'abord dans la Checkout Session (shipping_details)
+        let shippingInfo = (checkoutSession as any).shipping_details || (checkoutSession as any).shipping;
+        
+        // Si pas trouvé dans la session, essayer dans le PaymentIntent
+        if (!shippingInfo?.address && checkoutSession.payment_intent) {
+          try {
+            const paymentIntentId = checkoutSession.payment_intent as string;
+            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+            shippingInfo = (paymentIntent as any).shipping || (paymentIntent as any).shipping_details;
+          } catch (err) {
+            console.log("Impossible de récupérer le PaymentIntent pour l'adresse:", err);
+          }
+        }
+        
         const shippingAddress = shippingInfo?.address ? {
           name: shippingInfo.name || "",
           line1: shippingInfo.address.line1 || "",
@@ -79,12 +91,19 @@ export async function GET(req: NextRequest) {
         
         // Log pour déboguer
         if (checkoutSession.metadata?.deliveryMode === "shipping") {
-          console.log("Adresse de livraison (verify-session):", shippingAddress ? "OUI" : "NON");
+          console.log("=== DEBUG ADRESSE LIVRAISON (VERIFY-SESSION) ===");
+          console.log("Session ID:", checkoutSession.id);
+          console.log("Payment Intent ID:", checkoutSession.payment_intent);
+          console.log("Shipping details (session):", (checkoutSession as any).shipping_details);
+          console.log("Shipping (session):", (checkoutSession as any).shipping);
+          console.log("Shipping info final:", shippingInfo);
+          console.log("Adresse de livraison récupérée:", shippingAddress ? "OUI" : "NON");
           if (shippingAddress) {
-            console.log("Détails:", shippingAddress);
+            console.log("Détails:", JSON.stringify(shippingAddress, null, 2));
           } else {
-            console.log("Shipping info disponible:", shippingInfo ? "OUI" : "NON");
+            console.log("⚠️  ATTENTION: Adresse non trouvée dans la session ni dans le PaymentIntent");
           }
+          console.log("================================================");
         }
 
         await Promise.all(
