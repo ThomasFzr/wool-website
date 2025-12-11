@@ -58,9 +58,13 @@ export async function PATCH(
     await connectToDatabase();
     const body = await req.json();
 
-    const update: any = {};
+    // Construire l'objet de mise à jour avec les opérateurs MongoDB
+    const setData: any = {};
+    const unsetData: any = {};
+    const incData: any = {};
+
     if (body.title !== undefined) {
-      update.title = body.title;
+      setData.title = body.title;
       // Régénérer le slug si le titre change
       let baseSlug = generateSlug(body.title);
       let slug = baseSlug;
@@ -69,52 +73,72 @@ export async function PATCH(
         slug = `${baseSlug}-${counter}`;
         counter++;
       }
-      update.slug = slug;
+      setData.slug = slug;
     }
-    if (body.description !== undefined) update.description = body.description;
-    if (body.imageUrl !== undefined) update.imageUrl = body.imageUrl;
-    if (body.images !== undefined) update.images = body.images;
+    if (body.description !== undefined) setData.description = body.description;
+    if (body.imageUrl !== undefined) setData.imageUrl = body.imageUrl;
+    if (body.images !== undefined) setData.images = body.images;
     if (body.imagePublicIds !== undefined) {
-      update.imagePublicIds = body.imagePublicIds;
+      setData.imagePublicIds = body.imagePublicIds;
     }
-    if (body.price !== undefined) update.price = body.price;
-    if (body.color !== undefined) update.color = body.color;
-    if (body.yarnBrand !== undefined) update.yarnBrand = body.yarnBrand;
-    if (body.weight !== undefined) update.weight = body.weight;
-    if (body.yarnPrice !== undefined) update.yarnPrice = body.yarnPrice;
+    if (body.price !== undefined) setData.price = body.price;
+    if (body.color !== undefined) setData.color = body.color;
+    if (body.yarnBrand !== undefined) setData.yarnBrand = body.yarnBrand;
+    if (body.weight !== undefined) setData.weight = body.weight;
+    if (body.yarnPrice !== undefined) setData.yarnPrice = body.yarnPrice;
     if (body.type !== undefined) {
       // Si type est vide, on le supprime du document, sinon on le met à jour
       if (body.type === "" || body.type === null) {
-        update.$unset = { type: "" };
+        unsetData.type = "";
       } else {
-        update.type = body.type;
+        setData.type = body.type;
       }
     }
 
-    if (body.reserved !== undefined) update.reserved = body.reserved;
-    if (body.reservedName !== undefined) update.reservedName = body.reservedName;
-    if (body.reservedContact !== undefined)
-      update.reservedContact = body.reservedContact;
-    if (body.reservedMessage !== undefined)
-      update.reservedMessage = body.reservedMessage;
-    if (body.reservedAt !== undefined) update.reservedAt = body.reservedAt;
+    if (body.reserved !== undefined) setData.reserved = body.reserved;
+    if (body.reservedName !== undefined) setData.reservedName = body.reservedName;
+    if (body.reservedContact !== undefined) setData.reservedContact = body.reservedContact;
+    if (body.reservedMessage !== undefined) setData.reservedMessage = body.reservedMessage;
+    if (body.reservedAt !== undefined) setData.reservedAt = body.reservedAt;
     
     // Gérer le changement de statut "vendu"
     if (body.sold !== undefined) {
       const currentCreation = await Creation.findById(id);
-      update.sold = body.sold;
+      setData.sold = body.sold;
       
       // Si on marque comme vendu et que ce n'était pas déjà vendu, incrémenter salesCount
       if (body.sold === true && currentCreation && !currentCreation.sold) {
-        update.$inc = { salesCount: 1 };
+        incData.salesCount = 1;
       }
     }
     
-    if (body.showAsNew !== undefined) update.showAsNew = body.showAsNew;
-    if (body.displayOrder !== undefined) update.displayOrder = body.displayOrder;
+    if (body.showAsNew !== undefined) setData.showAsNew = body.showAsNew;
+    if (body.displayOrder !== undefined) setData.displayOrder = body.displayOrder;
+
+    // Construire l'objet update final avec seulement les opérateurs nécessaires
+    const update: any = {};
+    if (Object.keys(setData).length > 0) {
+      update.$set = setData;
+    }
+    if (Object.keys(unsetData).length > 0) {
+      update.$unset = unsetData;
+    }
+    if (Object.keys(incData).length > 0) {
+      update.$inc = incData;
+    }
+
+    // Vérifier qu'il y a au moins une opération à effectuer
+    if (Object.keys(update).length === 0) {
+      console.warn("⚠️ Aucune mise à jour à effectuer");
+      const creation = await Creation.findById(id);
+      return NextResponse.json(creation);
+    }
+
+    console.log("🔧 Update object:", JSON.stringify(update, null, 2));
 
     const creation = await Creation.findByIdAndUpdate(id, update, {
       new: true,
+      runValidators: false, // Désactiver les validations pour éviter les problèmes
     });
 
     if (!creation) {
