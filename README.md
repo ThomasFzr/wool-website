@@ -115,7 +115,12 @@ Create a `.env.local` file:
 
 ```env
 # MongoDB
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/dbname
+# Le nom de la base de données est inclus dans l'URI
+# Production: mongodb+srv://username:password@cluster.mongodb.net/maillemum-prod
+# Staging: mongodb+srv://username:password@cluster.mongodb.net/maillemum-staging
+# Développement: mongodb+srv://username:password@cluster.mongodb.net/maillemum-dev
+# Local: mongodb://localhost:27017/maillemum-dev
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/maillemum-prod
 
 # NextAuth
 NEXTAUTH_URL=http://localhost:3000
