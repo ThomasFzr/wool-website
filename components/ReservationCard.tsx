@@ -8,12 +8,14 @@ export type Reservation = {
   name: string;
   contact: string;
   message?: string;
-  status: "pending" | "validated" | "cancelled";
+  status: "pending" | "preparing" | "shipped" | "in_transit" | "delivered" | "validated" | "cancelled";
   createdAt: string;
   cancelReason?: string;
   cancelledBy?: "admin" | "user";
   deliveryMode?: "pickup" | "shipping";
   shippingCost?: number;
+  trackingNumber?: string;
+  shippedAt?: string;
   stripeCheckoutSessionId?: string;
   paidAt?: string;
   shippingAddress?: {
@@ -48,13 +50,30 @@ export function ReservationCard({ reservation, onClick }: ReservationCardProps) 
   const creation = reservation.creationId;
   const image = creation?.images?.[0] || creation?.imageUrl || undefined;
 
-  const statusVariant = 
-    reservation.status === "pending" ? "success" :
-    reservation.status === "validated" ? "success" : "danger";
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case "pending":
+        return { variant: "success" as const, label: "En cours de préparation" };
+      case "preparing":
+        return { variant: "warning" as const, label: "En préparation" };
+      case "shipped":
+        return { variant: "success" as const, label: "Expédiée" };
+      case "in_transit":
+        return { variant: "success" as const, label: "En cours de livraison" };
+      case "delivered":
+        return { variant: "success" as const, label: "Livrée" };
+      case "validated":
+        return { variant: "success" as const, label: "Confirmée" };
+      case "cancelled":
+        return { variant: "danger" as const, label: "Annulée" };
+      default:
+        return { variant: "success" as const, label: "En cours" };
+    }
+  };
 
-  const statusLabel =
-    reservation.status === "pending" ? "En cours de préparation" :
-    reservation.status === "validated" ? "Confirmée" : "Annulée";
+  const statusInfo = getStatusInfo(reservation.status);
+  const statusVariant = statusInfo.variant;
+  const statusLabel = statusInfo.label;
 
   const deliveryLabel = 
     reservation.deliveryMode === "shipping" ? "Livraison" : "Remise en main propre";

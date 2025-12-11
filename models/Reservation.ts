@@ -19,9 +19,15 @@ const schema = new Schema(
 
     status: {
       type: String,
-      enum: ["pending", "validated", "cancelled"],
+      enum: ["pending", "preparing", "shipped", "in_transit", "delivered", "validated", "cancelled"],
       default: "pending",
     },
+    
+    // 📦 Numéro de suivi (tracking)
+    trackingNumber: String,
+    
+    // 📅 Date d'expédition
+    shippedAt: Date,
 
     // ✅ nouvelle raison d'annulation côté client
     cancelReason: String,

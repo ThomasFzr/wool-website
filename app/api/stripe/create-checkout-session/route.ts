@@ -74,12 +74,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculer les frais de livraison par article (répartis équitablement)
-    const shippingPerItem = deliveryMode === "shipping" ? shippingCost / items.length : 0;
+    // Les frais de livraison sont un montant total pour la commande, pas par article
+    // On met le total sur le premier article uniquement
+    const totalShippingCost = deliveryMode === "shipping" ? shippingCost : 0;
 
     // Créer des commandes temporaires (pending)
     const reservations = await Promise.all(
-      items.map(async (item: any) => {
+      items.map(async (item: any, index: number) => {
         const creation = creations.find(
           (c) => c._id.toString() === item.creationId
         );
@@ -93,7 +94,8 @@ export async function POST(req: NextRequest) {
           status: "pending",
           paymentStatus: "pending",
           deliveryMode,
-          shippingCost: shippingPerItem,
+          // Mettre les frais de livraison uniquement sur le premier article
+          shippingCost: index === 0 ? totalShippingCost : 0,
         });
       })
     );

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Badge, Card, Input } from "@/components";
 import { CreationModal } from "@/components/CreationModal";
@@ -11,12 +11,14 @@ type Reservation = {
     name: string;
     contact: string;
     message?: string;
-    status: "pending" | "validated" | "cancelled";
+    status: "pending" | "preparing" | "shipped" | "in_transit" | "delivered" | "validated" | "cancelled";
     createdAt: string;
     cancelReason?: string;
     cancelledBy?: "admin" | "user";
     deliveryMode?: "pickup" | "shipping";
     shippingCost?: number;
+    trackingNumber?: string;
+    shippedAt?: string;
     seenByAdmin?: boolean;
     shippingAddress?: {
         name: string;
@@ -29,6 +31,18 @@ type Reservation = {
     creationId?: Creation | null;
 };
 
+type GroupedOrder = {
+    id: string;
+    items: Reservation[];
+    customerName: string;
+    customerEmail: string;
+    createdAt: string;
+    status: string;
+    deliveryMode?: string;
+    totalPrice: number;
+    seenByAdmin: boolean;
+};
+
 function AdminReservationsContent() {
     const searchParams = useSearchParams();
     const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -37,12 +51,14 @@ function AdminReservationsContent() {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [selected, setSelected] = useState<Reservation | null>(null);
+    const [selectedOrderItems, setSelectedOrderItems] = useState<Reservation[]>([]);
     const [showValidateConfirm, setShowValidateConfirm] = useState(false);
     const [showCancelConfirm, setShowCancelConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [cancelReason, setCancelReason] = useState("");
     const [showCreationModal, setShowCreationModal] = useState(false);
     const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
+    const [trackingNumber, setTrackingNumber] = useState("");
 
     async function load() {
         const params = new URLSearchParams({
@@ -65,6 +81,7 @@ function AdminReservationsContent() {
         setPage(data.page);
         setTotalPages(data.totalPages);
         setSelected(null);
+        setSelectedOrderItems([]);
         setShowValidateConfirm(false);
         setShowCancelConfirm(false);
         setShowDeleteConfirm(false);
@@ -106,10 +123,16 @@ function AdminReservationsContent() {
         };
     }, [selected]);
 
-    async function updateStatus(id: string, status: string) {
+    async function updateStatus(id: string, status: string, tracking?: string) {
         const body: any = { status };
         if (status === "cancelled" && cancelReason.trim()) {
             body.cancelReason = cancelReason.trim();
+        }
+        if (tracking) {
+            body.trackingNumber = tracking;
+        }
+        if (status === "shipped") {
+            body.shippedAt = new Date().toISOString();
         }
         
         await fetch(`/api/admin/reservations/${id}`, {
@@ -117,6 +140,7 @@ function AdminReservationsContent() {
             body: JSON.stringify(body),
             headers: { "Content-Type": "application/json" },
         });
+        setTrackingNumber("");
         load();
     }
 
@@ -126,15 +150,41 @@ function AdminReservationsContent() {
     }
 
     const getStatusBadgeVariant = (status: string) => {
-        if (status === "pending") return "warning";
-        if (status === "validated") return "success";
-        return "danger";
+        switch (status) {
+            case "pending":
+            case "preparing":
+                return "warning";
+            case "shipped":
+            case "in_transit":
+            case "delivered":
+            case "validated":
+                return "success";
+            case "cancelled":
+                return "danger";
+            default:
+                return "warning";
+        }
     };
 
     const getStatusLabel = (status: string) => {
-        if (status === "pending") return "En cours de préparation";
-        if (status === "validated") return "Confirmée";
-        return "Annulée";
+        switch (status) {
+            case "pending":
+                return "En cours de préparation";
+            case "preparing":
+                return "En préparation";
+            case "shipped":
+                return "Expédiée";
+            case "in_transit":
+                return "En cours de livraison";
+            case "delivered":
+                return "Livrée";
+            case "validated":
+                return "Confirmée";
+            case "cancelled":
+                return "Annulée";
+            default:
+                return "En cours";
+        }
     };
 
     const getDeliveryLabel = (mode?: string) => {
@@ -142,8 +192,67 @@ function AdminReservationsContent() {
         return "🤝 Remise en main propre";
     };
 
-    const pendingCount = reservations.filter(r => r.status === "pending").length;
-    const totalCount = reservations.length;
+    // Regrouper les réservations par commande (stripeCheckoutSessionId)
+    const groupedOrders = useMemo(() => {
+        const grouped = new Map<string, Reservation[]>();
+        
+        reservations.forEach((res) => {
+            // Utiliser stripeCheckoutSessionId comme clé, ou l'ID de la réservation si pas de session
+            const key = res.stripeCheckoutSessionId || res._id;
+            if (!grouped.has(key)) {
+                grouped.set(key, []);
+            }
+            grouped.get(key)!.push(res);
+        });
+
+        // Convertir en tableau de commandes groupées
+        const orders: GroupedOrder[] = [];
+        grouped.forEach((items, id) => {
+            const firstItem = items[0];
+            const subtotal = items.reduce((sum, item) => sum + ((item.creationId as any)?.price || 0), 0);
+            const shippingCost = items.reduce((sum, item) => sum + (item.shippingCost || 0), 0);
+            const totalPrice = subtotal + shippingCost;
+            
+            // Déterminer le statut global (prendre le plus avancé)
+            const statusPriority: Record<string, number> = {
+                cancelled: 0,
+                pending: 1,
+                preparing: 2,
+                shipped: 3,
+                in_transit: 4,
+                delivered: 5,
+                validated: 6,
+            };
+            
+            const sortedByStatus = [...items].sort((a, b) => 
+                (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0)
+            );
+            const highestStatus = sortedByStatus[0].status;
+            
+            // Vérifier si la commande a été vue
+            const seenByAdmin = items.some(i => i.seenByAdmin);
+
+            orders.push({
+                id,
+                items,
+                customerName: firstItem.name,
+                customerEmail: firstItem.contact,
+                createdAt: (firstItem as any).paidAt || firstItem.createdAt,
+                status: highestStatus,
+                deliveryMode: firstItem.deliveryMode,
+                totalPrice,
+                seenByAdmin,
+            });
+        });
+
+        // Trier par date décroissante
+        return orders.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+    }, [reservations]);
+
+    const pendingCount = groupedOrders.filter(o => o.status === "pending").length;
+    const totalCount = groupedOrders.length;
 
     return (
         <main className="min-h-screen bg-slate-50">
@@ -190,15 +299,19 @@ function AdminReservationsContent() {
                             className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                         >
                             <option value="">📊 Tous les statuts</option>
-                            <option value="pending">⏳ En attente</option>
-                            <option value="validated">✅ Validées</option>
+                            <option value="pending">⏳ En cours de préparation</option>
+                            <option value="preparing">📦 En préparation</option>
+                            <option value="shipped">📮 Expédiées</option>
+                            <option value="in_transit">🚚 En cours de livraison</option>
+                            <option value="delivered">✅ Livrées</option>
+                            <option value="validated">✔️ Confirmées</option>
                             <option value="cancelled">❌ Annulées</option>
                         </select>
                     </div>
                 </Card>
 
                 {/* Liste des commandes */}
-                {reservations.length === 0 ? (
+                {groupedOrders.length === 0 ? (
                     <Card className="p-12 text-center">
                         <div className="text-4xl mb-3">📭</div>
                         <p className="text-slate-600 font-medium">Aucune commande</p>
@@ -209,70 +322,87 @@ function AdminReservationsContent() {
                         </p>
                     </Card>
                 ) : (
-                    <div className="space-y-2">
-                        {reservations.map((r) => (
+                    <div className="space-y-3">
+                        {groupedOrders.map((order) => (
                             <Card
-                                key={r._id}
-                                className={`p-4 cursor-pointer transition hover:shadow-md hover:scale-[1.01] ${!r.seenByAdmin ? 'ring-2 ring-blue-500 bg-blue-50/50' : ''}`}
+                                key={order.id}
+                                className={`p-4 cursor-pointer transition hover:shadow-md hover:scale-[1.01] ${!order.seenByAdmin ? 'ring-2 ring-blue-500 bg-blue-50/50' : ''}`}
                                 onClick={() => {
-                                    setSelected(r);
-                                    // Marquer comme vue
-                                    if (!r.seenByAdmin) {
-                                        fetch(`/api/admin/reservations/${r._id}`, {
-                                            method: "PATCH",
-                                            body: JSON.stringify({ seenByAdmin: true }),
-                                            headers: { "Content-Type": "application/json" },
+                                    // Sélectionner le premier article de la commande pour afficher les détails
+                                    // Chercher l'article avec l'adresse de livraison si disponible
+                                    const itemWithAddress = order.items.find(item => item.shippingAddress) || order.items[0];
+                                    setSelected(itemWithAddress);
+                                    setSelectedOrderItems(order.items);
+                                    // Marquer tous les articles comme vus
+                                    if (!order.seenByAdmin) {
+                                        order.items.forEach(item => {
+                                            fetch(`/api/admin/reservations/${item._id}`, {
+                                                method: "PATCH",
+                                                body: JSON.stringify({ seenByAdmin: true }),
+                                                headers: { "Content-Type": "application/json" },
+                                            });
                                         });
                                     }
                                 }}
                             >
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                                     <div className="flex gap-3 flex-1 min-w-0">
-                                        {/* Image de l'article */}
-                                        {(r.creationId?.images?.[0] || r.creationId?.imageUrl) && (
-                                            <img
-                                                src={r.creationId.images?.[0] ?? r.creationId.imageUrl!}
-                                                alt={r.creationId.title}
-                                                className="h-16 w-16 rounded-lg object-cover shrink-0"
-                                            />
-                                        )}
+                                        {/* Images des articles (première image de chaque article) */}
+                                        <div className="flex gap-1 shrink-0">
+                                            {order.items.slice(0, 3).map((item, idx) => {
+                                                const creation = item.creationId;
+                                                const image = creation?.images?.[0] || creation?.imageUrl;
+                                                return image ? (
+                                                    <img
+                                                        key={idx}
+                                                        src={image}
+                                                        alt={creation?.title || "Article"}
+                                                        className="h-16 w-16 rounded-lg object-cover border border-slate-200"
+                                                    />
+                                                ) : null;
+                                            })}
+                                            {order.items.length > 3 && (
+                                                <div className="h-16 w-16 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600">
+                                                    +{order.items.length - 3}
+                                                </div>
+                                            )}
+                                        </div>
 
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between gap-2 mb-1">
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <p className="font-semibold text-slate-900 truncate">{r.name}</p>
-                                                        {!r.seenByAdmin && (
+                                                        <p className="font-semibold text-slate-900 truncate">{order.customerName}</p>
+                                                        {!order.seenByAdmin && (
                                                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500 text-white animate-pulse">
                                                                 NOUVELLE
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-slate-500 truncate">{r.contact}</p>
+                                                    <p className="text-xs text-slate-500 truncate">{order.customerEmail}</p>
                                                 </div>
-                                                <Badge variant={getStatusBadgeVariant(r.status) as any} className="shrink-0">
-                                                    {getStatusLabel(r.status)}
+                                                <Badge variant={getStatusBadgeVariant(order.status) as any} className="shrink-0">
+                                                    {getStatusLabel(order.status)}
                                                 </Badge>
                                             </div>
 
                                             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mt-2">
                                                 <span className="flex items-center gap-1">
-                                                    🕒 {new Date(r.createdAt).toLocaleDateString("fr-FR", {
+                                                    🕒 {new Date(order.createdAt).toLocaleDateString("fr-FR", {
                                                         day: "numeric",
                                                         month: "short",
                                                         hour: "2-digit",
                                                         minute: "2-digit"
                                                     })}
                                                 </span>
-                                                {r.creationId && (
+                                                <span>•</span>
+                                                <span className="font-medium">{order.items.length} article{order.items.length > 1 ? "s" : ""}</span>
+                                                <span>•</span>
+                                                <span className="font-semibold text-slate-900">{order.totalPrice} €</span>
+                                                {order.deliveryMode && (
                                                     <>
                                                         <span>•</span>
-                                                        <span className="font-medium">{r.creationId.title}</span>
-                                                        {r.creationId.price && (
-                                                            <Badge variant="default" className="text-[10px]">
-                                                                {r.creationId.price} €
-                                                            </Badge>
-                                                        )}
+                                                        <span>{getDeliveryLabel(order.deliveryMode)}</span>
                                                     </>
                                                 )}
                                             </div>
@@ -320,7 +450,10 @@ function AdminReservationsContent() {
                     {/* Fond semi-transparent pour fermer au clic */}
                     <div 
                         className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 animate-fadeIn"
-                        onClick={() => setSelected(null)}
+                        onClick={() => {
+                                    setSelected(null);
+                                    setSelectedOrderItems([]);
+                                }}
                     />
                     
                     <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white shadow-2xl p-6 z-50 overflow-y-auto animate-slideInRight">
@@ -328,7 +461,10 @@ function AdminReservationsContent() {
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-xl font-bold text-slate-900">Détails de la commande</h2>
                             <button
-                                onClick={() => setSelected(null)}
+                                onClick={() => {
+                                    setSelected(null);
+                                    setSelectedOrderItems([]);
+                                }}
                                 className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 text-slate-600 cursor-pointer"
                                 aria-label="Fermer"
                             >
@@ -389,14 +525,30 @@ function AdminReservationsContent() {
                                                 {getDeliveryLabel(selected.deliveryMode)}
                                             </p>
                                             
-                                            {/* Adresse de livraison */}
-                                            {selected.deliveryMode === "shipping" && selected.shippingAddress && (
+                                            {/* Bouton télécharger bordereau - toujours visible pour shipping */}
+                                            {selected.deliveryMode === "shipping" && (
+                                                <Button
+                                                    onClick={() => {
+                                                        window.open(`/api/admin/reservations/${selected._id}/shipping-label`, '_blank');
+                                                    }}
+                                                    variant="secondary"
+                                                    className="w-full mt-3 cursor-pointer"
+                                                    size="md"
+                                                >
+                                                    📄 Télécharger bordereau d&apos;envoi
+                                                </Button>
+                                            )}
+                                            
+                                            {/* Adresse de livraison - chercher dans tous les articles de la commande */}
+                                            {selected.deliveryMode === "shipping" && (() => {
+                                                const addr = selected.shippingAddress || 
+                                                             selectedOrderItems.find(item => item.shippingAddress)?.shippingAddress;
+                                                return addr ? (
                                                 <div className="mt-3 pt-3 border-t border-slate-200">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <p className="text-xs font-semibold text-slate-700">📍 Adresse de livraison</p>
                                                         <button
                                                             onClick={() => {
-                                                                const addr = selected.shippingAddress!;
                                                                 const text = `${addr.name}\n${addr.line1}${addr.line2 ? '\n' + addr.line2 : ''}\n${addr.postalCode} ${addr.city}\n${addr.country}`;
                                                                 navigator.clipboard.writeText(text);
                                                                 alert('Adresse copiée !');
@@ -407,41 +559,89 @@ function AdminReservationsContent() {
                                                         </button>
                                                     </div>
                                                     <div className="text-sm text-slate-900 bg-white rounded-lg p-3 border border-slate-200">
-                                                        <p className="font-medium">{selected.shippingAddress.name}</p>
-                                                        <p>{selected.shippingAddress.line1}</p>
-                                                        {selected.shippingAddress.line2 && (
-                                                            <p>{selected.shippingAddress.line2}</p>
+                                                        <p className="font-medium">{addr.name}</p>
+                                                        <p>{addr.line1}</p>
+                                                        {addr.line2 && (
+                                                            <p>{addr.line2}</p>
                                                         )}
-                                                        <p>{selected.shippingAddress.postalCode} {selected.shippingAddress.city}</p>
-                                                        <p className="text-slate-600">{selected.shippingAddress.country}</p>
+                                                        <p>{addr.postalCode} {addr.city}</p>
+                                                        <p className="text-slate-600">{addr.country}</p>
                                                     </div>
                                                     
-                                                    {/* Bouton pour copier le bordereau */}
-                                                    <button
-                                                        onClick={() => {
-                                                            const addr = selected.shippingAddress!;
-                                                            const creation = selected.creationId;
-                                                            const bordereau = `EXPÉDITEUR:\nMailleMum\n[Votre adresse]\n\nDESTINATAIRE:\n${addr.name}\n${addr.line1}${addr.line2 ? '\n' + addr.line2 : ''}\n${addr.postalCode} ${addr.city}\n${addr.country}\n\nCONTENU:\n${creation?.title || 'Article'}\nPrix: ${creation?.price || 0}€`;
-                                                            navigator.clipboard.writeText(bordereau);
-                                                            alert('Infos bordereau copiées !');
-                                                        }}
-                                                        className="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg cursor-pointer flex items-center justify-center gap-2"
-                                                    >
-                                                        🏷️ Copier pour bordereau d&apos;envoi
-                                                    </button>
+                                                </div>
+                                                ) : null;
+                                            })()}
+                                            
+                                            {/* Message si pas d'adresse mais mode shipping */}
+                                            {selected.deliveryMode === "shipping" && !selected.shippingAddress && !selectedOrderItems.find(item => item.shippingAddress) && (
+                                                <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                                    <p className="text-xs text-yellow-800">
+                                                        ⚠️ Adresse de livraison non disponible. Le bordereau sera généré sans adresse complète.
+                                                    </p>
                                                 </div>
                                             )}
                                             
-                                            {/* Frais de livraison */}
-                                            {selected.shippingCost != null && selected.shippingCost > 0 && (
+                                            {/* Frais de livraison - calculer le total de tous les articles de la commande */}
+                                            {selectedOrderItems.length > 0 ? (
+                                                (() => {
+                                                    const totalShipping = selectedOrderItems.reduce((sum, item) => sum + (item.shippingCost || 0), 0);
+                                                    return totalShipping > 0 ? (
+                                                        <p className="mt-2 text-xs text-slate-600">
+                                                            Frais de livraison : <span className="font-semibold">{totalShipping} €</span>
+                                                        </p>
+                                                    ) : null;
+                                                })()
+                                            ) : selected.shippingCost != null && selected.shippingCost > 0 ? (
                                                 <p className="mt-2 text-xs text-slate-600">
                                                     Frais de livraison : <span className="font-semibold">{selected.shippingCost} €</span>
                                                 </p>
-                                            )}
+                                            ) : null}
                                         </Card>
 
-                                        {/* Article commandé */}
-                                        {selected.creationId && (
+                                        {/* Articles de la commande */}
+                                        {selectedOrderItems.length > 0 ? (
+                                            <Card className="p-4 mb-4">
+                                                <p className="text-xs font-semibold text-slate-700 mb-3">
+                                                    🎨 Articles de la commande ({selectedOrderItems.length})
+                                                </p>
+                                                <div className="space-y-3">
+                                                    {selectedOrderItems.map((item) => {
+                                                        const creation = item.creationId;
+                                                        if (!creation) return null;
+                                                        
+                                                        return (
+                                                            <div key={item._id} className="flex gap-3 p-3 rounded-lg border border-slate-200">
+                                                                {(creation.images?.[0] || creation.imageUrl) && (
+                                                                    <img
+                                                                        src={creation.images?.[0] ?? creation.imageUrl!}
+                                                                        alt={creation.title}
+                                                                        className="h-24 w-24 rounded-lg object-cover shrink-0 ring-1 ring-slate-200"
+                                                                    />
+                                                                )}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                                                        <p className="text-sm font-semibold text-slate-900">
+                                                                            {creation.title}
+                                                                        </p>
+                                                                        {creation.price != null && (
+                                                                            <Badge variant="default" className="bg-slate-900 text-white whitespace-nowrap">
+                                                                                {creation.price} €
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    {creation.color && (
+                                                                        <div className="flex items-center gap-1.5 mb-2">
+                                                                            <span className="text-xs text-slate-500">Couleur:</span>
+                                                                            <Badge variant="default">{creation.color}</Badge>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </Card>
+                                        ) : selected.creationId && (
                                             <Card className="p-4 mb-4">
                                                 <p className="text-xs font-semibold text-slate-700 mb-3">🎨 Article commandé</p>
 
@@ -520,28 +720,37 @@ function AdminReservationsContent() {
 
                         {/* Actions admin */}
                         <div className="space-y-3">
+                            <p className="text-xs font-semibold text-slate-700 mb-2">⚡ Actions</p>
+                            
+                            {/* Gestion des statuts */}
                             {selected.status === "pending" && (
                                 <>
-                                    <p className="text-xs font-semibold text-slate-700 mb-2">⚡ Actions</p>
-                                    
                                     {!showValidateConfirm && !showCancelConfirm ? (
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-col gap-2">
                                             <Button
-                                                onClick={() => setShowValidateConfirm(true)}
-                                                className="flex-1 bg-green-600 hover:bg-green-700 cursor-pointer"
+                                                onClick={() => updateStatus(selected._id, "preparing")}
+                                                className="w-full bg-blue-600 hover:bg-blue-700 cursor-pointer"
                                                 size="md"
                                             >
-                                                ✅ Valider
+                                                📦 Passer en préparation
                                             </Button>
-
-                                            <Button
-                                                variant="danger"
-                                                onClick={() => setShowCancelConfirm(true)}
-                                                className="flex-1 cursor-pointer"
-                                                size="md"
-                                            >
-                                                ❌ Annuler
-                                            </Button>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    onClick={() => setShowValidateConfirm(true)}
+                                                    className="flex-1 bg-green-600 hover:bg-green-700 cursor-pointer"
+                                                    size="md"
+                                                >
+                                                    ✅ Valider
+                                                </Button>
+                                                <Button
+                                                    variant="danger"
+                                                    onClick={() => setShowCancelConfirm(true)}
+                                                    className="flex-1 cursor-pointer"
+                                                    size="md"
+                                                >
+                                                    ❌ Annuler
+                                                </Button>
+                                            </div>
                                         </div>
                                     ) : null}
 
@@ -622,13 +831,96 @@ function AdminReservationsContent() {
                                 </>
                             )}
 
-{selected.status === "validated" && (
-                                                <div className="flex items-center justify-center py-3">
-                                                    <Badge variant="success" className="text-sm py-2 px-4">
-                                                        ✔️ Commande confirmée
-                                                    </Badge>
-                                                </div>
-                                            )}
+{selected.status === "preparing" && (
+                                <div className="space-y-2">
+                                    <Button
+                                        onClick={() => {
+                                            const tracking = prompt("Numéro de suivi (optionnel) :");
+                                            updateStatus(selected._id, "shipped", tracking || undefined);
+                                        }}
+                                        className="w-full bg-purple-600 hover:bg-purple-700 cursor-pointer"
+                                        size="md"
+                                    >
+                                        📦 Marquer comme expédiée
+                                    </Button>
+                                    <Button
+                                        onClick={() => updateStatus(selected._id, "pending")}
+                                        variant="secondary"
+                                        className="w-full cursor-pointer"
+                                        size="md"
+                                    >
+                                        ← Retour en préparation
+                                    </Button>
+                                </div>
+                            )}
+
+                            {selected.status === "shipped" && (
+                                <div className="space-y-2">
+                                    {selected.trackingNumber && (
+                                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                            <p className="text-xs font-semibold text-blue-900 mb-1">🔢 Numéro de suivi</p>
+                                            <p className="text-sm font-mono text-blue-700">{selected.trackingNumber}</p>
+                                        </div>
+                                    )}
+                                    <Button
+                                        onClick={() => updateStatus(selected._id, "in_transit")}
+                                        className="w-full bg-orange-600 hover:bg-orange-700 cursor-pointer"
+                                        size="md"
+                                    >
+                                        🚚 Marquer en cours de livraison
+                                    </Button>
+                                    <Button
+                                        onClick={() => updateStatus(selected._id, "preparing")}
+                                        variant="secondary"
+                                        className="w-full cursor-pointer"
+                                        size="md"
+                                    >
+                                        ← Retour en préparation
+                                    </Button>
+                                </div>
+                            )}
+
+                            {selected.status === "in_transit" && (
+                                <div className="space-y-2">
+                                    {selected.trackingNumber && (
+                                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                            <p className="text-xs font-semibold text-blue-900 mb-1">🔢 Numéro de suivi</p>
+                                            <p className="text-sm font-mono text-blue-700">{selected.trackingNumber}</p>
+                                        </div>
+                                    )}
+                                    <Button
+                                        onClick={() => updateStatus(selected._id, "delivered")}
+                                        className="w-full bg-green-600 hover:bg-green-700 cursor-pointer"
+                                        size="md"
+                                    >
+                                        ✅ Marquer comme livrée
+                                    </Button>
+                                    <Button
+                                        onClick={() => updateStatus(selected._id, "shipped")}
+                                        variant="secondary"
+                                        className="w-full cursor-pointer"
+                                        size="md"
+                                    >
+                                        ← Retour expédiée
+                                    </Button>
+                                </div>
+                            )}
+
+                            {selected.status === "delivered" && (
+                                <div className="flex items-center justify-center py-3">
+                                    <Badge variant="success" className="text-sm py-2 px-4">
+                                        ✅ Commande livrée
+                                    </Badge>
+                                </div>
+                            )}
+
+                            {selected.status === "validated" && (
+                                <div className="flex items-center justify-center py-3">
+                                    <Badge variant="success" className="text-sm py-2 px-4">
+                                        ✔️ Commande confirmée
+                                    </Badge>
+                                </div>
+                            )}
 
                                             {selected.status === "cancelled" && (
                                                 <div className="flex items-center justify-center py-3">

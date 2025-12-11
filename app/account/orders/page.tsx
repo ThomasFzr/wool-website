@@ -33,28 +33,49 @@ export default function OrdersPage() {
       const shippingCost = items.reduce((sum, item) => sum + (item.shippingCost || 0), 0);
       const totalPrice = subtotal + shippingCost;
       
-      // Déterminer le statut global de la commande
-      const hasValidated = items.some(i => i.status === "validated");
-      const hasCancelled = items.some(i => i.status === "cancelled");
-      const allCancelled = items.every(i => i.status === "cancelled");
+      // Déterminer le statut global de la commande (prendre le statut le plus avancé)
+      const statusPriority: Record<string, number> = {
+        cancelled: 0,
+        pending: 1,
+        preparing: 2,
+        shipped: 3,
+        in_transit: 4,
+        delivered: 5,
+        validated: 6,
+      };
       
-      let orderStatus: "pending" | "validated" | "cancelled" = "pending";
+      const allCancelled = items.every(i => i.status === "cancelled");
       if (allCancelled) {
-        orderStatus = "cancelled";
-      } else if (hasValidated) {
-        orderStatus = "validated";
-      }
+        orderList.push({
+          id,
+          items,
+          createdAt: firstItem.paidAt || firstItem.createdAt,
+          status: "cancelled",
+          deliveryMode: firstItem.deliveryMode,
+          subtotal,
+          shippingCost,
+          totalPrice,
+          trackingNumber: items.find(i => i.trackingNumber)?.trackingNumber,
+        });
+      } else {
+        // Prendre le statut le plus avancé
+        const sortedByStatus = [...items].sort((a, b) => 
+          (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0)
+        );
+        const highestStatus = sortedByStatus[0].status as any;
 
-      orderList.push({
-        id,
-        items,
-        createdAt: firstItem.paidAt || firstItem.createdAt,
-        status: orderStatus,
-        deliveryMode: firstItem.deliveryMode,
-        subtotal,
-        shippingCost,
-        totalPrice,
-      });
+        orderList.push({
+          id,
+          items,
+          createdAt: firstItem.paidAt || firstItem.createdAt,
+          status: highestStatus,
+          deliveryMode: firstItem.deliveryMode,
+          subtotal,
+          shippingCost,
+          totalPrice,
+          trackingNumber: items.find(i => i.trackingNumber)?.trackingNumber,
+        });
+      }
     });
 
     // Trier par date décroissante

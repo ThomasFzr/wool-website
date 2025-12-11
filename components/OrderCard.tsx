@@ -8,11 +8,12 @@ export type Order = {
   id: string;
   items: Reservation[];
   createdAt: string;
-  status: "pending" | "validated" | "cancelled";
+  status: "pending" | "preparing" | "shipped" | "in_transit" | "delivered" | "validated" | "cancelled";
   deliveryMode?: "pickup" | "shipping";
   totalPrice: number;
   shippingCost: number;
   subtotal: number;
+  trackingNumber?: string;
 };
 
 interface OrderCardProps {
@@ -20,13 +21,30 @@ interface OrderCardProps {
 }
 
 export function OrderCard({ order }: OrderCardProps) {
-  const statusVariant = 
-    order.status === "pending" ? "success" :
-    order.status === "validated" ? "success" : "danger";
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case "pending":
+        return { variant: "success" as const, label: "En cours de préparation" };
+      case "preparing":
+        return { variant: "warning" as const, label: "En préparation" };
+      case "shipped":
+        return { variant: "success" as const, label: "Expédiée" };
+      case "in_transit":
+        return { variant: "success" as const, label: "En cours de livraison" };
+      case "delivered":
+        return { variant: "success" as const, label: "Livrée" };
+      case "validated":
+        return { variant: "success" as const, label: "Confirmée" };
+      case "cancelled":
+        return { variant: "danger" as const, label: "Annulée" };
+      default:
+        return { variant: "success" as const, label: "En cours" };
+    }
+  };
 
-  const statusLabel =
-    order.status === "pending" ? "En cours de préparation" :
-    order.status === "validated" ? "Confirmée" : "Annulée";
+  const statusInfo = getStatusInfo(order.status);
+  const statusVariant = statusInfo.variant;
+  const statusLabel = statusInfo.label;
 
   const deliveryLabel = 
     order.deliveryMode === "shipping" ? "Livraison" : "Remise en main propre";
@@ -98,6 +116,13 @@ export function OrderCard({ order }: OrderCardProps) {
             📦 {deliveryLabel}
           </p>
         </div>
+        {order.trackingNumber && (
+          <div className="mb-2">
+            <p className="text-xs text-slate-600">
+              🔢 Numéro de suivi : <span className="font-semibold">{order.trackingNumber}</span>
+            </p>
+          </div>
+        )}
         <div className="flex justify-between text-xs text-slate-600">
           <span>Sous-total articles</span>
           <span>{order.subtotal} €</span>

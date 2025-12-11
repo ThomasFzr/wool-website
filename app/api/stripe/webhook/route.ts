@@ -63,10 +63,13 @@ export async function POST(req: NextRequest) {
     // Gérer l'événement checkout.session.completed
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
+      
+      // Récupérer la session complète avec toutes les informations (y compris shipping)
+      const fullSession = await stripe.checkout.sessions.retrieve(session.id);
 
       // Récupérer les IDs des réservations depuis les metadata
-      const reservationIds = session.metadata?.reservationIds
-        ? JSON.parse(session.metadata.reservationIds)
+      const reservationIds = fullSession.metadata?.reservationIds
+        ? JSON.parse(fullSession.metadata.reservationIds)
         : [];
 
       if (reservationIds.length === 0) {
@@ -79,30 +82,58 @@ export async function POST(req: NextRequest) {
         _id: { $in: reservationIds },
       });
 
-      const paymentIntentId = session.payment_intent as string;
+      const paymentIntentId = fullSession.payment_intent as string;
 
       // Récupérer le mode de livraison et les frais de livraison depuis les metadata
-      const deliveryMode = session.metadata?.deliveryMode || "pickup";
-      const totalShippingCost = session.metadata?.shippingCost 
-        ? parseFloat(session.metadata.shippingCost) 
+      const deliveryMode = fullSession.metadata?.deliveryMode || "pickup";
+      const totalShippingCost = fullSession.metadata?.shippingCost 
+        ? parseFloat(fullSession.metadata.shippingCost) 
         : 0;
-      const shippingPerItem = totalShippingCost / reservations.length;
+      
+      // Récupérer l'adresse de livraison depuis Stripe
+      // Stripe stocke l'adresse dans shipping (pas shipping_details pour checkout sessions)
+      const shippingInfo = (fullSession as any).shipping;
+      const shippingAddress = shippingInfo?.address ? {
+        name: shippingInfo.name || "",
+        line1: shippingInfo.address.line1 || "",
+        line2: shippingInfo.address.line2 || "",
+        city: shippingInfo.address.city || "",
+        postalCode: shippingInfo.address.postal_code || "",
+        country: shippingInfo.address.country || "",
+      } : null;
+      
+      // Log pour déboguer
+      if (fullSession.metadata?.deliveryMode === "shipping") {
+        console.log("Adresse de livraison récupérée:", shippingAddress ? "OUI" : "NON");
+        if (shippingAddress) {
+          console.log("Détails:", shippingAddress);
+        } else {
+          console.log("Shipping info disponible:", shippingInfo ? "OUI" : "NON");
+        }
+      }
 
       await Promise.all(
-        reservations.map(async (reservation) => {
+        reservations.map(async (reservation, index) => {
           // Mettre à jour la réservation
           reservation.stripePaymentIntentId = paymentIntentId;
-          reservation.stripeCustomerId = session.customer as string;
+          reservation.stripeCustomerId = fullSession.customer as string;
           reservation.paymentStatus = "paid";
           reservation.status = "validated";
           reservation.paidAt = new Date();
           reservation.deliveryMode = deliveryMode;
-          // Mettre à jour les frais de livraison (au cas où ils auraient changé)
+          
+          // Mettre les frais de livraison uniquement sur le premier article
           if (deliveryMode === "shipping" && totalShippingCost > 0) {
-            reservation.shippingCost = shippingPerItem;
+            reservation.shippingCost = index === 0 ? totalShippingCost : 0;
           } else {
             reservation.shippingCost = 0;
           }
+          
+          // Ajouter l'adresse de livraison si disponible
+          if (shippingAddress) {
+            reservation.shippingAddress = shippingAddress;
+          }
+          
           await reservation.save();
 
           // Mettre à jour la création - marquer comme vendue

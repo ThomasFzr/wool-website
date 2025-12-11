@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ valid: false }, { status: 400 });
     }
 
-    // Récupérer la session Stripe
+    // Récupérer la session Stripe complète avec toutes les informations
     const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
 
     // Vérifier que la session appartient à l'utilisateur
@@ -64,27 +64,38 @@ export async function GET(req: NextRequest) {
         const totalShippingCost = checkoutSession.metadata?.shippingCost 
           ? parseFloat(checkoutSession.metadata.shippingCost) 
           : 0;
-        const shippingPerItem = totalShippingCost / reservations.length;
         
         // Récupérer l'adresse de livraison si disponible
-        const shippingDetails = checkoutSession.shipping_details;
-        const shippingAddress = shippingDetails?.address ? {
-          name: shippingDetails.name || "",
-          line1: shippingDetails.address.line1 || "",
-          line2: shippingDetails.address.line2 || "",
-          city: shippingDetails.address.city || "",
-          postalCode: shippingDetails.address.postal_code || "",
-          country: shippingDetails.address.country || "",
+        // Stripe stocke l'adresse dans shipping pour les checkout sessions
+        const shippingInfo = (checkoutSession as any).shipping;
+        const shippingAddress = shippingInfo?.address ? {
+          name: shippingInfo.name || "",
+          line1: shippingInfo.address.line1 || "",
+          line2: shippingInfo.address.line2 || "",
+          city: shippingInfo.address.city || "",
+          postalCode: shippingInfo.address.postal_code || "",
+          country: shippingInfo.address.country || "",
         } : null;
+        
+        // Log pour déboguer
+        if (checkoutSession.metadata?.deliveryMode === "shipping") {
+          console.log("Adresse de livraison (verify-session):", shippingAddress ? "OUI" : "NON");
+          if (shippingAddress) {
+            console.log("Détails:", shippingAddress);
+          } else {
+            console.log("Shipping info disponible:", shippingInfo ? "OUI" : "NON");
+          }
+        }
 
         await Promise.all(
-          reservations.map(async (reservation: any) => {
+          reservations.map(async (reservation: any, index: number) => {
             // Vérifier si déjà traité
             if (reservation.paymentStatus === "paid") {
               return;
             }
 
             // Mettre à jour la réservation
+            // payment_intent est toujours une string (ID) dans checkout.sessions
             reservation.stripePaymentIntentId = checkoutSession.payment_intent as string;
             reservation.stripeCustomerId = checkoutSession.customer as string;
             reservation.paymentStatus = "paid";
@@ -92,9 +103,9 @@ export async function GET(req: NextRequest) {
             reservation.paidAt = new Date();
             reservation.deliveryMode = deliveryMode;
             
-            // Mettre à jour les frais de livraison
+            // Mettre les frais de livraison uniquement sur le premier article
             if (deliveryMode === "shipping" && totalShippingCost > 0) {
-              reservation.shippingCost = shippingPerItem;
+              reservation.shippingCost = index === 0 ? totalShippingCost : 0;
             } else {
               reservation.shippingCost = 0;
             }

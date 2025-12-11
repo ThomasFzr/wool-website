@@ -23,9 +23,23 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
     const body = await req.json();
 
     const { id } = await context.params; // ✅ ici
+    
+    // Préparer les mises à jour
+    const updates: any = { ...body };
+    
+    // Si on passe à "shipped", enregistrer la date
+    if (body.status === "shipped" && !body.shippedAt) {
+      updates.shippedAt = new Date();
+    }
+    
+    // Si on ajoute un trackingNumber, le sauvegarder
+    if (body.trackingNumber) {
+      updates.trackingNumber = body.trackingNumber;
+    }
+    
     const reservation = await Reservation.findByIdAndUpdate(
       id,
-      body,
+      updates,
       { new: true }
     ).populate("creationId");
 
@@ -45,9 +59,9 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       creation?.price != null ? `${creation.price} €` : "Prix sur demande";
 
     /* -----------------------------
-       ✅ PASSAGE EN "validated"
+       ✅ PASSAGE EN "validated" ou "preparing"
     ------------------------------*/
-    if (body.status === "validated" && creation) {
+    if ((body.status === "validated" || body.status === "preparing") && creation) {
       await Creation.findByIdAndUpdate(creation._id, {
         $set: {
           sold: true,
