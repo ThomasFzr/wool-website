@@ -2,8 +2,8 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   robots: {
-    noindex: true,
-    nofollow: true,
+    index: false,
+    follow: false,
   },
 };
 

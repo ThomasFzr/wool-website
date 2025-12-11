@@ -21,7 +21,11 @@ function generateSlug(title: string): string {
 export async function GET() {
   try {
     await connectToDatabase();
-    const creations = await Creation.find().sort({ displayOrder: -1, createdAt: -1 }).lean();
+    // Exclure les champs admin (yarnBrand, weight) pour les utilisateurs publics
+    const creations = await Creation.find()
+      .select("-yarnBrand -weight")
+      .sort({ displayOrder: -1, createdAt: -1 })
+      .lean();
     return NextResponse.json(creations);
   } catch (err) {
     console.error(err);
@@ -76,6 +80,8 @@ export async function POST(req: NextRequest) {
       type: body.type && body.type !== "" ? body.type : undefined,
       displayOrder: nextDisplayOrder,
       showAsNew: body.showAsNew !== undefined ? body.showAsNew : true,
+      yarnBrand: body.yarnBrand,
+      weight: body.weight,
     });
 
     // 🔄 Invalider le cache immédiatement après création

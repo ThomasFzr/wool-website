@@ -26,6 +26,8 @@ type Creation = {
   sold?: boolean;
   slug?: string;
   createdAt?: string;
+  yarnBrand?: string; // Marque de laine (admin uniquement)
+  weight?: number; // Poids en grammes (admin uniquement)
 };
 
 function AdminCreationsContent() {
@@ -43,6 +45,8 @@ function AdminCreationsContent() {
     color: "",
     type: "" as string,
     showAsNew: true as boolean,
+    yarnBrand: "", // Marque de laine (admin uniquement)
+    weight: "", // Poids en grammes (admin uniquement)
   });
 
   const [message, setMessage] = useState<string | null>(null);
@@ -248,6 +252,8 @@ function AdminCreationsContent() {
       color: form.color || undefined,
       type: form.type || undefined,
       showAsNew: form.showAsNew,
+      yarnBrand: form.yarnBrand || undefined,
+      weight: form.weight ? Number(form.weight) : undefined,
     };
 
     const url = editingId ? `/api/creations/${editingId}` : "/api/creations";
@@ -277,6 +283,8 @@ function AdminCreationsContent() {
       color: "",
       type: "",
       showAsNew: true,
+      yarnBrand: "",
+      weight: "",
     });
     setEditingId(null);
     setShowEditModal(false);
@@ -296,6 +304,8 @@ function AdminCreationsContent() {
       color: c.color ?? "",
       type: c.type ?? "",
       showAsNew: c.showAsNew !== undefined ? c.showAsNew : true,
+      yarnBrand: c.yarnBrand ?? "",
+      weight: c.weight != null ? String(c.weight) : "",
     });
     setMessage(null);
     setShowEditModal(true);
@@ -342,6 +352,8 @@ function AdminCreationsContent() {
       color: "",
       type: "",
       showAsNew: true,
+      yarnBrand: "",
+      weight: "",
     });
     setMessage(null);
     setShowEditModal(false);
@@ -892,6 +904,28 @@ function AdminCreationsContent() {
                 </div>
               </div>
 
+              {/* Informations admin uniquement */}
+              <div className="pt-4 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
+                  🔒 Informations admin (non visibles pour les utilisateurs)
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Marque de laine"
+                    placeholder="Ex : Drops, Phildar..."
+                    value={form.yarnBrand}
+                    onChange={(e) => setForm({ ...form, yarnBrand: e.target.value })}
+                  />
+                  <Input
+                    label="Poids (grammes)"
+                    type="number"
+                    placeholder="Ex : 150"
+                    value={form.weight}
+                    onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                  />
+                </div>
+              </div>
+
               {/* Flag New */}
               <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm hover:bg-slate-100">
                 <input
@@ -1078,6 +1112,28 @@ function AdminCreationsContent() {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Informations admin uniquement */}
+              <div className="pt-4 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
+                  🔒 Informations admin (non visibles pour les utilisateurs)
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Marque de laine"
+                    placeholder="Ex : Drops, Phildar..."
+                    value={form.yarnBrand}
+                    onChange={(e) => setForm({ ...form, yarnBrand: e.target.value })}
+                  />
+                  <Input
+                    label="Poids (grammes)"
+                    type="number"
+                    placeholder="Ex : 150"
+                    value={form.weight}
+                    onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                  />
                 </div>
               </div>
 

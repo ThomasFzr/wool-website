@@ -10,6 +10,10 @@ const schema = new Schema(
     price: Number,
     color: String,
     type: String,
+    
+    // Champs admin uniquement (non visibles pour les utilisateurs)
+    yarnBrand: String, // Marque de laine
+    weight: Number, // Poids en grammes
 
     imagePublicIds: [String],
     imagePublicId: String,

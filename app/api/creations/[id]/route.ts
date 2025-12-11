@@ -79,6 +79,8 @@ export async function PATCH(
     }
     if (body.price !== undefined) update.price = body.price;
     if (body.color !== undefined) update.color = body.color;
+    if (body.yarnBrand !== undefined) update.yarnBrand = body.yarnBrand;
+    if (body.weight !== undefined) update.weight = body.weight;
     if (body.type !== undefined) {
       // Si type est vide, on le supprime du document, sinon on le met à jour
       if (body.type === "" || body.type === null) {
