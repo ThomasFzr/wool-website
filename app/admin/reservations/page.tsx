@@ -675,6 +675,7 @@ function AdminReservationsContent() {
                                 <div 
                                     className="flex gap-3 mb-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors"
                                     onClick={async () => {
+                                        if (!selected.creationId) return;
                                         try {
                                             const res = await fetch(`/api/creations/${selected.creationId._id}`);
                                             if (res.ok) {
