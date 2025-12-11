@@ -1,11 +1,8 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import mongoose from "mongoose";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
-import ReservationModel from "@/models/Reservation";
 import { Header } from "@/components/Header";
 import { CreationDetail } from "./CreationDetail";
 
@@ -25,18 +22,6 @@ async function getCreation(slug: string) {
   
   const creationData: any = creation;
   
-  // Récupérer la réservation pour savoir qui l'a réservée
-  let reservedByUserId = null;
-  if (creationData.reserved) {
-    const reservation: any = await ReservationModel.findOne({ 
-      creationId: creationData._id,
-      status: { $ne: 'cancelled' }
-    }).lean();
-    if (reservation) {
-      reservedByUserId = reservation.userId?.toString();
-    }
-  }
-  
   return {
     _id: creationData._id.toString(),
     slug: creationData.slug,
@@ -47,11 +32,9 @@ async function getCreation(slug: string) {
     price: creationData.price,
     color: creationData.color,
     type: creationData.type,
-    reserved: creationData.reserved,
     sold: creationData.sold,
     showAsNew: creationData.showAsNew,
     createdAt: creationData.createdAt ? creationData.createdAt.toString() : undefined,
-    reservedByUserId,
   };
 }
 
@@ -116,15 +99,11 @@ export default async function CreationPage({ params }: Props) {
     notFound();
   }
 
-  // Récupérer l'utilisateur connecté
-  const session = await getServerSession(authOptions);
-  const currentUserId = (session?.user as any)?.id;
-
   return (
     <>
       <Header />
       <main className="min-h-screen bg-linear-to-br from-slate-50 via-pink-50/30 to-slate-50">
-        <CreationDetail creation={creation} currentUserId={currentUserId} />
+        <CreationDetail creation={creation} />
       </main>
     </>
   );

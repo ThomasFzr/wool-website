@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
-import { Badge, Button, Textarea } from "./ui";
+import { Badge } from "./ui";
 
 export type Reservation = {
   _id: string;
@@ -14,6 +13,8 @@ export type Reservation = {
   cancelReason?: string;
   cancelledBy?: "admin" | "user";
   deliveryMode?: "pickup" | "shipping";
+  stripeCheckoutSessionId?: string;
+  paidAt?: string;
   creationId?: {
     _id: string;
     title: string;
@@ -30,46 +31,20 @@ export type Order = Reservation;
 
 interface ReservationCardProps {
   reservation: Reservation;
-  onCancel?: (id: string, reason?: string) => Promise<void>;
   onClick?: () => void;
 }
 
 // Renommé en OrderCard mais avec alias pour rétrocompatibilité
-export function ReservationCard({ reservation, onCancel, onClick }: ReservationCardProps) {
-  const [cancelId, setCancelId] = useState<string | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelLoading, setCancelLoading] = useState(false);
-  const [info, setInfo] = useState<string | null>(null);
-
+export function ReservationCard({ reservation, onClick }: ReservationCardProps) {
   const creation = reservation.creationId;
   const image = creation?.images?.[0] || creation?.imageUrl || undefined;
-  const canCancel = reservation.status === "pending" && onCancel;
-  const isThisCancelling = cancelId === reservation._id;
-
-  async function handleCancelReservation() {
-    if (!onCancel) return;
-    
-    try {
-      setCancelLoading(true);
-      setInfo(null);
-      await onCancel(reservation._id, cancelReason.trim() || undefined);
-      setInfo("Commande annulée ✔️");
-      setCancelId(null);
-      setCancelReason("");
-    } catch (error) {
-      console.error(error);
-      setInfo("Erreur lors de l'annulation.");
-    } finally {
-      setCancelLoading(false);
-    }
-  }
 
   const statusVariant = 
-    reservation.status === "pending" ? "warning" :
+    reservation.status === "pending" ? "success" :
     reservation.status === "validated" ? "success" : "danger";
 
   const statusLabel =
-    reservation.status === "pending" ? "En attente de paiement" :
+    reservation.status === "pending" ? "En cours de préparation" :
     reservation.status === "validated" ? "Confirmée" : "Annulée";
 
   const deliveryLabel = 
@@ -131,22 +106,10 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
             </p>
           )}
 
-          {reservation.status === "cancelled" && reservation.cancelledBy === "user" && (
-            <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 border border-slate-200">
-              <p className="text-xs font-semibold text-slate-700">
-                Vous avez annulé cette commande
-              </p>
-              {reservation.cancelReason && (
-                <p className="mt-1 text-xs text-slate-600">
-                  Raison : {reservation.cancelReason}
-                </p>
-              )}
-            </div>
-          )}
-          {reservation.status === "cancelled" && reservation.cancelledBy !== "user" && (
+          {reservation.status === "cancelled" && (
             <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 border border-red-200">
               <p className="text-xs font-semibold text-red-800">
-                ⚠️ Annulée par la créatrice
+                ⚠️ Commande annulée
               </p>
               {reservation.cancelReason && (
                 <p className="mt-1 text-xs text-red-700">
@@ -157,57 +120,6 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
           )}
         </div>
       </div>
-
-      {canCancel && (
-        <div className="mt-3 border-t border-slate-200 pt-3" onClick={(e) => e.stopPropagation()}>
-          {!isThisCancelling ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setCancelId(reservation._id);
-                setCancelReason("");
-                setInfo(null);
-              }}
-              className="cursor-pointer"
-            >
-              Annuler ma commande
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <Textarea
-                placeholder="Pourquoi souhaitez-vous annuler ? (facultatif)"
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                rows={2}
-              />
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={handleCancelReservation}
-                  disabled={cancelLoading}
-                  className="cursor-pointer"
-                >
-                  {cancelLoading ? "Annulation..." : "Confirmer l'annulation"}
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCancelId(null);
-                    setCancelReason("");
-                    setInfo(null);
-                  }}
-                  className="text-[11px] text-slate-500 hover:underline cursor-pointer"
-                >
-                  Garder ma commande
-                </button>
-              </div>
-              {info && <p className="text-[11px] text-slate-600">{info}</p>}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

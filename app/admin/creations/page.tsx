@@ -22,7 +22,6 @@ type Creation = {
   type?: "bonnet" | "tour de cou" | "bandeau";
   showAsNew?: boolean;
   displayOrder?: number;
-  reserved?: boolean;
   sold?: boolean;
   slug?: string;
   createdAt?: string;
@@ -96,8 +95,7 @@ function AdminCreationsContent() {
 
   const filteredCreations = creations.filter((c) => {
     // Filtre par statut
-    if (statusFilter === "disponible" && (c.reserved || c.sold)) return false;
-    if (statusFilter === "reserve" && (!c.reserved || c.sold)) return false;
+    if (statusFilter === "disponible" && c.sold) return false;
     if (statusFilter === "vendu" && !c.sold) return false;
     
     // Filtre par marque de laine
@@ -546,7 +544,6 @@ function AdminCreationsContent() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reserved: false,
           sold: false,
         }),
       });
@@ -693,15 +690,7 @@ function AdminCreationsContent() {
                     onClick={() => setStatusFilter("disponible")}
                     className="cursor-pointer"
                   >
-                    ✅ Disponible ({creations.filter(c => !c.reserved && !c.sold).length})
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={statusFilter === "reserve" ? "primary" : "secondary"}
-                    onClick={() => setStatusFilter("reserve")}
-                    className="cursor-pointer"
-                  >
-                    🔵 Réservé ({creations.filter(c => c.reserved && !c.sold).length})
+                    ✅ Disponible ({creations.filter(c => !c.sold).length})
                   </Button>
                   <Button
                     size="sm"
@@ -778,11 +767,6 @@ function AdminCreationsContent() {
                             Vendu
                           </span>
                         )}
-                        {c.reserved && !c.sold && (
-                          <span className="absolute left-1 top-1 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                            Réservé
-                          </span>
-                        )}
                         <img
                           src={c.imageUrl}
                           alt={c.title}
@@ -815,7 +799,7 @@ function AdminCreationsContent() {
                   </div>
 
                   <div className="flex items-center gap-2 sm:shrink-0">
-                    {(c.reserved || c.sold) && (
+                    {c.sold && (
                       <Button
                         variant="primary"
                         size="sm"

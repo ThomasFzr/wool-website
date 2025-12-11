@@ -1,23 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Creation } from "./CreationCard";
 import { Button, Badge } from "./ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
+import { useCart } from "@/contexts/CartContext";
 
 interface CreationModalProps {
   creation: Creation | null;
   isOpen: boolean;
   onClose: () => void;
-  onReserve?: (creation: Creation) => Promise<void>;
   hideActions?: boolean;
 }
 
-export function CreationModal({ creation, isOpen, onClose, onReserve, hideActions = false }: CreationModalProps) {
-  const { data: session } = useSession();
+export function CreationModal({ creation, isOpen, onClose, hideActions = false }: CreationModalProps) {
   const router = useRouter();
+  const { addItem, items } = useCart();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [zoomed, setZoomed] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -28,9 +27,11 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
   const [pinchStartScale, setPinchStartScale] = useState(1);
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [swipeDeltaX, setSwipeDeltaX] = useState(0);
-  const [reserveLoading, setReserveLoading] = useState(false);
-  const [justReserved, setJustReserved] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
+  const [justAddedToCart, setJustAddedToCart] = useState(false);
+  
+  // Vérifier si l'article est déjà dans le panier
+  const isInCart = creation ? items.some((item) => item.creationId === creation._id) : false;
 
   const images = creation?.images && creation.images.length > 0 
     ? creation.images 
@@ -54,7 +55,7 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
       setZoomed(false);
       setOffset({ x: 0, y: 0 });
       setScale(1);
-      setJustReserved(false);
+      setJustAddedToCart(false);
     }
   }, [isOpen]);
 
@@ -109,18 +110,23 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
     setOffset({ x: 0, y: 0 });
   }
 
-  async function handleReserve() {
-    if (!creation || !onReserve) return;
+  function handleAddToCart() {
+    if (!creation || creation.sold || isInCart) return;
     
-    setReserveLoading(true);
-    try {
-      await onReserve(creation);
-      setJustReserved(true);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setReserveLoading(false);
-    }
+    addItem({
+      creationId: creation._id,
+      slug: creation.slug,
+      title: creation.title,
+      imageUrl: creation.images && creation.images.length > 0 
+        ? creation.images[0] 
+        : creation.imageUrl,
+      price: creation.price,
+    });
+
+    setJustAddedToCart(true);
+    setTimeout(() => {
+      setJustAddedToCart(false);
+    }, 2000);
   }
 
   if (!creation) return null;
@@ -348,29 +354,21 @@ export function CreationModal({ creation, isOpen, onClose, onReserve, hideAction
         <div className="mt-4 flex items-center justify-between">
           {!hideActions && (
             <div className="flex items-center gap-2">
-              {justReserved ? (
-                <p className="text-sm font-medium text-green-600">
-                  Article réservé ✔️
-                </p>
-              ) : creation.sold ? (
+              {creation.sold ? (
                 <p className="text-sm font-medium text-slate-700">
                   Cet article est déjà vendu.
                 </p>
-              ) : creation.reserved ? (
-                <p className="text-sm font-medium text-red-600">
-                  Cet article est déjà réservé.
+              ) : justAddedToCart ? (
+                <p className="text-sm font-medium text-green-600">
+                  ✓ Ajouté au panier !
                 </p>
-              ) : !session ? (
-                <Button size="sm" onClick={() => signIn()}>
-                  Se connecter pour réserver
-                </Button>
               ) : (
                 <Button 
                   size="sm" 
-                  onClick={handleReserve}
-                  disabled={reserveLoading}
+                  onClick={handleAddToCart}
+                  disabled={isInCart}
                 >
-                  {reserveLoading ? "Réservation..." : "Réserver"}
+                  {isInCart ? "Déjà dans le panier" : "Ajouter au panier"}
                 </Button>
               )}
 

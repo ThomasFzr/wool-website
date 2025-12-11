@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button, Badge } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
@@ -18,20 +17,16 @@ export type Creation = {
   price?: number;
   color?: string;
   type?: "bonnet" | "tour de cou" | "bandeau";
-  reserved?: boolean;
   sold?: boolean;
   showAsNew?: boolean;
   createdAt?: string;
-  reservedByUserId?: string | null;
 };
 
 interface CreationDetailProps {
   creation: Creation;
-  currentUserId?: string;
 }
 
-export function CreationDetail({ creation, currentUserId }: CreationDetailProps) {
-  const { data: session } = useSession();
+export function CreationDetail({ creation }: CreationDetailProps) {
   const router = useRouter();
   const { addItem, items } = useCart();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -47,16 +42,11 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
   const [pinchStartScale, setPinchStartScale] = useState(1);
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [swipeDeltaX, setSwipeDeltaX] = useState(0);
-  const [reserveLoading, setReserveLoading] = useState(false);
-  const [justReserved, setJustReserved] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
   const [thumbnailScroll, setThumbnailScroll] = useState(0);
   const [showToast, setShowToast] = useState(false);
   const [justAddedToCart, setJustAddedToCart] = useState(false);
-
-  // Vérifier si l'utilisateur connecté est celui qui a réservé l'article
-  const isReservedByCurrentUser = currentUserId && creation.reservedByUserId === currentUserId;
 
   const images = creation?.images && creation.images.length > 0 
     ? creation.images 
@@ -283,7 +273,7 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
   }
 
   function handleAddToCart() {
-    if (creation.reserved || creation.sold || isInCart) {
+    if (creation.sold || isInCart) {
       return;
     }
 
@@ -307,45 +297,6 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setShowToast(true);
     }
-  }
-
-  async function handleReserve() {
-    if (!session?.user) {
-      signIn();
-      return;
-    }
-
-    setReserveLoading(true);
-
-    const name = session.user.name || "";
-    const contact = session.user.email || "";
-
-    if (!name || !contact) {
-      alert("Impossible de récupérer vos informations. Veuillez vous reconnecter.");
-      setReserveLoading(false);
-      return;
-    }
-
-    const res = await fetch(`/api/creations/${creation._id}/reserve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, contact }),
-    });
-
-    setReserveLoading(false);
-
-    if (res.status === 409) {
-      alert("Cet article vient déjà d'être réservé.");
-      router.refresh();
-      return;
-    }
-    if (!res.ok) {
-      alert("Erreur lors de la réservation, réessayez plus tard.");
-      return;
-    }
-
-    setJustReserved(true);
-    router.refresh();
   }
 
   const currentImageUrl = images[currentIndex]
@@ -477,10 +428,6 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
               <span className="absolute left-4 top-4 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
                 Vendu
               </span>
-            ) : creation.reserved || justReserved ? (
-              <span className="absolute left-4 top-4 rounded-full bg-red-500 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                Réservé
-              </span>
             ) : isNewArticle ? (
               <span className="absolute left-4 top-4 rounded-full bg-red-500 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
                 Nouveau
@@ -542,75 +489,38 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
 
           {/* Actions - Desktop */}
           <div className="hidden md:block space-y-3">
-            {!creation.reserved && !creation.sold && !justReserved ? (
-              <div className="space-y-3">
-                <Button
-                  onClick={handleAddToCart}
-                  disabled={isInCart || justAddedToCart}
-                  className={`w-full cursor-pointer transition-all duration-300 ${
-                    justAddedToCart
-                      ? "bg-green-500 hover:bg-green-500 scale-105"
-                      : ""
-                  }`}
-                  size="lg"
-                >
-                  {justAddedToCart
-                    ? "✓ Ajouté !"
-                    : isInCart
-                    ? "Déjà dans le panier"
-                    : "Ajouter au panier"}
-                </Button>
-                <Button
-                  onClick={handleReserve}
-                  disabled={reserveLoading}
-                  variant="secondary"
-                  className="w-full cursor-pointer"
-                  size="lg"
-                >
-                  {reserveLoading ? "Réservation..." : "Réserver directement"}
-                </Button>
-              </div>
+            {!creation.sold ? (
+              <Button
+                onClick={handleAddToCart}
+                disabled={isInCart || justAddedToCart}
+                className={`w-full cursor-pointer transition-all duration-300 ${
+                  justAddedToCart
+                    ? "bg-green-500 hover:bg-green-500 scale-105"
+                    : ""
+                }`}
+                size="lg"
+              >
+                {justAddedToCart
+                  ? "✓ Ajouté !"
+                  : isInCart
+                  ? "Déjà dans le panier"
+                  : "Ajouter au panier"}
+              </Button>
             ) : (
               <>
-                <div className={`rounded-lg p-4 text-center ${
-                  creation.sold ? "bg-gray-100" :
-                  isReservedByCurrentUser ? "bg-blue-50" :
-                  justReserved ? "bg-green-50" : "bg-red-50"
-                }`}>
-                  <p className={`font-medium ${
-                    creation.sold ? "text-gray-900" :
-                    isReservedByCurrentUser ? "text-blue-900" :
-                    justReserved ? "text-green-900" : "text-red-900"
-                  }`}>
-                    {creation.sold ? "Article vendu" :
-                     isReservedByCurrentUser ? "Vous avez réservé cet article" :
-                     justReserved ? "Réservé avec succès !" : "Article déjà réservé"}
+                <div className="rounded-lg p-4 text-center bg-gray-100">
+                  <p className="font-medium text-gray-900">Article vendu</p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Cet article n'est plus disponible
                   </p>
-                  {justReserved && (
-                    <p className="mt-1 text-sm text-green-700">
-                      Vous recevrez un email de confirmation.
-                    </p>
-                  )}
-                  {isReservedByCurrentUser && (
-                    <p className="mt-1 text-sm text-blue-700">
-                      Nous vous contacterons pour finaliser la vente.
-                    </p>
-                  )}
-                  {(creation.sold || (creation.reserved && !isReservedByCurrentUser)) && (
-                    <p className="mt-1 text-sm text-gray-600">
-                      Cet article n'est plus disponible
-                    </p>
-                  )}
                 </div>
-                {(creation.sold || (creation.reserved && !isReservedByCurrentUser)) && (
-                  <Button
-                    onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)}
-                    className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
-                    size="lg"
-                  >
-                    Commander un article identique
-                  </Button>
-                )}
+                <Button
+                  onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)}
+                  className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
+                  size="lg"
+                >
+                  Commander un article identique
+                </Button>
               </>
             )}
           </div>
@@ -619,75 +529,38 @@ export function CreationDetail({ creation, currentUserId }: CreationDetailProps)
 
       {/* Mobile Actions */}
       <div className="md:hidden p-4 space-y-2">
-        {!creation.reserved && !creation.sold && !justReserved ? (
-          <div className="space-y-2">
-            <Button
-              onClick={handleAddToCart}
-              disabled={isInCart || justAddedToCart}
-              className={`w-full cursor-pointer transition-all duration-300 ${
-                justAddedToCart
-                  ? "bg-green-500 hover:bg-green-500 scale-105"
-                  : ""
-              }`}
-              size="lg"
-            >
-              {justAddedToCart
-                ? "✓ Ajouté !"
-                : isInCart
-                ? "Déjà dans le panier"
-                : "Ajouter au panier"}
-            </Button>
-            <Button
-              onClick={handleReserve}
-              disabled={reserveLoading}
-              variant="secondary"
-              className="w-full cursor-pointer"
-              size="lg"
-            >
-              {reserveLoading ? "Réservation..." : "Réserver directement"}
-            </Button>
-          </div>
+        {!creation.sold ? (
+          <Button
+            onClick={handleAddToCart}
+            disabled={isInCart || justAddedToCart}
+            className={`w-full cursor-pointer transition-all duration-300 ${
+              justAddedToCart
+                ? "bg-green-500 hover:bg-green-500 scale-105"
+                : ""
+            }`}
+            size="lg"
+          >
+            {justAddedToCart
+              ? "✓ Ajouté !"
+              : isInCart
+              ? "Déjà dans le panier"
+              : "Ajouter au panier"}
+          </Button>
         ) : (
           <>
-            <div className={`rounded-lg p-3 text-center ${
-              creation.sold ? "bg-gray-100" :
-              isReservedByCurrentUser ? "bg-blue-50" :
-              justReserved ? "bg-green-50" : "bg-red-50"
-            }`}>
-              <p className={`text-sm font-medium ${
-                creation.sold ? "text-gray-900" :
-                isReservedByCurrentUser ? "text-blue-900" :
-                justReserved ? "text-green-900" : "text-red-900"
-              }`}>
-                {creation.sold ? "Article vendu" :
-                 isReservedByCurrentUser ? "Vous avez réservé cet article" :
-                 justReserved ? "Réservé avec succès !" : "Article déjà réservé"}
+            <div className="rounded-lg p-3 text-center bg-gray-100">
+              <p className="text-sm font-medium text-gray-900">Article vendu</p>
+              <p className="mt-1 text-xs text-gray-600">
+                Cet article n'est plus disponible
               </p>
-              {justReserved && (
-                <p className="mt-1 text-xs text-green-700">
-                  Vous recevrez un email de confirmation.
-                </p>
-              )}
-              {isReservedByCurrentUser && (
-                <p className="mt-1 text-xs text-blue-700">
-                  Nous vous contacterons pour finaliser la vente.
-                </p>
-              )}
-              {(creation.sold || (creation.reserved && !isReservedByCurrentUser)) && (
-                <p className="mt-1 text-xs text-gray-600">
-                  Cet article n'est plus disponible
-                </p>
-              )}
             </div>
-            {(creation.sold || (creation.reserved && !isReservedByCurrentUser)) && (
-              <Button
-                onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)}
-                className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
-                size="lg"
-              >
-                Commander un article identique
-              </Button>
-            )}
+            <Button
+              onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)}
+              className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
+              size="lg"
+            >
+              Commander un article identique
+            </Button>
           </>
         )}
       </div>

@@ -79,7 +79,7 @@ export function HomeClient({ initialCreations, availableColors = [], availableTy
 
   // Filtrage des créations
   const filteredCreations = creations.filter((c) => {
-    if (showOnlyAvailable && (c.sold || c.reserved)) {
+    if (showOnlyAvailable && c.sold) {
       return false;
     }
     if (selectedColors.length > 0 && !selectedColors.includes(c.color || "")) {

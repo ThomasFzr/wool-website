@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search");
 
     const query: any = {
-      contact: session.user.email, // 🔥 ne renvoie QUE les réservations de cet email
+      contact: session.user.email, // 🔥 ne renvoie QUE les commandes de cet email
+      paymentStatus: "paid", // 🔥 uniquement les commandes payées
     };
 
     if (status) {
@@ -46,7 +47,8 @@ export async function GET(req: NextRequest) {
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("creationId", "title description images imageUrl price color");
+      .populate("creationId", "title description images imageUrl price color")
+      .select("+stripeCheckoutSessionId +deliveryMode +paidAt");
 
     return NextResponse.json({
       reservations,

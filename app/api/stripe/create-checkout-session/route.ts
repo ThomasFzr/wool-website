@@ -56,11 +56,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Vérifier qu'aucune création n'est déjà réservée
-    const reservedCreations = creations.filter((c) => c.reserved || c.sold);
-    if (reservedCreations.length > 0) {
+    // Vérifier qu'aucune création n'est déjà vendue
+    const soldCreations = creations.filter((c) => c.sold);
+    if (soldCreations.length > 0) {
       return new NextResponse(
-        "Certaines créations sont déjà réservées ou vendues",
+        "Certaines créations sont déjà vendues",
         { status: 409 }
       );
     }

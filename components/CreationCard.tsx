@@ -12,7 +12,6 @@ export type Creation = {
   price?: number;
   color?: string;
   type?: "bonnet" | "tour de cou" | "bandeau";
-  reserved?: boolean;
   sold?: boolean;
   showAsNew?: boolean;
   createdAt?: string;
@@ -60,10 +59,6 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
         {creation.sold ? (
           <span className="absolute left-2 top-2 z-10 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
             Vendu
-          </span>
-        ) : creation.reserved ? (
-          <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-            Réservé
           </span>
         ) : isNewArticle ? (
           <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">

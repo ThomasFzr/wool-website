@@ -91,13 +91,9 @@ export async function POST(req: NextRequest) {
           reservation.paidAt = new Date();
           await reservation.save();
 
-          // Mettre à jour la création
+          // Mettre à jour la création - marquer comme vendue
           const creation = await Creation.findById(reservation.creationId);
           if (creation) {
-            creation.reserved = true;
-            creation.reservedName = reservation.name;
-            creation.reservedContact = reservation.contact;
-            creation.reservedAt = new Date();
             creation.sold = true;
             creation.salesCount = (creation.salesCount || 0) + 1;
             await creation.save();

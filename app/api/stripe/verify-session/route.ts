@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import Stripe from "stripe";
+import { connectToDatabase } from "@/lib/db";
+import Reservation from "@/models/Reservation";
+import Creation from "@/models/Creation";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -44,6 +47,44 @@ export async function GET(req: NextRequest) {
 
     // Récupérer les détails de la session si valide
     if (isValid) {
+      // Mettre à jour les réservations et créations (comme le webhook)
+      await connectToDatabase();
+      
+      const reservationIds = checkoutSession.metadata?.reservationIds
+        ? JSON.parse(checkoutSession.metadata.reservationIds)
+        : [];
+
+      if (reservationIds.length > 0) {
+        const reservations = await Reservation.find({
+          _id: { $in: reservationIds },
+        });
+
+        await Promise.all(
+          reservations.map(async (reservation: any) => {
+            // Vérifier si déjà traité
+            if (reservation.paymentStatus === "paid") {
+              return;
+            }
+
+            // Mettre à jour la réservation
+            reservation.stripePaymentIntentId = checkoutSession.payment_intent as string;
+            reservation.stripeCustomerId = checkoutSession.customer as string;
+            reservation.paymentStatus = "paid";
+            reservation.status = "validated";
+            reservation.paidAt = new Date();
+            await reservation.save();
+
+            // Mettre à jour la création - marquer comme vendue
+            const creation = await Creation.findById(reservation.creationId);
+            if (creation) {
+              creation.sold = true;
+              creation.salesCount = (creation.salesCount || 0) + 1;
+              await creation.save();
+            }
+          })
+        );
+      }
+
       // Récupérer les line items pour avoir les détails
       const lineItems = await stripe.checkout.sessions.listLineItems(sessionId, {
         expand: ["data.price.product"],

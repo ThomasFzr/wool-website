@@ -1,15 +1,63 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { ReservationCard, Reservation } from "@/components/ReservationCard";
+import { Reservation } from "@/components/ReservationCard";
+import { OrderCard, Order } from "@/components/OrderCard";
 
 export default function OrdersPage() {
   const { data: session, status } = useSession();
-  const [orders, setOrders] = useState<Reservation[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Regrouper les réservations par commande (stripeCheckoutSessionId)
+  const orders = useMemo(() => {
+    const grouped = new Map<string, Reservation[]>();
+    
+    reservations.forEach((res) => {
+      // Utiliser stripeCheckoutSessionId comme clé, ou l'ID de la réservation si pas de session
+      const key = res.stripeCheckoutSessionId || res._id;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(res);
+    });
+
+    // Convertir en tableau de commandes
+    const orderList: Order[] = [];
+    grouped.forEach((items, id) => {
+      const firstItem = items[0];
+      const totalPrice = items.reduce((sum, item) => sum + (item.creationId?.price || 0), 0);
+      
+      // Déterminer le statut global de la commande
+      const hasValidated = items.some(i => i.status === "validated");
+      const hasCancelled = items.some(i => i.status === "cancelled");
+      const allCancelled = items.every(i => i.status === "cancelled");
+      
+      let orderStatus: "pending" | "validated" | "cancelled" = "pending";
+      if (allCancelled) {
+        orderStatus = "cancelled";
+      } else if (hasValidated) {
+        orderStatus = "validated";
+      }
+
+      orderList.push({
+        id,
+        items,
+        createdAt: firstItem.paidAt || firstItem.createdAt,
+        status: orderStatus,
+        deliveryMode: firstItem.deliveryMode,
+        totalPrice,
+      });
+    });
+
+    // Trier par date décroissante
+    return orderList.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [reservations]);
 
   async function load() {
     try {
@@ -20,7 +68,7 @@ export default function OrdersPage() {
         throw new Error("Erreur chargement");
       }
       const data = await res.json();
-      setOrders(data.reservations ?? []);
+      setReservations(data.reservations ?? []);
     } catch (e) {
       console.error(e);
       setError("Impossible de charger vos commandes.");
@@ -34,21 +82,6 @@ export default function OrdersPage() {
       load();
     }
   }, [status]);
-
-  async function handleCancelOrder(id: string, reason?: string) {
-    const res = await fetch(`/api/account/reservations/${id}/cancel`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || "Erreur lors de l'annulation.");
-    }
-
-    await load();
-  }
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -90,10 +123,9 @@ export default function OrdersPage() {
 
       <div className="mt-4 space-y-4">
         {orders.map((order) => (
-          <ReservationCard
-            key={order._id}
-            reservation={order}
-            onCancel={handleCancelOrder}
+          <OrderCard
+            key={order.id}
+            order={order}
           />
         ))}
       </div>

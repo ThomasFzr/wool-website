@@ -51,7 +51,6 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       await Creation.findByIdAndUpdate(creation._id, {
         $set: {
           sold: true,
-          reserved: false, // il n'est plus juste réservé, il est vendu
         },
         $inc: {
           salesCount: 1, // Incrémenter le compteur de ventes
@@ -66,12 +65,12 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       if (shouldSendEmail) {
         await sendEmail({
         to: reservation.contact,
-        subject: "🎉 Votre réservation a été validée",
+        subject: "🎉 Votre commande a été validée",
         html: emailTemplate(`
             <h1 style="font-size:20px;margin:0 0 12px 0;">Bonne nouvelle 🎉</h1>
             <p style="font-size:14px;margin:0 0 16px 0;">
               Bonjour <strong>${reservation.name}</strong>,<br/>
-              Votre réservation a été <strong>validée</strong> ! Nous allons revenir vers vous pour finaliser la vente.
+              Votre commande a été <strong>validée</strong> ! Nous allons revenir vers vous pour finaliser la livraison.
             </p>
 
             <div style="margin-top:16px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
@@ -91,7 +90,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
 
             <p style="font-size:12px;margin-top:20px;color:#6b7280;">
               Vous pouvez retrouver cette commande dans :<br/>
-              <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Mes réservations</a>
+              <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Mes commandes</a>
             </p>
         `),
         });
@@ -101,11 +100,11 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       if (process.env.SELLER_EMAIL) {
         await sendEmail({
           to: process.env.SELLER_EMAIL,
-          subject: `✅ Réservation validée : ${creation.title}`,
+          subject: `✅ Commande validée : ${creation.title}`,
           html: emailTemplate(`
-              <h1 style="font-size:18px;margin:0 0 12px 0;">Réservation validée</h1>
+              <h1 style="font-size:18px;margin:0 0 12px 0;">Commande validée</h1>
               <p style="font-size:14px;margin:0 0 12px 0;">
-                La réservation de <strong>${reservation.name}</strong> (${reservation.contact}) a été <strong>validée</strong>.
+                La commande de <strong>${reservation.name}</strong> (${reservation.contact}) a été <strong>validée</strong>.
               </p>
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
@@ -134,14 +133,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       // L'article redevient disponible
       await Creation.findByIdAndUpdate(creation._id, {
         $set: {
-          reserved: false,
           sold: false,
-        },
-        $unset: {
-          reservedName: "",
-          reservedContact: "",
-          reservedMessage: "",
-          reservedAt: "",
         },
       });
 
@@ -165,12 +157,12 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       if (shouldSendEmail) {
         await sendEmail({
         to: reservation.contact,
-        subject: "❌ Votre réservation a été annulée",
+        subject: "❌ Votre commande a été annulée",
         html: emailTemplate(`
-            <h1 style="font-size:20px;margin:0 0 12px 0;">Réservation annulée</h1>
+            <h1 style="font-size:20px;margin:0 0 12px 0;">Commande annulée</h1>
             <p style="font-size:14px;margin:0 0 16px 0;">
               Bonjour <strong>${reservation.name}</strong>,<br/>
-              Votre réservation pour l'article suivant a été <strong>annulée par la créatrice</strong>.
+              Votre commande pour l'article suivant a été <strong>annulée par la créatrice</strong>.
             </p>
 
             <div style="margin-top:16px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
@@ -200,11 +192,11 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       if (process.env.SELLER_EMAIL) {
                 await sendEmail({
           to: process.env.SELLER_EMAIL,
-          subject: `❌ Réservation annulée : ${creation.title}`,
+          subject: `❌ Commande annulée : ${creation.title}`,
           html: emailTemplate(`
-              <h1 style="font-size:18px;margin:0 0 12px 0;">Réservation annulée</h1>
+              <h1 style="font-size:18px;margin:0 0 12px 0;">Commande annulée</h1>
               <p style="font-size:14px;margin:0 0 12px 0;">
-                La réservation de <strong>${reservation.name}</strong> (${reservation.contact}) a été <strong>annulée</strong>.
+                La commande de <strong>${reservation.name}</strong> (${reservation.contact}) a été <strong>annulée</strong>.
               </p>
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
@@ -259,15 +251,10 @@ export async function DELETE(
     }
 
     if (reservation.creationId) {
+      // Remettre l'article en disponible si suppression de la commande
       await Creation.findByIdAndUpdate(reservation.creationId, {
         $set: {
-          reserved: false,
-        },
-        $unset: {
-          reservedName: "",
-          reservedContact: "",
-          reservedMessage: "",
-          reservedAt: "",
+          sold: false,
         },
       });
     }
