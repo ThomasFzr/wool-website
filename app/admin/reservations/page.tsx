@@ -145,7 +145,18 @@ function AdminReservationsContent() {
     }
 
     async function deleteReservation(id: string) {
-        await fetch(`/api/admin/reservations/${id}`, { method: "DELETE" });
+        // Si on a des articles groupés, supprimer toute la commande
+        if (selectedOrderItems.length > 0) {
+            // Supprimer tous les articles de la commande en parallèle
+            await Promise.all(
+                selectedOrderItems.map(item => 
+                    fetch(`/api/admin/reservations/${item._id}`, { method: "DELETE" })
+                )
+            );
+        } else {
+            // Sinon, supprimer seulement l'article sélectionné
+            await fetch(`/api/admin/reservations/${id}`, { method: "DELETE" });
+        }
         load();
     }
 
@@ -947,7 +958,12 @@ function AdminReservationsContent() {
                                                             ⚠️ Confirmer la suppression ?
                                                         </p>
                                                         <p className="text-xs text-red-700 mb-4">
-                                                            Cette action est <strong>irréversible</strong>. La commande sera supprimée de la base de données et l'article redeviendra disponible.
+                                                            Cette action est <strong>irréversible</strong>. 
+                                                            {selectedOrderItems.length > 1 ? (
+                                                                <> Toute la commande ({selectedOrderItems.length} article{selectedOrderItems.length > 1 ? 's' : ''}) sera supprimée de la base de données et les articles redeviendront disponibles.</>
+                                                            ) : (
+                                                                <> La commande sera supprimée de la base de données et l'article redeviendra disponible.</>
+                                                            )}
                                                         </p>
                                                         <div className="flex gap-2">
                                                             <Button
