@@ -936,7 +936,7 @@ function AdminCreationsContent() {
                     onChange={(e) => setForm({ ...form, weight: e.target.value })}
                   />
                   <Input
-                    label="Prix de la laine (€)"
+                    label="Prix de la laine (€/100g)"
                     type="number"
                     step="0.01"
                     placeholder="Ex : 12.50"
@@ -1155,7 +1155,7 @@ function AdminCreationsContent() {
                     onChange={(e) => setForm({ ...form, weight: e.target.value })}
                   />
                   <Input
-                    label="Prix de la laine (€)"
+                    label="Prix de la laine (€/100g)"
                     type="number"
                     step="0.01"
                     placeholder="Ex : 12.50"

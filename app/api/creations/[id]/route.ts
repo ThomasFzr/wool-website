@@ -4,7 +4,7 @@ import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 
 /**
  * Génère un slug à partir d'un titre
@@ -153,7 +153,6 @@ export async function PATCH(
     // 🔄 Invalider le cache après modification
     revalidatePath('/');
     revalidatePath('/api/creations');
-    revalidateTag('creations');
 
     return NextResponse.json(creation);
   } catch (err) {
