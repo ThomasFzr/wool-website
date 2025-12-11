@@ -21,9 +21,9 @@ function generateSlug(title: string): string {
 export async function GET() {
   try {
     await connectToDatabase();
-    // Exclure les champs admin (yarnBrand, weight) pour les utilisateurs publics
+    // Exclure les champs admin (yarnBrand, weight, yarnPrice) pour les utilisateurs publics
     const creations = await Creation.find()
-      .select("-yarnBrand -weight")
+      .select("-yarnBrand -weight -yarnPrice")
       .sort({ displayOrder: -1, createdAt: -1 })
       .lean();
     return NextResponse.json(creations);
@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
       showAsNew: body.showAsNew !== undefined ? body.showAsNew : true,
       yarnBrand: body.yarnBrand,
       weight: body.weight,
+      yarnPrice: body.yarnPrice,
     });
 
     // 🔄 Invalider le cache immédiatement après création

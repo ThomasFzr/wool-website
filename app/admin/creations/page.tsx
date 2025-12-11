@@ -28,6 +28,7 @@ type Creation = {
   createdAt?: string;
   yarnBrand?: string; // Marque de laine (admin uniquement)
   weight?: number; // Poids en grammes (admin uniquement)
+  yarnPrice?: number; // Prix de la laine (admin uniquement)
 };
 
 function AdminCreationsContent() {
@@ -47,6 +48,7 @@ function AdminCreationsContent() {
     showAsNew: true as boolean,
     yarnBrand: "", // Marque de laine (admin uniquement)
     weight: "", // Poids en grammes (admin uniquement)
+    yarnPrice: "", // Prix de la laine (admin uniquement)
   });
 
   const [message, setMessage] = useState<string | null>(null);
@@ -254,6 +256,7 @@ function AdminCreationsContent() {
       showAsNew: form.showAsNew,
       yarnBrand: form.yarnBrand || undefined,
       weight: form.weight ? Number(form.weight) : undefined,
+      yarnPrice: form.yarnPrice ? Number(form.yarnPrice) : undefined,
     };
 
     const url = editingId ? `/api/creations/${editingId}` : "/api/creations";
@@ -285,6 +288,7 @@ function AdminCreationsContent() {
       showAsNew: true,
       yarnBrand: "",
       weight: "",
+      yarnPrice: "",
     });
     setEditingId(null);
     setShowEditModal(false);
@@ -306,6 +310,7 @@ function AdminCreationsContent() {
       showAsNew: c.showAsNew !== undefined ? c.showAsNew : true,
       yarnBrand: c.yarnBrand ?? "",
       weight: c.weight != null ? String(c.weight) : "",
+      yarnPrice: c.yarnPrice != null ? String(c.yarnPrice) : "",
     });
     setMessage(null);
     setShowEditModal(true);
@@ -354,6 +359,7 @@ function AdminCreationsContent() {
       showAsNew: true,
       yarnBrand: "",
       weight: "",
+      yarnPrice: "",
     });
     setMessage(null);
     setShowEditModal(false);
@@ -909,7 +915,7 @@ function AdminCreationsContent() {
                 <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
                   🔒 Informations admin (non visibles pour les utilisateurs)
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <Input
                     label="Marque de laine"
                     placeholder="Ex : Drops, Phildar..."
@@ -922,6 +928,14 @@ function AdminCreationsContent() {
                     placeholder="Ex : 150"
                     value={form.weight}
                     onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                  />
+                  <Input
+                    label="Prix de la laine (€)"
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex : 12.50"
+                    value={form.yarnPrice}
+                    onChange={(e) => setForm({ ...form, yarnPrice: e.target.value })}
                   />
                 </div>
               </div>
@@ -1120,7 +1134,7 @@ function AdminCreationsContent() {
                 <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
                   🔒 Informations admin (non visibles pour les utilisateurs)
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <Input
                     label="Marque de laine"
                     placeholder="Ex : Drops, Phildar..."
@@ -1133,6 +1147,14 @@ function AdminCreationsContent() {
                     placeholder="Ex : 150"
                     value={form.weight}
                     onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                  />
+                  <Input
+                    label="Prix de la laine (€)"
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex : 12.50"
+                    value={form.yarnPrice}
+                    onChange={(e) => setForm({ ...form, yarnPrice: e.target.value })}
                   />
                 </div>
               </div>
