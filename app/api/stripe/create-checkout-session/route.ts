@@ -142,13 +142,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Détecter si on est en développement (localhost)
-    const isDevelopment = process.env.NODE_ENV === "development" || 
-                          !process.env.NEXT_PUBLIC_APP_URL || 
-                          process.env.NEXT_PUBLIC_APP_URL.includes("localhost");
-    const appUrl = isDevelopment 
-      ? "http://localhost:3000" 
-      : (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
+    // Détecter l'URL de base depuis la requête actuelle
+    // Cela permet d'utiliser automatiquement le bon domaine (staging, production, localhost)
+    const host = req.headers.get("host") || "";
+    const protocol = req.headers.get("x-forwarded-proto") || 
+                     (host.includes("localhost") ? "http" : "https");
+    
+    // Construire l'URL de base
+    let appUrl: string;
+    
+    if (host.includes("localhost") || host.includes("127.0.0.1")) {
+      // Développement local
+      appUrl = "http://localhost:3000";
+    } else {
+      // Production ou staging - utiliser le domaine de la requête
+      appUrl = `${protocol}://${host}`;
+    }
 
     // Créer la session Stripe Checkout
     const checkoutSession = await stripe.checkout.sessions.create({
