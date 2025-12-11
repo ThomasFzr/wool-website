@@ -107,6 +107,10 @@ export async function POST(req: NextRequest) {
           const user = await User.findOne({ email: reservation.contact });
           const shouldSendEmail = user?.emailNotifications !== false;
 
+          // Récupérer le mode de livraison depuis les metadata ou la réservation
+          const deliveryMode = session.metadata?.deliveryMode || reservation.deliveryMode || "pickup";
+          const deliveryLabel = deliveryMode === "shipping" ? "Livraison postale" : "Remise en main propre";
+
           if (shouldSendEmail && creation) {
             const productImage =
               (Array.isArray(creation.images) && creation.images.length > 0
@@ -144,6 +148,7 @@ export async function POST(req: NextRequest) {
                         : ""
                     }
                     <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
+                    <p style="margin:0 0 4px 0;">📦 Mode de livraison : <strong>${deliveryLabel}</strong></p>
                     <p style="margin:4px 0 0 0;font-size:12px;color:#6b7280;">
                       Numéro de commande : ${reservation._id.toString().slice(-8)}
                     </p>
@@ -175,9 +180,9 @@ export async function POST(req: NextRequest) {
 
             await sendEmail({
               to: process.env.SELLER_EMAIL,
-              subject: `💳 Nouvelle vente : ${creation.title}`,
+              subject: `💳 Nouvelle commande : ${creation.title}`,
               html: emailTemplate(`
-                <h1 style="font-size:18px;margin:0 0 12px 0;">Nouvelle vente confirmée</h1>
+                <h1 style="font-size:18px;margin:0 0 12px 0;">Nouvelle commande confirmée</h1>
                 <p style="font-size:14px;margin:0 0 12px 0;">
                   <strong>${reservation.name}</strong> (${reservation.contact}) a effectué un paiement pour :
                 </p>
@@ -196,17 +201,18 @@ export async function POST(req: NextRequest) {
                         : ""
                     }
                     <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
+                    <p style="margin:0 0 4px 0;">📦 Mode de livraison : <strong>${deliveryLabel}</strong></p>
                     <p style="margin:0 0 4px 0;font-size:12px;color:#6b7280;">
                       Paiement effectué le : ${new Date().toLocaleString("fr-FR")}
                     </p>
                     <p style="margin:4px 0 0 0;font-size:12px;color:#6b7280;">
-                      ID de réservation : ${reservation._id.toString()}
+                      ID de commande : ${reservation._id.toString()}
                     </p>
                   </div>
                 </div>
 
                 <p style="font-size:12px;margin-top:20px;color:#6b7280;">
-                  <a href="${appUrl}/admin/reservations?creationId=${creation._id}" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer cette réservation</a>
+                  <a href="${appUrl}/admin/reservations?creationId=${creation._id}" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer cette commande</a>
                 </p>
               `),
             });

@@ -11,9 +11,13 @@ export type CartItem = {
   quantity: number;
 };
 
+export type DeliveryMode = "pickup" | "shipping";
+
 type CartContextType = {
   items: CartItem[];
   isOpen: boolean;
+  deliveryMode: DeliveryMode;
+  shippingCost: number;
   openCart: () => void;
   closeCart: () => void;
   addItem: (item: Omit<CartItem, "quantity">) => void;
@@ -22,18 +26,23 @@ type CartContextType = {
   clearCart: () => void;
   getTotalItems: () => number;
   getTotalPrice: () => number;
+  getTotalWithShipping: () => number;
+  setDeliveryMode: (mode: DeliveryMode) => void;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const STORAGE_KEY = "wool-starter-cart";
+const DELIVERY_MODE_KEY = "wool-starter-delivery-mode";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [deliveryMode, setDeliveryModeState] = useState<DeliveryMode>("pickup");
+  const [shippingCost, setShippingCost] = useState(5);
 
-  // Charger le panier depuis localStorage au montage
+  // Charger le panier et le mode de livraison depuis localStorage au montage
   useEffect(() => {
     setMounted(true);
     try {
@@ -41,9 +50,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (stored) {
         setItems(JSON.parse(stored));
       }
+      const storedDeliveryMode = localStorage.getItem(DELIVERY_MODE_KEY);
+      if (storedDeliveryMode === "pickup" || storedDeliveryMode === "shipping") {
+        setDeliveryModeState(storedDeliveryMode);
+      }
     } catch (error) {
       console.error("Erreur lors du chargement du panier:", error);
     }
+  }, []);
+
+  // Charger les frais de livraison depuis les settings
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.shippingCost != null) {
+          setShippingCost(data.shippingCost);
+        }
+      })
+      .catch((err) => console.error("Erreur chargement settings:", err));
   }, []);
 
   // Sauvegarder le panier dans localStorage à chaque changement
@@ -56,6 +81,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [items, mounted]);
+
+  // Sauvegarder le mode de livraison
+  useEffect(() => {
+    if (mounted) {
+      try {
+        localStorage.setItem(DELIVERY_MODE_KEY, deliveryMode);
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde du mode de livraison:", error);
+      }
+    }
+  }, [deliveryMode, mounted]);
+
+  const setDeliveryMode = (mode: DeliveryMode) => {
+    setDeliveryModeState(mode);
+  };
 
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);
@@ -114,11 +154,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }, 0);
   };
 
+  const getTotalWithShipping = () => {
+    const subtotal = getTotalPrice();
+    if (deliveryMode === "shipping") {
+      return subtotal + shippingCost;
+    }
+    return subtotal;
+  };
+
   return (
     <CartContext.Provider
       value={{
         items,
         isOpen,
+        deliveryMode,
+        shippingCost,
         openCart,
         closeCart,
         addItem,
@@ -127,6 +177,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         getTotalItems,
         getTotalPrice,
+        getTotalWithShipping,
+        setDeliveryMode,
       }}
     >
       {children}

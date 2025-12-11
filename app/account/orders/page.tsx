@@ -7,7 +7,7 @@ import { ReservationCard, Reservation } from "@/components/ReservationCard";
 
 export default function OrdersPage() {
   const { data: session, status } = useSession();
-  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [orders, setOrders] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,10 +20,10 @@ export default function OrdersPage() {
         throw new Error("Erreur chargement");
       }
       const data = await res.json();
-      setReservations(data.reservations ?? []);
+      setOrders(data.reservations ?? []);
     } catch (e) {
       console.error(e);
-      setError("Impossible de charger vos réservations.");
+      setError("Impossible de charger vos commandes.");
     } finally {
       setLoading(false);
     }
@@ -35,7 +35,7 @@ export default function OrdersPage() {
     }
   }, [status]);
 
-  async function handleCancelReservation(id: string, reason?: string) {
+  async function handleCancelOrder(id: string, reason?: string) {
     const res = await fetch(`/api/account/reservations/${id}/cancel`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -73,27 +73,27 @@ export default function OrdersPage() {
         >
           ← Retour à l&apos;accueil
         </Link>
-        <h1 className="text-xl font-semibold">Mes réservations</h1>
+        <h1 className="text-xl font-semibold">Mes commandes</h1>
       </div>
 
       {loading && (
-        <p className="text-sm text-slate-500">Chargement de vos réservations…</p>
+        <p className="text-sm text-slate-500">Chargement de vos commandes…</p>
       )}
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      {!loading && !error && reservations.length === 0 && (
+      {!loading && !error && orders.length === 0 && (
         <p className="text-sm text-slate-500">
-          Vous n&apos;avez pas encore de réservation.
+          Vous n&apos;avez pas encore de commande.
         </p>
       )}
 
       <div className="mt-4 space-y-4">
-        {reservations.map((reservation) => (
+        {orders.map((order) => (
           <ReservationCard
-            key={reservation._id}
-            reservation={reservation}
-            onCancel={handleCancelReservation}
+            key={order._id}
+            reservation={order}
+            onCancel={handleCancelOrder}
           />
         ))}
       </div>

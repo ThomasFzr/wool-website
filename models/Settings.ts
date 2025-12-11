@@ -29,6 +29,11 @@ const settingsSchema = new Schema(
       type: [String], 
       default: ["bonnet", "tour de cou", "bandeau"]
     },
+    // Frais de livraison
+    shippingCost: {
+      type: Number,
+      default: 5,
+    },
   },
   { timestamps: true }
 );

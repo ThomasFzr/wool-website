@@ -15,6 +15,7 @@ type Reservation = {
     createdAt: string;
     cancelReason?: string;
     cancelledBy?: "admin" | "user";
+    deliveryMode?: "pickup" | "shipping";
     creationId?: Creation | null;
 };
 
@@ -121,9 +122,14 @@ function AdminReservationsContent() {
     };
 
     const getStatusLabel = (status: string) => {
-        if (status === "pending") return "En attente";
-        if (status === "validated") return "Validée";
+        if (status === "pending") return "En attente de paiement";
+        if (status === "validated") return "Confirmée";
         return "Annulée";
+    };
+
+    const getDeliveryLabel = (mode?: string) => {
+        if (mode === "shipping") return "🚚 Livraison";
+        return "🤝 Remise en main propre";
     };
 
     const pendingCount = reservations.filter(r => r.status === "pending").length;
@@ -143,10 +149,10 @@ function AdminReservationsContent() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
                             <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                                📋 Réservations
+                                📋 Commandes
                             </h1>
                             <p className="text-sm text-slate-600 mt-1">
-                                {totalCount} réservation{totalCount > 1 ? "s" : ""} au total
+                                {totalCount} commande{totalCount > 1 ? "s" : ""} au total
                                 {pendingCount > 0 && (
                                     <span className="text-orange-600 font-medium">
                                         {" "} • {pendingCount} en attente
@@ -181,15 +187,15 @@ function AdminReservationsContent() {
                     </div>
                 </Card>
 
-                {/* Liste des réservations */}
+                {/* Liste des commandes */}
                 {reservations.length === 0 ? (
                     <Card className="p-12 text-center">
                         <div className="text-4xl mb-3">📭</div>
-                        <p className="text-slate-600 font-medium">Aucune réservation</p>
+                        <p className="text-slate-600 font-medium">Aucune commande</p>
                         <p className="text-sm text-slate-500 mt-1">
                             {search || statusFilter
                                 ? "Essayez de modifier vos filtres"
-                                : "Les réservations apparaîtront ici"}
+                                : "Les commandes apparaîtront ici"}
                         </p>
                     </Card>
                 ) : (
@@ -293,7 +299,7 @@ function AdminReservationsContent() {
                     <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white shadow-2xl p-6 z-50 overflow-y-auto animate-slideInRight">
                         {/* Header */}
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-slate-900">Détails de la réservation</h2>
+                            <h2 className="text-xl font-bold text-slate-900">Détails de la commande</h2>
                             <button
                                 onClick={() => setSelected(null)}
                                 className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 text-slate-600 cursor-pointer"
@@ -329,30 +335,38 @@ function AdminReservationsContent() {
                             </Card>
                         )}
 
-                        {/* Statut d'annulation */}
-                        {selected.status === "cancelled" && (
-                            <Card className="p-4 mb-4 bg-red-50 border-red-200">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-red-600">❌</span>
-                                    <p className="text-xs font-semibold uppercase text-red-700">
-                                        Annulée par {selected.cancelledBy === "user" ? "l'utilisateur" : "l'administrateur"}
-                                    </p>
-                                </div>
-                                {(selected.cancelReason && selected.cancelReason.trim().length > 0) && (
-                                    <div className="mt-3 pt-3 border-t border-red-200">
-                                        <p className="text-xs font-semibold text-red-700 mb-1">Raison</p>
-                                        <p className="text-sm text-red-900">
-                                            {selected.cancelReason}
-                                        </p>
-                                    </div>
-                                )}
-                            </Card>
-                        )}
+{/* Statut d'annulation */}
+                                        {selected.status === "cancelled" && (
+                                            <Card className="p-4 mb-4 bg-red-50 border-red-200">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-red-600">❌</span>
+                                                    <p className="text-xs font-semibold uppercase text-red-700">
+                                                        Commande annulée par {selected.cancelledBy === "user" ? "le client" : "l'administrateur"}
+                                                    </p>
+                                                </div>
+                                                {(selected.cancelReason && selected.cancelReason.trim().length > 0) && (
+                                                    <div className="mt-3 pt-3 border-t border-red-200">
+                                                        <p className="text-xs font-semibold text-red-700 mb-1">Raison</p>
+                                                        <p className="text-sm text-red-900">
+                                                            {selected.cancelReason}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </Card>
+                                        )}
 
-                        {/* Article réservé */}
-                        {selected.creationId && (
-                            <Card className="p-4 mb-4">
-                                <p className="text-xs font-semibold text-slate-700 mb-3">🎨 Article réservé</p>
+{/* Mode de livraison */}
+                                        <Card className="p-4 mb-4 bg-slate-50">
+                                            <p className="text-xs font-semibold text-slate-700 mb-2">📦 Mode de livraison</p>
+                                            <p className="text-sm font-medium text-slate-900">
+                                                {getDeliveryLabel(selected.deliveryMode)}
+                                            </p>
+                                        </Card>
+
+                                        {/* Article commandé */}
+                                        {selected.creationId && (
+                                            <Card className="p-4 mb-4">
+                                                <p className="text-xs font-semibold text-slate-700 mb-3">🎨 Article commandé</p>
 
                                 <div className="flex gap-3 mb-3 p-3 rounded-lg border border-slate-200">
                                     {/* Image */}
@@ -454,140 +468,140 @@ function AdminReservationsContent() {
                                         </div>
                                     ) : null}
 
-                                    {/* Confirmation de validation */}
-                                    {showValidateConfirm && (
-                                        <Card className="p-4 bg-green-50 border-green-200">
-                                            <p className="text-sm font-semibold text-green-900 mb-3">
-                                                ✅ Confirmer la validation ?
-                                            </p>
-                                            <p className="text-xs text-green-700 mb-4">
-                                                L'article sera marqué comme vendu et un email sera envoyé au client.
-                                            </p>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    onClick={() => {
-                                                        updateStatus(selected._id, "validated");
-                                                    }}
-                                                    className="flex-1 bg-green-600 hover:bg-green-700 cursor-pointer"
-                                                    size="sm"
-                                                >
-                                                    Confirmer
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    onClick={() => setShowValidateConfirm(false)}
-                                                    className="flex-1 cursor-pointer"
-                                                    size="sm"
-                                                >
-                                                    Annuler
-                                                </Button>
-                                            </div>
-                                        </Card>
-                                    )}
+{/* Confirmation de validation */}
+                                                    {showValidateConfirm && (
+                                                        <Card className="p-4 bg-green-50 border-green-200">
+                                                            <p className="text-sm font-semibold text-green-900 mb-3">
+                                                                ✅ Confirmer la commande ?
+                                                            </p>
+                                                            <p className="text-xs text-green-700 mb-4">
+                                                                L'article sera marqué comme vendu et un email sera envoyé au client.
+                                                            </p>
+                                                            <div className="flex gap-2">
+                                                                <Button
+                                                                    onClick={() => {
+                                                                        updateStatus(selected._id, "validated");
+                                                                    }}
+                                                                    className="flex-1 bg-green-600 hover:bg-green-700 cursor-pointer"
+                                                                    size="sm"
+                                                                >
+                                                                    Confirmer
+                                                                </Button>
+                                                                <Button
+                                                                    variant="secondary"
+                                                                    onClick={() => setShowValidateConfirm(false)}
+                                                                    className="flex-1 cursor-pointer"
+                                                                    size="sm"
+                                                                >
+                                                                    Annuler
+                                                                </Button>
+                                                            </div>
+                                                        </Card>
+                                                    )}
 
-                                    {/* Confirmation d'annulation avec raison */}
-                                    {showCancelConfirm && (
-                                        <Card className="p-4 bg-red-50 border-red-200">
-                                            <p className="text-sm font-semibold text-red-900 mb-3">
-                                                ❌ Confirmer l'annulation ?
-                                            </p>
-                                            <p className="text-xs text-red-700 mb-3">
-                                                La réservation sera annulée et l'article redeviendra disponible.
-                                            </p>
-                                            
-                                            <textarea
-                                                value={cancelReason}
-                                                onChange={(e) => setCancelReason(e.target.value)}
-                                                placeholder="Raison de l'annulation (optionnel)..."
-                                                className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-200 mb-3"
-                                                rows={3}
-                                            />
-                                            
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="danger"
-                                                    onClick={() => {
-                                                        updateStatus(selected._id, "cancelled");
-                                                    }}
-                                                    className="flex-1 cursor-pointer"
-                                                    size="sm"
-                                                >
-                                                    Confirmer l'annulation
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    onClick={() => {
-                                                        setShowCancelConfirm(false);
-                                                        setCancelReason("");
-                                                    }}
-                                                    className="flex-1 cursor-pointer"
-                                                    size="sm"
-                                                >
-                                                    Annuler
-                                                </Button>
-                                            </div>
-                                        </Card>
-                                    )}
+                                                    {/* Confirmation d'annulation avec raison */}
+                                                    {showCancelConfirm && (
+                                                        <Card className="p-4 bg-red-50 border-red-200">
+                                                            <p className="text-sm font-semibold text-red-900 mb-3">
+                                                                ❌ Annuler la commande ?
+                                                            </p>
+                                                            <p className="text-xs text-red-700 mb-3">
+                                                                La commande sera annulée et l'article redeviendra disponible.
+                                                            </p>
+                                                            
+                                                            <textarea
+                                                                value={cancelReason}
+                                                                onChange={(e) => setCancelReason(e.target.value)}
+                                                                placeholder="Raison de l'annulation (optionnel)..."
+                                                                className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-200 mb-3"
+                                                                rows={3}
+                                                            />
+                                                            
+                                                            <div className="flex gap-2">
+                                                                <Button
+                                                                    variant="danger"
+                                                                    onClick={() => {
+                                                                        updateStatus(selected._id, "cancelled");
+                                                                    }}
+                                                                    className="flex-1 cursor-pointer"
+                                                                    size="sm"
+                                                                >
+                                                                    Confirmer l'annulation
+                                                                </Button>
+                                                                <Button
+                                                                    variant="secondary"
+                                                                    onClick={() => {
+                                                                        setShowCancelConfirm(false);
+                                                                        setCancelReason("");
+                                                                    }}
+                                                                    className="flex-1 cursor-pointer"
+                                                                    size="sm"
+                                                                >
+                                                                    Annuler
+                                                                </Button>
+                                                            </div>
+                                                        </Card>
+                                                    )}
                                 </>
                             )}
 
-                            {selected.status === "validated" && (
-                                <div className="flex items-center justify-center py-3">
-                                    <Badge variant="success" className="text-sm py-2 px-4">
-                                        ✔️ Réservation validée
-                                    </Badge>
-                                </div>
-                            )}
+{selected.status === "validated" && (
+                                                <div className="flex items-center justify-center py-3">
+                                                    <Badge variant="success" className="text-sm py-2 px-4">
+                                                        ✔️ Commande confirmée
+                                                    </Badge>
+                                                </div>
+                                            )}
 
-                            {selected.status === "cancelled" && (
-                                <div className="flex items-center justify-center py-3">
-                                    <Badge variant="danger" className="text-sm py-2 px-4">
-                                        ✕ Réservation annulée
-                                    </Badge>
-                                </div>
-                            )}
+                                            {selected.status === "cancelled" && (
+                                                <div className="flex items-center justify-center py-3">
+                                                    <Badge variant="danger" className="text-sm py-2 px-4">
+                                                        ✕ Commande annulée
+                                                    </Badge>
+                                                </div>
+                                            )}
 
-                            {/* Bouton de suppression définitive */}
-                            <div className="pt-4 mt-4 border-t border-slate-200">
-                                {!showDeleteConfirm ? (
-                                    <Button
-                                        variant="danger"
-                                        onClick={() => setShowDeleteConfirm(true)}
-                                        className="w-full bg-red-600 hover:bg-red-700 cursor-pointer"
-                                        size="sm"
-                                    >
-                                        🗑️ Supprimer définitivement
-                                    </Button>
-                                ) : (
-                                    <Card className="p-4 bg-red-50 border-red-200">
-                                        <p className="text-sm font-semibold text-red-900 mb-2">
-                                            ⚠️ Confirmer la suppression ?
-                                        </p>
-                                        <p className="text-xs text-red-700 mb-4">
-                                            Cette action est <strong>irréversible</strong>. La réservation sera supprimée de la base de données et l'article redeviendra disponible.
-                                        </p>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="danger"
-                                                onClick={() => deleteReservation(selected._id)}
-                                                className="flex-1 cursor-pointer"
-                                                size="sm"
-                                            >
-                                                Supprimer
-                                            </Button>
-                                            <Button
-                                                variant="secondary"
-                                                onClick={() => setShowDeleteConfirm(false)}
-                                                className="flex-1 cursor-pointer"
-                                                size="sm"
-                                            >
-                                                Annuler
-                                            </Button>
+                                            {/* Bouton de suppression définitive */}
+                                            <div className="pt-4 mt-4 border-t border-slate-200">
+                                                {!showDeleteConfirm ? (
+                                                    <Button
+                                                        variant="danger"
+                                                        onClick={() => setShowDeleteConfirm(true)}
+                                                        className="w-full bg-red-600 hover:bg-red-700 cursor-pointer"
+                                                        size="sm"
+                                                    >
+                                                        🗑️ Supprimer définitivement
+                                                    </Button>
+                                                ) : (
+                                                    <Card className="p-4 bg-red-50 border-red-200">
+                                                        <p className="text-sm font-semibold text-red-900 mb-2">
+                                                            ⚠️ Confirmer la suppression ?
+                                                        </p>
+                                                        <p className="text-xs text-red-700 mb-4">
+                                                            Cette action est <strong>irréversible</strong>. La commande sera supprimée de la base de données et l'article redeviendra disponible.
+                                                        </p>
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                variant="danger"
+                                                                onClick={() => deleteReservation(selected._id)}
+                                                                className="flex-1 cursor-pointer"
+                                                                size="sm"
+                                                            >
+                                                                Supprimer
+                                                            </Button>
+                                                            <Button
+                                                                variant="secondary"
+                                                                onClick={() => setShowDeleteConfirm(false)}
+                                                                className="flex-1 cursor-pointer"
+                                                                size="sm"
+                                                            >
+                                                                Annuler
+                                                            </Button>
+                                                        </div>
+                                                    </Card>
+                                                )}
+                                            </div>
                                         </div>
-                                    </Card>
-                                )}
-                            </div>
-                        </div>
                     </div>
                 </>
             )}

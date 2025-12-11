@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui";
 import Link from "next/link";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Image from "next/image";
+import { useCart } from "@/contexts/CartContext";
 
 interface SessionDetails {
   id: string;
@@ -25,11 +26,13 @@ interface SessionDetails {
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { clearCart } = useCart();
   const [isLoading, setIsLoading] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [sessionDetails, setSessionDetails] = useState<SessionDetails | null>(
     null
   );
+  const hasCleared = useRef(false);
 
   useEffect(() => {
     const sessionId = searchParams.get("session_id");
@@ -46,6 +49,11 @@ export default function CheckoutSuccessPage() {
         setIsValid(data.valid || false);
         if (data.valid && data.session) {
           setSessionDetails(data.session);
+          // Vider le panier une seule fois après paiement réussi
+          if (!hasCleared.current) {
+            clearCart();
+            hasCleared.current = true;
+          }
         }
         setIsLoading(false);
       })
@@ -53,7 +61,7 @@ export default function CheckoutSuccessPage() {
         console.error("Erreur lors de la vérification:", error);
         setIsLoading(false);
       });
-  }, [searchParams]);
+  }, [searchParams, clearCart]);
 
   const formatPrice = (amount: number, currency: string) => {
     return new Intl.NumberFormat("fr-FR", {

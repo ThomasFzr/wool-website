@@ -32,6 +32,13 @@ const schema = new Schema(
       enum: ["admin", "user"],
     },
 
+    // 🚚 Mode de livraison
+    deliveryMode: {
+      type: String,
+      enum: ["pickup", "shipping"],
+      default: "pickup",
+    },
+
     // 💳 Informations Stripe
     stripeCheckoutSessionId: String,
     stripePaymentIntentId: String,

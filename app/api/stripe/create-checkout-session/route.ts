@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
+import Settings from "@/models/Settings";
 import Stripe from "stripe";
 
 function getStripeInstance() {
@@ -15,6 +16,8 @@ function getStripeInstance() {
   }
   return new Stripe(secretKey);
 }
+
+type DeliveryMode = "pickup" | "shipping";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,11 +33,18 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    const { items } = await req.json();
+    const { items, deliveryMode = "pickup" } = await req.json() as { 
+      items: any[]; 
+      deliveryMode?: DeliveryMode;
+    };
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return new NextResponse("Panier vide", { status: 400 });
     }
+
+    // Récupérer les frais de livraison depuis les settings
+    const settings = await Settings.findById("main").lean() as { shippingCost?: number } | null;
+    const shippingCost = settings?.shippingCost ?? 5;
 
     // Récupérer les créations et vérifier leur disponibilité
     const creationIds = items.map((item: any) => item.creationId);
@@ -64,7 +74,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Créer des réservations temporaires (pending)
+    // Créer des commandes temporaires (pending)
     const reservations = await Promise.all(
       items.map(async (item: any) => {
         const creation = creations.find(
@@ -79,6 +89,7 @@ export async function POST(req: NextRequest) {
           contact: session.user?.email || "",
           status: "pending",
           paymentStatus: "pending",
+          deliveryMode,
         });
       })
     );
@@ -110,6 +121,21 @@ export async function POST(req: NextRequest) {
         };
       });
 
+    // Ajouter les frais de livraison si mode "shipping"
+    if (deliveryMode === "shipping" && shippingCost > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "eur",
+          product_data: {
+            name: "Frais de livraison",
+            description: "Envoi postal",
+          },
+          unit_amount: Math.round(shippingCost * 100),
+        },
+        quantity: 1,
+      });
+    }
+
     // Détecter si on est en développement (localhost)
     const isDevelopment = process.env.NODE_ENV === "development" || 
                           !process.env.NEXT_PUBLIC_APP_URL || 
@@ -131,6 +157,7 @@ export async function POST(req: NextRequest) {
         reservationIds: JSON.stringify(
           reservations.map((r) => r._id.toString())
         ),
+        deliveryMode,
       },
     });
 

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession, signIn } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
 
 export function CartModal() {
@@ -14,12 +13,9 @@ export function CartModal() {
     isOpen,
     closeCart,
     removeItem,
-    clearCart,
     getTotalPrice,
   } = useCart();
   const router = useRouter();
-  const { data: session } = useSession();
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
@@ -70,60 +66,9 @@ export function CartModal() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isOpen, handleClose]);
 
-  const handleCheckout = async () => {
-    if (!session?.user) {
-      closeCart();
-      signIn(undefined, { callbackUrl: "/cart" });
-      return;
-    }
-
-    if (items.length === 0) {
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      // Créer une session de checkout Stripe
-      const response = await fetch("/api/stripe/create-checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = "Erreur lors de la création de la session de paiement";
-        
-        // Messages d'erreur plus clairs
-        if (errorText.includes("STRIPE_SECRET_KEY")) {
-          errorMessage = "Stripe n'est pas configuré. Veuillez contacter l'administrateur.";
-        } else if (errorText.includes("Panier vide")) {
-          errorMessage = "Votre panier est vide.";
-        } else if (errorText.includes("déjà réservées")) {
-          errorMessage = "Certains articles ont déjà été réservés. Veuillez actualiser la page.";
-        } else if (errorText) {
-          errorMessage = errorText;
-        }
-        
-        alert(errorMessage);
-        setIsProcessing(false);
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.url) {
-        // Rediriger vers Stripe Checkout
-        window.location.href = data.url;
-      } else {
-        throw new Error("URL de checkout non reçue");
-      }
-    } catch (error) {
-      console.error("Erreur lors du checkout:", error);
-      alert("Une erreur est survenue. Veuillez réessayer.");
-      setIsProcessing(false);
-    }
+  const handleGoToCart = () => {
+    handleClose();
+    router.push("/cart");
   };
 
   // Ne pas afficher la modale sur mobile
@@ -280,37 +225,24 @@ export function CartModal() {
             <div className="border-t border-slate-200 bg-white p-6">
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-base font-semibold text-slate-900">
-                  Total
+                  Sous-total
                 </span>
                 <span className="text-lg font-bold text-slate-900">
                   {totalPrice.toFixed(2)} €
                 </span>
               </div>
 
-              <div className="space-y-3">
-                <Button
-                  onClick={handleCheckout}
-                  disabled={isProcessing}
-                  className="w-full cursor-pointer"
-                  size="lg"
-                >
-                  {isProcessing
-                    ? "Traitement..."
-                    : session
-                    ? "Procéder au paiement"
-                    : "Se connecter pour payer"}
-                </Button>
+              <p className="text-xs text-slate-500 mb-4">
+                Choisissez votre mode de livraison dans le panier
+              </p>
 
-                <Link href="/cart" onClick={handleClose}>
-                  <Button
-                    variant="secondary"
-                    className="w-full cursor-pointer"
-                    size="lg"
-                  >
-                    Voir le panier complet
-                  </Button>
-                </Link>
-              </div>
+              <Button
+                onClick={handleGoToCart}
+                className="w-full cursor-pointer"
+                size="lg"
+              >
+                Finaliser la commande
+              </Button>
             </div>
           )}
         </div>

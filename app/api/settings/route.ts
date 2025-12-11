@@ -24,13 +24,14 @@ const DEFAULT_SETTINGS = {
     "Multicolore",
   ],
   types: ["bonnet", "tour de cou", "bandeau"],
+  shippingCost: 5,
 };
 
 export async function GET() {
   try {
     await connectToDatabase();
     const doc = (await Settings.findById("main").lean()) as
-      | { title?: string; subtitle?: string; colors?: string[]; types?: string[] }
+      | { title?: string; subtitle?: string; colors?: string[]; types?: string[]; shippingCost?: number }
       | null;
 
     if (!doc) {
@@ -43,6 +44,7 @@ export async function GET() {
       subtitle: doc.subtitle ?? DEFAULT_SETTINGS.subtitle,
       colors: doc.colors ?? DEFAULT_SETTINGS.colors,
       types: doc.types ?? DEFAULT_SETTINGS.types,
+      shippingCost: doc.shippingCost ?? DEFAULT_SETTINGS.shippingCost,
     });
   } catch (err) {
     console.error(err);
@@ -68,6 +70,7 @@ export async function POST(req: NextRequest) {
         subtitle: body.subtitle,
         colors: body.colors,
         types: body.types,
+        shippingCost: body.shippingCost,
       },
       { new: true, upsert: true }
     );

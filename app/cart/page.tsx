@@ -1,6 +1,6 @@
 "use client";
 
-import { useCart } from "@/contexts/CartContext";
+import { useCart, DeliveryMode } from "@/contexts/CartContext";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
@@ -10,12 +10,22 @@ import { useSession, signIn } from "next-auth/react";
 import { useState } from "react";
 
 export default function CartPage() {
-  const { items, removeItem, clearCart, getTotalPrice } = useCart();
+  const { 
+    items, 
+    removeItem, 
+    clearCart, 
+    getTotalPrice, 
+    getTotalWithShipping,
+    deliveryMode,
+    setDeliveryMode,
+    shippingCost
+  } = useCart();
   const router = useRouter();
   const { data: session } = useSession();
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const totalPrice = getTotalPrice();
+  const subtotal = getTotalPrice();
+  const totalPrice = getTotalWithShipping();
 
   const handleCheckout = async () => {
     if (!session?.user) {
@@ -34,7 +44,7 @@ export default function CartPage() {
       const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, deliveryMode }),
       });
 
       if (!response.ok) {
@@ -194,11 +204,108 @@ export default function CartPage() {
           </div>
 
           <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-              <span className="text-lg font-semibold text-slate-900">Total</span>
-              <span className="text-2xl font-bold text-slate-900">
-                {totalPrice.toFixed(2)} €
-              </span>
+            {/* Choix du mode de livraison */}
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                Mode de récupération
+              </h3>
+              <div className="space-y-2">
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    deliveryMode === "pickup"
+                      ? "border-slate-900 bg-slate-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deliveryMode"
+                    value="pickup"
+                    checked={deliveryMode === "pickup"}
+                    onChange={() => setDeliveryMode("pickup")}
+                    className="sr-only"
+                  />
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      deliveryMode === "pickup"
+                        ? "border-slate-900"
+                        : "border-slate-300"
+                    }`}
+                  >
+                    {deliveryMode === "pickup" && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-slate-900" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-slate-900">
+                      Remise en main propre
+                    </p>
+                    <p className="text-xs text-slate-500">Gratuit</p>
+                  </div>
+                  <span className="text-sm font-semibold text-green-600">
+                    Gratuit
+                  </span>
+                </label>
+
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    deliveryMode === "shipping"
+                      ? "border-slate-900 bg-slate-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deliveryMode"
+                    value="shipping"
+                    checked={deliveryMode === "shipping"}
+                    onChange={() => setDeliveryMode("shipping")}
+                    className="sr-only"
+                  />
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      deliveryMode === "shipping"
+                        ? "border-slate-900"
+                        : "border-slate-300"
+                    }`}
+                  >
+                    {deliveryMode === "shipping" && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-slate-900" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-slate-900">Livraison</p>
+                    <p className="text-xs text-slate-500">
+                      Envoi postal à votre adresse
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">
+                    +{shippingCost.toFixed(2)} €
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Récapitulatif des prix */}
+            <div className="border-t border-slate-200 pt-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-600">Sous-total</span>
+                <span className="text-slate-900">{subtotal.toFixed(2)} €</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-600">
+                  {deliveryMode === "pickup" ? "Remise en main propre" : "Livraison"}
+                </span>
+                <span className="text-slate-900">
+                  {deliveryMode === "pickup" ? "Gratuit" : `${shippingCost.toFixed(2)} €`}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                <span className="text-lg font-semibold text-slate-900">Total</span>
+                <span className="text-2xl font-bold text-slate-900">
+                  {totalPrice.toFixed(2)} €
+                </span>
+              </div>
             </div>
 
             <div className="mt-6 space-y-3">

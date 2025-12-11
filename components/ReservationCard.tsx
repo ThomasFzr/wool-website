@@ -13,6 +13,7 @@ export type Reservation = {
   createdAt: string;
   cancelReason?: string;
   cancelledBy?: "admin" | "user";
+  deliveryMode?: "pickup" | "shipping";
   creationId?: {
     _id: string;
     title: string;
@@ -24,12 +25,16 @@ export type Reservation = {
   } | null;
 };
 
+// Alias pour la rétrocompatibilité
+export type Order = Reservation;
+
 interface ReservationCardProps {
   reservation: Reservation;
   onCancel?: (id: string, reason?: string) => Promise<void>;
   onClick?: () => void;
 }
 
+// Renommé en OrderCard mais avec alias pour rétrocompatibilité
 export function ReservationCard({ reservation, onCancel, onClick }: ReservationCardProps) {
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -48,7 +53,7 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
       setCancelLoading(true);
       setInfo(null);
       await onCancel(reservation._id, cancelReason.trim() || undefined);
-      setInfo("Réservation annulée ✔️");
+      setInfo("Commande annulée ✔️");
       setCancelId(null);
       setCancelReason("");
     } catch (error) {
@@ -64,8 +69,11 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
     reservation.status === "validated" ? "success" : "danger";
 
   const statusLabel =
-    reservation.status === "pending" ? "En attente" :
-    reservation.status === "validated" ? "Validée" : "Annulée";
+    reservation.status === "pending" ? "En attente de paiement" :
+    reservation.status === "validated" ? "Confirmée" : "Annulée";
+
+  const deliveryLabel = 
+    reservation.deliveryMode === "shipping" ? "Livraison" : "Remise en main propre";
 
   return (
     <div
@@ -92,7 +100,7 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
                 {creation?.title ?? "Article supprimé"}
               </p>
               <p className="text-xs text-slate-500">
-                Réservé le {new Date(reservation.createdAt).toLocaleString("fr-FR")}
+                Commandé le {new Date(reservation.createdAt).toLocaleString("fr-FR")}
               </p>
             </div>
 
@@ -111,6 +119,11 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
               Couleur : {creation.color}
             </p>
           )}
+          {reservation.deliveryMode && (
+            <p className="text-xs text-slate-700">
+              📦 {deliveryLabel}
+            </p>
+          )}
 
           {reservation.message && (
             <p className="mt-1 text-xs text-slate-500">
@@ -121,7 +134,7 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
           {reservation.status === "cancelled" && reservation.cancelledBy === "user" && (
             <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 border border-slate-200">
               <p className="text-xs font-semibold text-slate-700">
-                Vous avez annulé cette réservation
+                Vous avez annulé cette commande
               </p>
               {reservation.cancelReason && (
                 <p className="mt-1 text-xs text-slate-600">
@@ -158,7 +171,7 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
               }}
               className="cursor-pointer"
             >
-              Annuler ma réservation
+              Annuler ma commande
             </Button>
           ) : (
             <div className="space-y-2">
@@ -187,7 +200,7 @@ export function ReservationCard({ reservation, onCancel, onClick }: ReservationC
                   }}
                   className="text-[11px] text-slate-500 hover:underline cursor-pointer"
                 >
-                  Garder ma réservation
+                  Garder ma commande
                 </button>
               </div>
               {info && <p className="text-[11px] text-slate-600">{info}</p>}
