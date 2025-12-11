@@ -81,6 +81,13 @@ export async function POST(req: NextRequest) {
 
       const paymentIntentId = session.payment_intent as string;
 
+      // Récupérer le mode de livraison et les frais de livraison depuis les metadata
+      const deliveryMode = session.metadata?.deliveryMode || "pickup";
+      const totalShippingCost = session.metadata?.shippingCost 
+        ? parseFloat(session.metadata.shippingCost) 
+        : 0;
+      const shippingPerItem = totalShippingCost / reservations.length;
+
       await Promise.all(
         reservations.map(async (reservation) => {
           // Mettre à jour la réservation
@@ -89,6 +96,13 @@ export async function POST(req: NextRequest) {
           reservation.paymentStatus = "paid";
           reservation.status = "validated";
           reservation.paidAt = new Date();
+          reservation.deliveryMode = deliveryMode;
+          // Mettre à jour les frais de livraison (au cas où ils auraient changé)
+          if (deliveryMode === "shipping" && totalShippingCost > 0) {
+            reservation.shippingCost = shippingPerItem;
+          } else {
+            reservation.shippingCost = 0;
+          }
           await reservation.save();
 
           // Mettre à jour la création - marquer comme vendue
@@ -103,8 +117,7 @@ export async function POST(req: NextRequest) {
           const user = await User.findOne({ email: reservation.contact });
           const shouldSendEmail = user?.emailNotifications !== false;
 
-          // Récupérer le mode de livraison depuis les metadata ou la réservation
-          const deliveryMode = session.metadata?.deliveryMode || reservation.deliveryMode || "pickup";
+          // Utiliser le deliveryMode déjà récupéré
           const deliveryLabel = deliveryMode === "shipping" ? "Livraison postale" : "Remise en main propre";
 
           if (shouldSendEmail && creation) {

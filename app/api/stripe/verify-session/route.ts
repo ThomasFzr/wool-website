@@ -59,6 +59,13 @@ export async function GET(req: NextRequest) {
           _id: { $in: reservationIds },
         });
 
+        // Récupérer le mode de livraison et les frais de livraison depuis les metadata
+        const deliveryMode = checkoutSession.metadata?.deliveryMode || "pickup";
+        const totalShippingCost = checkoutSession.metadata?.shippingCost 
+          ? parseFloat(checkoutSession.metadata.shippingCost) 
+          : 0;
+        const shippingPerItem = totalShippingCost / reservations.length;
+        
         // Récupérer l'adresse de livraison si disponible
         const shippingDetails = checkoutSession.shipping_details;
         const shippingAddress = shippingDetails?.address ? {
@@ -83,6 +90,14 @@ export async function GET(req: NextRequest) {
             reservation.paymentStatus = "paid";
             reservation.status = "validated";
             reservation.paidAt = new Date();
+            reservation.deliveryMode = deliveryMode;
+            
+            // Mettre à jour les frais de livraison
+            if (deliveryMode === "shipping" && totalShippingCost > 0) {
+              reservation.shippingCost = shippingPerItem;
+            } else {
+              reservation.shippingCost = 0;
+            }
             
             // Ajouter l'adresse de livraison si disponible
             if (shippingAddress) {
