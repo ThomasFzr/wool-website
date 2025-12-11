@@ -20,6 +20,7 @@ type Reservation = {
     trackingNumber?: string;
     shippedAt?: string;
     seenByAdmin?: boolean;
+    stripeCheckoutSessionId?: string;
     shippingAddress?: {
         name: string;
         line1: string;
@@ -621,7 +622,22 @@ function AdminReservationsContent() {
                                                         if (!creation) return null;
                                                         
                                                         return (
-                                                            <div key={item._id} className="flex gap-3 p-3 rounded-lg border border-slate-200">
+                                                            <div 
+                                                                key={item._id} 
+                                                                className="flex gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors"
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const res = await fetch(`/api/creations/${creation._id}`);
+                                                                        if (res.ok) {
+                                                                            const fullCreation = await res.json();
+                                                                            setSelectedCreation(fullCreation);
+                                                                            setShowCreationModal(true);
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Erreur lors du chargement de l'article:", err);
+                                                                    }
+                                                                }}
+                                                            >
                                                                 {(creation.images?.[0] || creation.imageUrl) && (
                                                                     <img
                                                                         src={creation.images?.[0] ?? creation.imageUrl!}
@@ -656,7 +672,21 @@ function AdminReservationsContent() {
                                             <Card className="p-4 mb-4">
                                                 <p className="text-xs font-semibold text-slate-700 mb-3">🎨 Article commandé</p>
 
-                                <div className="flex gap-3 mb-3 p-3 rounded-lg border border-slate-200">
+                                <div 
+                                    className="flex gap-3 mb-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors"
+                                    onClick={async () => {
+                                        try {
+                                            const res = await fetch(`/api/creations/${selected.creationId._id}`);
+                                            if (res.ok) {
+                                                const fullCreation = await res.json();
+                                                setSelectedCreation(fullCreation);
+                                                setShowCreationModal(true);
+                                            }
+                                        } catch (err) {
+                                            console.error("Erreur lors du chargement de l'article:", err);
+                                        }
+                                    }}
+                                >
                                     {/* Image */}
                                     {(selected.creationId.images?.[0] || selected.creationId.imageUrl) && (
                                         <img
@@ -688,7 +718,7 @@ function AdminReservationsContent() {
 
                                         <button
                                             onClick={(e) => {
-                                                e.preventDefault();
+                                                e.stopPropagation();
                                                 setSelectedCreation(selected.creationId!);
                                                 setShowCreationModal(true);
                                             }}

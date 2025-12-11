@@ -3,11 +3,13 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Reservation } from "@/components/ReservationCard";
 import { OrderCard, Order } from "@/components/OrderCard";
 
 export default function OrdersPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +116,11 @@ export default function OrdersPage() {
     }
   }, [status]);
 
+  function handleItemClick(creationId: string) {
+    // Rediriger vers la page de la création
+    router.push(`/creations/${creationId}`);
+  }
+
   if (status === "loading") {
     return <p className="p-8 text-sm text-slate-500">Chargement...</p>;
   }
@@ -151,6 +158,7 @@ export default function OrdersPage() {
           <OrderCard
             key={order.id}
             order={order}
+            onItemClick={handleItemClick}
           />
         ))}
       </div>

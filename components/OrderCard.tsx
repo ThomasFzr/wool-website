@@ -18,9 +18,10 @@ export type Order = {
 
 interface OrderCardProps {
   order: Order;
+  onItemClick?: (creationId: string) => void;
 }
 
-export function OrderCard({ order }: OrderCardProps) {
+export function OrderCard({ order, onItemClick }: OrderCardProps) {
   const getStatusInfo = (status: string) => {
     switch (status) {
       case "pending":
@@ -79,7 +80,15 @@ export function OrderCard({ order }: OrderCardProps) {
           const image = creation?.images?.[0] || creation?.imageUrl || undefined;
 
           return (
-            <div key={item._id} className="p-4 flex gap-3">
+            <div 
+              key={item._id} 
+              className={`p-4 flex gap-3 ${onItemClick && creation?._id ? "cursor-pointer hover:bg-slate-50 transition-colors" : ""}`}
+              onClick={() => {
+                if (onItemClick && creation?._id) {
+                  onItemClick(creation._id);
+                }
+              }}
+            >
               {image && (
                 <Image
                   src={image}

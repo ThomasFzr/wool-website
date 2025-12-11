@@ -46,6 +46,47 @@ async function checkAuth(req: NextRequest) {
   return session !== null;
 }
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    await connectToDatabase();
+    
+    // Récupérer la création par ID ou slug
+    let creation = await Creation.findById(id).lean();
+    if (!creation) {
+      // Essayer par slug si ce n'est pas un ObjectId valide
+      creation = await Creation.findOne({ slug: id }).lean();
+    }
+    
+    if (!creation) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+    
+    // Convertir en format JSON
+    const creationData: any = creation;
+    return NextResponse.json({
+      _id: creationData._id.toString(),
+      slug: creationData.slug,
+      title: creationData.title,
+      description: creationData.description,
+      imageUrl: creationData.imageUrl,
+      images: creationData.images,
+      price: creationData.price,
+      color: creationData.color,
+      type: creationData.type,
+      sold: creationData.sold,
+      showAsNew: creationData.showAsNew,
+      createdAt: creationData.createdAt ? creationData.createdAt.toString() : undefined,
+    });
+  } catch (err) {
+    console.error("❌ GET error:", err);
+    return new NextResponse("Server error", { status: 500 });
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
