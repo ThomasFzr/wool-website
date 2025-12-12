@@ -147,12 +147,6 @@ export default function OrdersPage() {
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      {!loading && !error && orders.length === 0 && (
-        <p className="text-sm text-slate-500">
-          Vous n&apos;avez pas encore de commande.
-        </p>
-      )}
-
       {/* Séparer les commandes en cours et terminées */}
       {(() => {
         const now = new Date();
