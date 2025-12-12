@@ -21,6 +21,16 @@ export type Creation = {
   sold?: boolean;
   showAsNew?: boolean;
   createdAt?: string;
+  relatedCreations?: Array<{
+    _id: string;
+    slug?: string;
+    title: string;
+    imageUrl?: string;
+    images?: string[];
+    price?: number;
+    color?: string;
+    type?: string;
+  }>;
 };
 
 interface CreationDetailProps {

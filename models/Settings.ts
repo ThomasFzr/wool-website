@@ -34,6 +34,25 @@ const settingsSchema = new Schema(
       type: Number,
       default: 5,
     },
+    // Conditions pour la remise en main propre
+    pickupConditions: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      minimumAmount: {
+        type: Number,
+        default: 0,
+      },
+      allowedPostalCodes: {
+        type: [String],
+        default: [],
+      },
+      message: {
+        type: String,
+        default: "",
+      },
+    },
   },
   { timestamps: true }
 );

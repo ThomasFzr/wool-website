@@ -219,7 +219,15 @@ function ContactForm() {
                 ) : (
                   <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-300 bg-white p-2">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {creations.map((creation) => {
+                      {[...creations]
+                        .sort((a, b) => {
+                          const aSelected = selectedCreationIds.includes(a._id);
+                          const bSelected = selectedCreationIds.includes(b._id);
+                          if (aSelected && !bSelected) return -1;
+                          if (!aSelected && bSelected) return 1;
+                          return 0;
+                        })
+                        .map((creation) => {
                         const isSelected = selectedCreationIds.includes(creation._id);
                         return (
                           <div

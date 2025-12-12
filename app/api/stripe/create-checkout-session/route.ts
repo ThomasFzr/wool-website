@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import Settings from "@/models/Settings";
+import User from "@/models/User";
 import Stripe from "stripe";
 
 function getStripeInstance() {
@@ -42,8 +43,16 @@ export async function POST(req: NextRequest) {
       return new NextResponse("Panier vide", { status: 400 });
     }
 
-    // Récupérer les frais de livraison depuis les settings
-    const settings = await Settings.findById("main").lean() as { shippingCost?: number } | null;
+    // Récupérer les frais de livraison et les conditions depuis les settings
+    const settings = await Settings.findById("main").lean() as { 
+      shippingCost?: number;
+      pickupConditions?: {
+        enabled?: boolean;
+        minimumAmount?: number;
+        allowedPostalCodes?: string[];
+        message?: string;
+      };
+    } | null;
     const shippingCost = settings?.shippingCost ?? 5;
 
     // Récupérer les créations et vérifier leur disponibilité
@@ -72,6 +81,58 @@ export async function POST(req: NextRequest) {
         "Certaines créations n'ont pas de prix défini",
         { status: 400 }
       );
+    }
+
+    // Calculer le total de la commande
+    const totalPrice = creations.reduce((sum, c) => sum + (c.price || 0), 0);
+
+    // Vérifier les conditions pour la remise en main propre
+    if (deliveryMode === "pickup" && settings?.pickupConditions?.enabled) {
+      const conditions = settings.pickupConditions;
+      
+      // Vérifier le montant minimum
+      if (conditions.minimumAmount && conditions.minimumAmount > 0 && totalPrice < conditions.minimumAmount) {
+        return new NextResponse(
+          `Le montant minimum de ${conditions.minimumAmount.toFixed(2)} € est requis pour la remise en main propre`,
+          { status: 400 }
+        );
+      }
+
+      // Vérifier les codes postaux autorisés
+      if (conditions.allowedPostalCodes && conditions.allowedPostalCodes.length > 0) {
+        // Récupérer le code postal de l'utilisateur
+        const user = await User.findOne({ email: session.user.email }).select("postalCode").lean() as { postalCode?: string } | null;
+        const userPostalCode = user?.postalCode;
+
+        if (!userPostalCode) {
+          return new NextResponse(
+            "Veuillez renseigner votre code postal dans votre profil pour utiliser la remise en main propre",
+            { status: 400 }
+          );
+        }
+
+        // Normaliser le code postal
+        const normalizedUserCode = userPostalCode.trim().toUpperCase();
+        const normalizedAllowedCodes = conditions.allowedPostalCodes.map(code => code.trim().toUpperCase());
+
+        // Vérifier si le code postal correspond
+        const isAllowed = normalizedAllowedCodes.some(allowedCode => {
+          // Correspondance exacte
+          if (normalizedUserCode === allowedCode) return true;
+          // Correspondance partielle (si le code autorisé est un préfixe)
+          if (normalizedUserCode.startsWith(allowedCode)) return true;
+          // Correspondance partielle inverse (si le code de l'utilisateur est un préfixe du code autorisé)
+          if (allowedCode.startsWith(normalizedUserCode)) return true;
+          return false;
+        });
+
+        if (!isAllowed) {
+          return new NextResponse(
+            `La remise en main propre n'est pas disponible pour le code postal ${userPostalCode}. Codes autorisés : ${conditions.allowedPostalCodes.join(", ")}`,
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Les frais de livraison sont un montant total pour la commande, pas par article

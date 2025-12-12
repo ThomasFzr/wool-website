@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
     }
     
     const creations = await query
+      .populate('relatedCreations', 'title imageUrl images price color type slug sold')
       .sort({ displayOrder: -1, createdAt: -1 })
       .lean();
     return NextResponse.json(creations);
@@ -96,6 +97,7 @@ export async function POST(req: NextRequest) {
       yarnBrand: body.yarnBrand,
       weight: body.weight,
       yarnPrice: body.yarnPrice,
+      relatedCreations: body.relatedCreations || [],
     });
 
     // 🔄 Invalider le cache immédiatement après création

@@ -13,14 +13,34 @@ type Props = {
 async function getCreation(slug: string) {
   await connectToDatabase();
   // Essayer d'abord par slug, sinon par ID (rétrocompatibilité)
-  let creation = await CreationModel.findOne({ slug }).lean();
+  let creation = await CreationModel.findOne({ slug })
+    .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+    .lean();
   if (!creation && mongoose.Types.ObjectId.isValid(slug)) {
-    creation = await CreationModel.findById(slug).lean();
+    creation = await CreationModel.findById(slug)
+      .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+      .lean();
   }
   
   if (!creation) return null;
   
   const creationData: any = creation;
+  
+  // Formater les articles liés
+  const relatedCreations = Array.isArray(creationData.relatedCreations)
+    ? creationData.relatedCreations
+        .filter((item: any) => item && !item.sold)
+        .map((item: any) => ({
+          _id: item._id.toString(),
+          title: item.title,
+          imageUrl: item.imageUrl,
+          images: item.images,
+          price: item.price,
+          color: item.color,
+          type: item.type,
+          slug: item.slug,
+        }))
+    : [];
   
   return {
     _id: creationData._id.toString(),
@@ -36,6 +56,7 @@ async function getCreation(slug: string) {
     sold: creationData.sold,
     showAsNew: creationData.showAsNew,
     createdAt: creationData.createdAt ? creationData.createdAt.toString() : undefined,
+    relatedCreations,
   };
 }
 

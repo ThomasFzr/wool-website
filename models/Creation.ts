@@ -32,6 +32,12 @@ const schema = new Schema(
 
     displayOrder: { type: Number, default: 0 },
 
+    // Articles liés (recommandations)
+    relatedCreations: [{
+      type: Schema.Types.ObjectId,
+      ref: "Creation",
+    }],
+
   },
   { timestamps: true }
 );

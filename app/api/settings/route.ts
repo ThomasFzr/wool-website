@@ -25,13 +25,31 @@ const DEFAULT_SETTINGS = {
   ],
   types: ["bonnet", "tour de cou", "bandeau"],
   shippingCost: 5,
+  pickupConditions: {
+    enabled: false,
+    minimumAmount: 0,
+    allowedPostalCodes: [],
+    message: "",
+  },
 };
 
 export async function GET() {
   try {
     await connectToDatabase();
     const doc = (await Settings.findById("main").lean()) as
-      | { title?: string; subtitle?: string; colors?: string[]; types?: string[]; shippingCost?: number }
+      | { 
+          title?: string; 
+          subtitle?: string; 
+          colors?: string[]; 
+          types?: string[]; 
+          shippingCost?: number;
+          pickupConditions?: {
+            enabled?: boolean;
+            minimumAmount?: number;
+            allowedPostalCodes?: string[];
+            message?: string;
+          };
+        }
       | null;
 
     if (!doc) {
@@ -45,6 +63,7 @@ export async function GET() {
       colors: doc.colors ?? DEFAULT_SETTINGS.colors,
       types: doc.types ?? DEFAULT_SETTINGS.types,
       shippingCost: doc.shippingCost ?? DEFAULT_SETTINGS.shippingCost,
+      pickupConditions: doc.pickupConditions ?? DEFAULT_SETTINGS.pickupConditions,
     });
   } catch (err) {
     console.error(err);
@@ -63,15 +82,30 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     const body = await req.json();
 
+    // Préparer les données de mise à jour
+    const updateData: any = {
+      title: body.title,
+      subtitle: body.subtitle,
+      colors: body.colors,
+      types: body.types,
+      shippingCost: body.shippingCost,
+    };
+
+    // Gérer pickupConditions séparément pour s'assurer que tous les champs sont bien sauvegardés
+    if (body.pickupConditions) {
+      updateData.pickupConditions = {
+        enabled: body.pickupConditions.enabled ?? false,
+        minimumAmount: body.pickupConditions.minimumAmount ?? 0,
+        allowedPostalCodes: body.pickupConditions.allowedPostalCodes ?? [],
+        message: body.pickupConditions.message ?? "",
+      };
+    } else {
+      updateData.pickupConditions = DEFAULT_SETTINGS.pickupConditions;
+    }
+
     const updated = await Settings.findByIdAndUpdate(
       "main",
-      {
-        title: body.title,
-        subtitle: body.subtitle,
-        colors: body.colors,
-        types: body.types,
-        shippingCost: body.shippingCost,
-      },
+      { $set: updateData },
       { new: true, upsert: true }
     );
 

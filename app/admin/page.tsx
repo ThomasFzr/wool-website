@@ -16,13 +16,20 @@ function AdminContent() {
     subtitle: "",
     colors: [] as string[],
     types: [] as string[],
-    shippingCost: 5
+    shippingCost: 5,
+    pickupConditions: {
+      enabled: false,
+      minimumAmount: 0,
+      allowedPostalCodes: [] as string[],
+      message: "",
+    }
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [pendingReservations, setPendingReservations] = useState(0);
   const [newMessages, setNewMessages] = useState(0);
   const [newColor, setNewColor] = useState("");
   const [newType, setNewType] = useState("");
+  const [newPostalCode, setNewPostalCode] = useState("");
 
   useEffect(() => {
     async function loadSettings() {
@@ -52,6 +59,12 @@ function AdminContent() {
           colors: sortedColors,
           types: sortedTypes,
           shippingCost: s.shippingCost ?? 5,
+          pickupConditions: s.pickupConditions ?? {
+            enabled: false,
+            minimumAmount: 0,
+            allowedPostalCodes: [],
+            message: "",
+          },
         });
       } catch (err) {
         console.error(err);
@@ -123,6 +136,7 @@ function AdminContent() {
         colors: savedData.colors ?? settings.colors,
         types: savedData.types ?? settings.types,
         shippingCost: savedData.shippingCost ?? settings.shippingCost,
+        pickupConditions: savedData.pickupConditions ?? settings.pickupConditions,
       });
 
       setMessage("Paramètres enregistrés ✔️");
@@ -135,15 +149,27 @@ function AdminContent() {
     }
   }
 
-  async function saveColorsAndTypes() {
+  async function saveColorsAndTypes(updatedSettings?: typeof settings) {
     try {
+      const settingsToSave = updatedSettings || settings;
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(settingsToSave),
       });
       if (!res.ok) {
         console.error("Erreur lors de la sauvegarde");
+      } else {
+        // Recharger les settings pour avoir les valeurs à jour
+        const savedData = await res.json();
+        setSettings({
+          title: savedData.title ?? settingsToSave.title,
+          subtitle: savedData.subtitle ?? settingsToSave.subtitle,
+          colors: savedData.colors ?? settingsToSave.colors,
+          types: savedData.types ?? settingsToSave.types,
+          shippingCost: savedData.shippingCost ?? settingsToSave.shippingCost,
+          pickupConditions: savedData.pickupConditions ?? settingsToSave.pickupConditions,
+        });
       }
     } catch (err) {
       console.error(err);
@@ -282,6 +308,181 @@ function AdminContent() {
                   <p className="text-xs text-slate-500">
                     Montant des frais de port affiché sur Stripe et dans le panier
                   </p>
+                </div>
+
+                {/* Conditions pour la remise en main propre */}
+                <div className="border-t border-slate-200 pt-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="pickupConditionsEnabled"
+                      checked={settings.pickupConditions.enabled}
+                      onChange={(e) => {
+                        setSettings((s) => ({
+                          ...s,
+                          pickupConditions: {
+                            ...s.pickupConditions,
+                            enabled: e.target.checked,
+                          },
+                        }));
+                      }}
+                      className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                    />
+                    <label htmlFor="pickupConditionsEnabled" className="text-sm font-medium text-slate-900">
+                      Activer les conditions pour la remise en main propre
+                    </label>
+                  </div>
+
+                  {settings.pickupConditions.enabled && (
+                    <div className="space-y-4 pl-6 border-l-2 border-slate-200">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">
+                          Montant minimum (en euros)
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={settings.pickupConditions.minimumAmount.toString()}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            if (!isNaN(value) && value >= 0) {
+                              setSettings((s) => ({
+                                ...s,
+                                pickupConditions: {
+                                  ...s.pickupConditions,
+                                  minimumAmount: value,
+                                },
+                              }));
+                            } else if (e.target.value === "") {
+                              setSettings((s) => ({
+                                ...s,
+                                pickupConditions: {
+                                  ...s.pickupConditions,
+                                  minimumAmount: 0,
+                                },
+                              }));
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-slate-500">
+                          Montant minimum requis pour choisir la remise en main propre (0 = pas de minimum)
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">
+                          Codes postaux autorisés (optionnel)
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Ex: 75001"
+                            value={newPostalCode}
+                            onChange={(e) => setNewPostalCode(e.target.value)}
+                            onKeyPress={async (e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                const trimmed = newPostalCode.trim();
+                                if (trimmed && !settings.pickupConditions.allowedPostalCodes.includes(trimmed)) {
+                                  const newCodes = [...settings.pickupConditions.allowedPostalCodes, trimmed];
+                                  const updatedSettings = {
+                                    ...settings,
+                                    pickupConditions: {
+                                      ...settings.pickupConditions,
+                                      allowedPostalCodes: newCodes,
+                                    },
+                                  };
+                                  setSettings(updatedSettings);
+                                  setNewPostalCode("");
+                                  await saveColorsAndTypes(updatedSettings);
+                                }
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={async () => {
+                              const trimmed = newPostalCode.trim();
+                              if (trimmed && !settings.pickupConditions.allowedPostalCodes.includes(trimmed)) {
+                                const newCodes = [...settings.pickupConditions.allowedPostalCodes, trimmed];
+                                const updatedSettings = {
+                                  ...settings,
+                                  pickupConditions: {
+                                    ...settings.pickupConditions,
+                                    allowedPostalCodes: newCodes,
+                                  },
+                                };
+                                setSettings(updatedSettings);
+                                setNewPostalCode("");
+                                await saveColorsAndTypes(updatedSettings);
+                              }
+                            }}
+                            className="cursor-pointer"
+                          >
+                            + Ajouter
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {settings.pickupConditions.allowedPostalCodes.map((code) => (
+                            <div
+                              key={code}
+                              className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm"
+                            >
+                              <span>{code}</span>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const newCodes = settings.pickupConditions.allowedPostalCodes.filter(
+                                    (c) => c !== code
+                                  );
+                                  const updatedSettings = {
+                                    ...settings,
+                                    pickupConditions: {
+                                      ...settings.pickupConditions,
+                                      allowedPostalCodes: newCodes,
+                                    },
+                                  };
+                                  setSettings(updatedSettings);
+                                  await saveColorsAndTypes(updatedSettings);
+                                }}
+                                className="text-red-500 hover:text-red-700 cursor-pointer"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Laissez vide pour autoriser tous les codes postaux. Si des codes sont spécifiés, seuls ces codes postaux pourront choisir la remise en main propre.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">
+                          Message informatif (optionnel)
+                        </label>
+                        <Textarea
+                          placeholder="Ex: Retrait disponible sur rendez-vous uniquement"
+                          value={settings.pickupConditions.message}
+                          onChange={(e) => {
+                            setSettings((s) => ({
+                              ...s,
+                              pickupConditions: {
+                                ...s.pickupConditions,
+                                message: e.target.value,
+                              },
+                            }));
+                          }}
+                          rows={2}
+                        />
+                        <p className="text-xs text-slate-500">
+                          Message affiché sous l'option "Remise en main propre" dans le panier
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <Button type="submit" disabled={savingSettings} className="cursor-pointer">
