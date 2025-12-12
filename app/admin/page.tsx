@@ -15,7 +15,8 @@ function AdminContent() {
     title: "", 
     subtitle: "",
     colors: [] as string[],
-    types: [] as string[]
+    types: [] as string[],
+    shippingCost: 5
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [pendingReservations, setPendingReservations] = useState(0);
@@ -50,6 +51,7 @@ function AdminContent() {
           subtitle: s.subtitle ?? "Clique sur une création pour voir toutes les photos.",
           colors: sortedColors,
           types: sortedTypes,
+          shippingCost: s.shippingCost ?? 5,
         });
       } catch (err) {
         console.error(err);
@@ -120,6 +122,7 @@ function AdminContent() {
         subtitle: savedData.subtitle ?? settings.subtitle,
         colors: savedData.colors ?? settings.colors,
         types: savedData.types ?? settings.types,
+        shippingCost: savedData.shippingCost ?? settings.shippingCost,
       });
 
       setMessage("Paramètres enregistrés ✔️");
@@ -257,6 +260,28 @@ function AdminContent() {
                     onChange={(e) => setSettings((s) => ({ ...s, subtitle: e.target.value }))}
                     rows={3}
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">💰 Frais de livraison (en euros)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="5.00"
+                    value={settings.shippingCost.toString()}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (!isNaN(value) && value >= 0) {
+                        setSettings((s) => ({ ...s, shippingCost: value }));
+                      } else if (e.target.value === "") {
+                        setSettings((s) => ({ ...s, shippingCost: 0 }));
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Montant des frais de port affiché sur Stripe et dans le panier
+                  </p>
                 </div>
 
                 <Button type="submit" disabled={savingSettings} className="cursor-pointer">
