@@ -153,15 +153,66 @@ export default function OrdersPage() {
         </p>
       )}
 
-      <div className="mt-4 space-y-4">
-        {orders.map((order) => (
-          <OrderCard
-            key={order.id}
-            order={order}
-            onItemClick={handleItemClick}
-          />
-        ))}
-      </div>
+      {/* Séparer les commandes en cours et terminées */}
+      {(() => {
+        const now = new Date();
+        const activeOrders = orders.filter(order => {
+          // Commandes en cours : pas encore livrées (pas delivered, pas cancelled)
+          return order.status !== "delivered" && order.status !== "cancelled";
+        });
+        
+        const completedOrders = orders.filter(order => {
+          // Commandes terminées : livrées ou annulées
+          return order.status === "delivered" || order.status === "cancelled";
+        });
+
+        return (
+          <>
+            {/* Commandes en cours */}
+            {activeOrders.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                  Commandes en cours
+                </h2>
+                <div className="space-y-4">
+                  {activeOrders.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      onItemClick={handleItemClick}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Commandes terminées */}
+            {completedOrders.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                  Commandes terminées
+                </h2>
+                <div className="space-y-4">
+                  {completedOrders.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      onItemClick={handleItemClick}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Message si aucune commande */}
+            {activeOrders.length === 0 && completedOrders.length === 0 && (
+              <p className="text-sm text-slate-500 mt-4">
+                Vous n&apos;avez pas encore de commande.
+              </p>
+            )}
+          </>
+        );
+      })()}
     </main>
   );
 }

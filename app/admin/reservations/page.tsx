@@ -136,11 +136,29 @@ function AdminReservationsContent() {
             body.shippedAt = new Date().toISOString();
         }
         
-        await fetch(`/api/admin/reservations/${id}`, {
-            method: "PATCH",
-            body: JSON.stringify(body),
-            headers: { "Content-Type": "application/json" },
-        });
+        // Si on a des articles groupés (commande), mettre à jour tous les articles
+        if (selectedOrderItems.length > 0) {
+            await Promise.all(
+                selectedOrderItems.map(item => 
+                    fetch(`/api/admin/reservations/${item._id}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({
+                            ...body,
+                            // Le tracking number seulement sur le premier article
+                            trackingNumber: tracking && item === selectedOrderItems[0] ? tracking : item.trackingNumber,
+                        }),
+                        headers: { "Content-Type": "application/json" },
+                    })
+                )
+            );
+        } else {
+            // Sinon, mettre à jour seulement la réservation sélectionnée
+            await fetch(`/api/admin/reservations/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify(body),
+                headers: { "Content-Type": "application/json" },
+            });
+        }
         setTrackingNumber("");
         load();
     }
@@ -191,7 +209,7 @@ function AdminReservationsContent() {
             case "delivered":
                 return "Livrée";
             case "validated":
-                return "Confirmée";
+                return "Paiement validé";
             case "cancelled":
                 return "Annulée";
             default:
@@ -386,8 +404,8 @@ function AdminReservationsContent() {
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-semibold text-slate-900 truncate">{order.customerName}</p>
                                                         {!order.seenByAdmin && (
-                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500 text-white animate-pulse">
-                                                                NOUVELLE
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-500 text-white">
+                                                                Paiement validé
                                                             </span>
                                                         )}
                                                     </div>
@@ -957,10 +975,30 @@ function AdminReservationsContent() {
                             )}
 
                             {selected.status === "validated" && (
-                                <div className="flex items-center justify-center py-3">
-                                    <Badge variant="success" className="text-sm py-2 px-4">
-                                        ✔️ Commande confirmée
+                                <div className="space-y-2">
+                                    <Badge variant="success" className="text-sm py-2 px-4 w-full justify-center">
+                                        ✔️ Paiement validé
                                     </Badge>
+                                    {selected.deliveryMode === "shipping" ? (
+                                        <Button
+                                            onClick={() => {
+                                                const tracking = prompt("Numéro de suivi (optionnel) :");
+                                                updateStatus(selected._id, "shipped", tracking || undefined);
+                                            }}
+                                            className="w-full bg-purple-600 hover:bg-purple-700 cursor-pointer"
+                                            size="md"
+                                        >
+                                            📦 Expédié
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            onClick={() => updateStatus(selected._id, "delivered")}
+                                            className="w-full bg-green-600 hover:bg-green-700 cursor-pointer"
+                                            size="md"
+                                        >
+                                            ✅ Terminé
+                                        </Button>
+                                    )}
                                 </div>
                             )}
 

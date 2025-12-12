@@ -35,7 +35,7 @@ export function OrderCard({ order, onItemClick }: OrderCardProps) {
       case "delivered":
         return { variant: "success" as const, label: "Livrée" };
       case "validated":
-        return { variant: "success" as const, label: "Confirmée" };
+        return { variant: "warning" as const, label: "En cours de préparation" };
       case "cancelled":
         return { variant: "danger" as const, label: "Annulée" };
       default:
