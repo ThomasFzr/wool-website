@@ -72,6 +72,7 @@ export async function GET(
       slug: creationData.slug,
       title: creationData.title,
       description: creationData.description,
+      seoDescription: creationData.seoDescription,
       imageUrl: creationData.imageUrl,
       images: creationData.images,
       price: creationData.price,
@@ -117,6 +118,7 @@ export async function PATCH(
       setData.slug = slug;
     }
     if (body.description !== undefined) setData.description = body.description;
+    if (body.seoDescription !== undefined) setData.seoDescription = body.seoDescription;
     if (body.imageUrl !== undefined) setData.imageUrl = body.imageUrl;
     if (body.images !== undefined) setData.images = body.images;
     if (body.imagePublicIds !== undefined) {

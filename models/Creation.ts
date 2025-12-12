@@ -5,6 +5,7 @@ const schema = new Schema(
     title: { type: String, required: true },
     slug: { type: String, unique: true, sparse: true },
     description: String,
+    seoDescription: String, // Description complète pour le référencement
     imageUrl: String,
     images: [String],
     price: Number,

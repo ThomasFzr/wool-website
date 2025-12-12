@@ -27,6 +27,7 @@ async function getCreation(slug: string) {
     slug: creationData.slug,
     title: creationData.title,
     description: creationData.description,
+    seoDescription: creationData.seoDescription,
     imageUrl: creationData.imageUrl,
     images: creationData.images,
     price: creationData.price,

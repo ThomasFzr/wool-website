@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
       title: body.title,
       slug,
       description: body.description,
+      seoDescription: body.seoDescription,
       imageUrl: body.imageUrl ?? images[0] ?? undefined,
       images,
       imagePublicIds,

@@ -12,6 +12,7 @@ export type Creation = {
   slug?: string;
   title: string;
   description?: string;
+  seoDescription?: string;
   imageUrl?: string;
   images?: string[];
   price?: number;
@@ -527,6 +528,13 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         </div>
       </div>
 
+      {/* Description SEO - Desktop */}
+      {creation.seoDescription && (
+        <div className="hidden md:block mt-8 prose prose-slate max-w-none">
+          <p className="text-slate-700 whitespace-pre-wrap">{creation.seoDescription}</p>
+        </div>
+      )}
+
       {/* Mobile Actions */}
       <div className="md:hidden p-4 space-y-2">
         {!creation.sold ? (
@@ -562,6 +570,13 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               Commander un article identique
             </Button>
           </>
+        )}
+
+        {/* Description SEO - Mobile */}
+        {creation.seoDescription && (
+          <div className="mt-4 prose prose-slate max-w-none">
+            <p className="text-slate-700 whitespace-pre-wrap text-sm">{creation.seoDescription}</p>
+          </div>
         )}
       </div>
 
