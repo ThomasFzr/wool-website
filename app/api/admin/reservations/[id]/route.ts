@@ -6,6 +6,7 @@ import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import { checkAdminAuth } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
 type AdminRouteContext = {
   params: Promise<{ id: string }>;
@@ -70,6 +71,10 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
           salesCount: 1, // Incrémenter le compteur de ventes
         },
       });
+
+      // 🔄 Invalider le cache après validation de la vente
+      revalidatePath('/');
+      revalidatePath('/api/creations');
 
       // Vérifier les préférences de notification de l'utilisateur
       const user = await User.findOne({ email: reservation.contact });
@@ -150,6 +155,10 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
           sold: false,
         },
       });
+
+      // 🔄 Invalider le cache après annulation (l'article redevient disponible)
+      revalidatePath('/');
+      revalidatePath('/api/creations');
 
       // ✅ Marquer que c'est l'admin qui a annulé
       (reservation as any).cancelledBy = "admin";
@@ -274,6 +283,10 @@ export async function DELETE(
     }
 
     await Reservation.findByIdAndDelete(id);
+
+    // 🔄 Invalider le cache après suppression (l'article redevient disponible)
+    revalidatePath('/');
+    revalidatePath('/api/creations');
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {
