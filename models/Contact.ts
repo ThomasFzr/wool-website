@@ -6,6 +6,7 @@ export interface IContact {
   subject: string;
   message: string;
   creationId?: mongoose.Types.ObjectId | null;
+  creationIds?: mongoose.Types.ObjectId[];
   userId?: mongoose.Types.ObjectId | null;
   status: "new" | "read" | "replied" | "archived";
 }
@@ -22,6 +23,7 @@ const contactSchema = new Schema<IContactDocument>(
     subject: { type: String, required: true },
     message: { type: String, required: true },
     creationId: { type: Schema.Types.ObjectId, ref: "Creation", default: null },
+    creationIds: [{ type: Schema.Types.ObjectId, ref: "Creation" }],
     userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     status: { type: String, enum: ["new", "read", "replied", "archived"], default: "new" },
   },

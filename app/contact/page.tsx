@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Input, Textarea, Card } from "@/components";
+import type { Creation } from "@/components/CreationCard";
 
 function ContactForm() {
   const { data: session } = useSession();
@@ -33,6 +34,46 @@ function ContactForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [formStartTime] = useState(Date.now());
+  const [creations, setCreations] = useState<Creation[]>([]);
+  const [selectedCreationIds, setSelectedCreationIds] = useState<string[]>([]);
+  const [loadingCreations, setLoadingCreations] = useState(false);
+  const [showCreationsSelector, setShowCreationsSelector] = useState(false);
+
+  // Charger les créations
+  useEffect(() => {
+    const loadCreations = async () => {
+      setLoadingCreations(true);
+      try {
+        const res = await fetch("/api/creations");
+        if (res.ok) {
+          const data = await res.json();
+          setCreations(data);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des créations:", error);
+      } finally {
+        setLoadingCreations(false);
+      }
+    };
+    loadCreations();
+  }, []);
+
+  // Initialiser la sélection si creationId est présent dans l'URL
+  useEffect(() => {
+    if (creationId && !selectedCreationIds.includes(creationId)) {
+      setSelectedCreationIds([creationId]);
+    }
+  }, [creationId]);
+
+  // Afficher le sélecteur de créations pour les sujets pertinents
+  useEffect(() => {
+    const shouldShow = form.subject === "Commander un article identique" || 
+                      form.subject === "Question sur une création";
+    setShowCreationsSelector(shouldShow);
+    if (!shouldShow) {
+      setSelectedCreationIds([]);
+    }
+  }, [form.subject]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -62,6 +103,7 @@ function ContactForm() {
         body: JSON.stringify({
           ...formData,
           creationId: creationId || null,
+          creationIds: selectedCreationIds.length > 0 ? selectedCreationIds : undefined,
         }),
       });
 
@@ -84,6 +126,7 @@ function ContactForm() {
           message: "",
           website: "",
         });
+        setSelectedCreationIds([]);
         if (!creationId) {
           router.push("/");
         }
@@ -158,11 +201,83 @@ function ContactForm() {
                 <option value="">Sélectionnez un sujet</option>
                 <option value="Commander un article identique">Commander un article identique</option>
                 <option value="Question sur une création">Question sur une création</option>
-                <option value="Demande de personnalisation">Demande de personnalisation</option>
                 <option value="Question générale">Question générale</option>
                 <option value="Autre">Autre</option>
               </select>
             </div>
+
+            {/* Sélecteur de créations */}
+            {showCreationsSelector && (
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-slate-700">
+                  Sélectionnez une ou plusieurs créations *
+                </label>
+                {loadingCreations ? (
+                  <p className="text-sm text-slate-500">Chargement des créations...</p>
+                ) : creations.length === 0 ? (
+                  <p className="text-sm text-slate-500">Aucune création disponible.</p>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-300 bg-white p-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {creations.map((creation) => {
+                        const isSelected = selectedCreationIds.includes(creation._id);
+                        return (
+                          <div
+                            key={creation._id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedCreationIds(selectedCreationIds.filter(id => id !== creation._id));
+                              } else {
+                                setSelectedCreationIds([...selectedCreationIds, creation._id]);
+                              }
+                            }}
+                            className={`relative p-1.5 rounded-lg border-2 cursor-pointer transition-all ${
+                              isSelected
+                                ? "border-blue-500 bg-blue-50"
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="absolute top-1.5 right-1.5 z-10">
+                              {isSelected ? (
+                                <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                              ) : (
+                                <div className="w-4 h-4 rounded-full border-2 border-slate-300 bg-white"></div>
+                              )}
+                            </div>
+                            {creation.imageUrl || (creation.images && creation.images[0]) ? (
+                              <img
+                                src={creation.imageUrl || creation.images?.[0]}
+                                alt={creation.title}
+                                className="w-full aspect-square object-cover rounded"
+                              />
+                            ) : (
+                              <div className="w-full aspect-square bg-slate-200 rounded flex items-center justify-center text-[10px] text-slate-400">
+                                Pas d&apos;image
+                              </div>
+                            )}
+                            <div className="mt-1.5">
+                              <p className="text-[11px] font-medium text-slate-900 truncate leading-tight">{creation.title}</p>
+                              {creation.price != null && (
+                                <p className="text-[10px] text-slate-600 mt-0.5">{creation.price} €</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {selectedCreationIds.length > 0 && (
+                  <p className="text-xs text-slate-600">
+                    {selectedCreationIds.length} création{selectedCreationIds.length > 1 ? "s" : ""} sélectionnée{selectedCreationIds.length > 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Honeypot - champ invisible pour les bots */}
             <input
@@ -202,7 +317,11 @@ function ContactForm() {
             )}
 
             <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={loading} className="cursor-pointer">
+              <Button 
+                type="submit" 
+                disabled={loading || (showCreationsSelector && selectedCreationIds.length === 0)} 
+                className="cursor-pointer"
+              >
                 {loading ? "Envoi..." : "📧 Envoyer le message"}
               </Button>
               <Button
