@@ -54,11 +54,15 @@ export async function GET(
     const { id } = await params;
     await connectToDatabase();
     
-    // Récupérer la création par ID ou slug
-    let creation = await Creation.findById(id).lean();
+    // Récupérer la création par ID ou slug avec les articles liés
+    let creation = await Creation.findById(id)
+      .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+      .lean();
     if (!creation) {
       // Essayer par slug si ce n'est pas un ObjectId valide
-      creation = await Creation.findOne({ slug: id }).lean();
+      creation = await Creation.findOne({ slug: id })
+        .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+        .lean();
     }
     
     if (!creation) {
@@ -81,6 +85,7 @@ export async function GET(
       sold: creationData.sold,
       showAsNew: creationData.showAsNew,
       createdAt: creationData.createdAt ? creationData.createdAt.toString() : undefined,
+      relatedCreations: creationData.relatedCreations || [],
     });
   } catch (err) {
     console.error("❌ GET error:", err);
@@ -157,6 +162,7 @@ export async function PATCH(
     
     if (body.showAsNew !== undefined) setData.showAsNew = body.showAsNew;
     if (body.displayOrder !== undefined) setData.displayOrder = body.displayOrder;
+    if (body.relatedCreations !== undefined) setData.relatedCreations = body.relatedCreations;
 
     // Construire l'objet update final avec seulement les opérateurs nécessaires
     const update: any = {};

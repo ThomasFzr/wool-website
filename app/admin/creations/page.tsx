@@ -29,6 +29,7 @@ type Creation = {
   yarnBrand?: string;
   weight?: number;
   yarnPrice?: number;
+  relatedCreations?: string[] | any[];
 };
 
 type CreationFormData = {
@@ -45,6 +46,7 @@ type CreationFormData = {
   yarnBrand: string;
   weight: string;
   yarnPrice: string;
+  relatedCreations: string[];
 };
 
 const initialFormState: CreationFormData = {
@@ -61,6 +63,7 @@ const initialFormState: CreationFormData = {
   yarnBrand: "",
   weight: "",
   yarnPrice: "",
+  relatedCreations: [],
 };
 
 function AdminCreationsContent() {
@@ -224,6 +227,7 @@ function AdminCreationsContent() {
       yarnBrand: form.yarnBrand || undefined,
       weight: form.weight ? Number(form.weight) : undefined,
       yarnPrice: form.yarnPrice ? Number(form.yarnPrice) : undefined,
+      relatedCreations: form.relatedCreations || [],
     };
 
     const url = editingId ? `/api/creations/${editingId}` : "/api/creations";
@@ -252,6 +256,12 @@ function AdminCreationsContent() {
 
   function handleEditClick(c: Creation) {
     setEditingId(c._id);
+    // Extraire les IDs des articles liés (peuvent être des objets ou des strings)
+    const relatedIds = Array.isArray(c.relatedCreations)
+      ? c.relatedCreations.map((item: any) => 
+          typeof item === 'string' ? item : item._id || item.toString()
+        )
+      : [];
     setForm({
       title: c.title ?? "",
       description: c.description ?? "",
@@ -266,6 +276,7 @@ function AdminCreationsContent() {
       yarnBrand: c.yarnBrand ?? "",
       weight: c.weight != null ? String(c.weight) : "",
       yarnPrice: c.yarnPrice != null ? String(c.yarnPrice) : "",
+      relatedCreations: relatedIds,
     });
     setMessage(null);
     setShowEditModal(true);
@@ -445,6 +456,8 @@ function AdminCreationsContent() {
         uploading={false}
         availableColors={availableColors}
         availableTypes={availableTypes}
+        availableCreations={creations}
+        currentCreationId={editingId}
       />
 
       {/* Modale de création */}
@@ -458,6 +471,8 @@ function AdminCreationsContent() {
         uploading={false}
         availableColors={availableColors}
         availableTypes={availableTypes}
+        availableCreations={creations}
+        currentCreationId={null}
       />
 
       {/* Modale de détails */}
