@@ -5,6 +5,9 @@ import Stripe from "stripe";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
+import User from "@/models/User";
+import { sendEmail } from "@/lib/sendEmail";
+import { emailTemplate } from "@/lib/emailTemplate";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -30,6 +33,23 @@ export async function GET(req: NextRequest) {
 
     if (!sessionId) {
       return NextResponse.json({ valid: false }, { status: 400 });
+    }
+
+    // Détecter l'URL de base depuis la requête actuelle
+    // Cela permet d'utiliser automatiquement le bon domaine (staging, production, localhost)
+    const host = req.headers.get("host") || "";
+    const protocol = req.headers.get("x-forwarded-proto") || 
+                     (host.includes("localhost") ? "http" : "https");
+    
+    // Construire l'URL de base
+    let appUrl: string;
+    
+    if (host.includes("localhost") || host.includes("127.0.0.1")) {
+      // Développement local
+      appUrl = "http://localhost:3000";
+    } else {
+      // Production ou staging - utiliser le domaine de la requête
+      appUrl = `${protocol}://${host}`;
     }
 
     // Récupérer la session Stripe complète avec toutes les informations
@@ -106,35 +126,58 @@ export async function GET(req: NextRequest) {
           console.log("================================================");
         }
 
+        // Traiter toutes les réservations d'abord (mise à jour, etc.)
+        const processedReservations: any[] = [];
+        const processedCreations: any[] = [];
+        
         await Promise.all(
           reservations.map(async (reservation: any, index: number) => {
+            // Log pour déboguer
+            console.log("[VERIFY-SESSION] Traitement réservation:", {
+              reservationId: reservation._id.toString(),
+              paymentStatus: reservation.paymentStatus,
+              contact: reservation.contact,
+            });
+
             // Vérifier si déjà traité
             if (reservation.paymentStatus === "paid") {
+              console.log("[VERIFY-SESSION] Réservation déjà payée, email déjà envoyé par le webhook");
+              // Ne pas renvoyer l'email si déjà payée (le webhook l'a déjà fait)
+              // En local, si le webhook n'a pas fonctionné, l'email sera envoyé lors du premier passage
               return;
             }
 
-            // Mettre à jour la réservation
-            // payment_intent est toujours une string (ID) dans checkout.sessions
-            reservation.stripePaymentIntentId = checkoutSession.payment_intent as string;
-            reservation.stripeCustomerId = checkoutSession.customer as string;
-            reservation.paymentStatus = "paid";
-            reservation.status = "validated";
-            reservation.paidAt = new Date();
-            reservation.deliveryMode = deliveryMode;
-            
-            // Mettre les frais de livraison uniquement sur le premier article
-            if (deliveryMode === "shipping" && totalShippingCost > 0) {
-              reservation.shippingCost = index === 0 ? totalShippingCost : 0;
-            } else {
-              reservation.shippingCost = 0;
+            // Protection contre les appels concurrents : utiliser findOneAndUpdate avec condition
+            // pour s'assurer qu'on ne traite qu'une seule fois
+            const now = new Date();
+            const updatedReservation = await Reservation.findOneAndUpdate(
+              {
+                _id: reservation._id,
+                paymentStatus: "pending", // Seulement si encore pending
+              },
+              {
+                $set: {
+                  stripePaymentIntentId: checkoutSession.payment_intent as string,
+                  stripeCustomerId: checkoutSession.customer as string,
+                  paymentStatus: "paid",
+                  status: "validated",
+                  paidAt: now,
+                  deliveryMode: deliveryMode,
+                  shippingCost: deliveryMode === "shipping" && totalShippingCost > 0 && index === 0 ? totalShippingCost : 0,
+                  ...(shippingAddress && { shippingAddress: shippingAddress }),
+                },
+              },
+              { new: true } // Retourner le document mis à jour
+            );
+
+            // Si updatedReservation est null, c'est que la réservation a déjà été traitée par un autre appel
+            if (!updatedReservation) {
+              console.log("[VERIFY-SESSION] Réservation déjà traitée par un autre appel concurrent, skip");
+              return;
             }
-            
-            // Ajouter l'adresse de livraison si disponible
-            if (shippingAddress) {
-              reservation.shippingAddress = shippingAddress;
-            }
-            
-            await reservation.save();
+
+            // Utiliser la réservation mise à jour
+            reservation = updatedReservation;
 
             // Mettre à jour la création - marquer comme vendue
             const creation = await Creation.findById(reservation.creationId);
@@ -142,9 +185,114 @@ export async function GET(req: NextRequest) {
               creation.sold = true;
               creation.salesCount = (creation.salesCount || 0) + 1;
               await creation.save();
+              processedReservations.push(reservation);
+              processedCreations.push(creation);
             }
           })
         );
+
+        // Envoyer un seul email groupé avec tous les articles
+        if (processedReservations.length > 0 && processedCreations.length > 0) {
+          const firstReservation = processedReservations[0];
+          const user = await User.findOne({ email: firstReservation.contact });
+          const deliveryLabel = deliveryMode === "shipping" ? "Livraison postale" : "Remise en main propre";
+          
+          // Calculer le total
+          const total = processedCreations.reduce((sum, creation) => sum + (creation.price || 0), 0) + (deliveryMode === "shipping" ? totalShippingCost : 0);
+
+          // Générer le HTML pour tous les articles
+          const itemsHTML = processedCreations.map((creation, index) => {
+            const reservation = processedReservations[index];
+            const productImage = (Array.isArray(creation.images) && creation.images.length > 0 ? creation.images[0] : creation.imageUrl) ?? null;
+            const priceLabel = creation.price != null ? `${creation.price} €` : "Prix sur demande";
+
+            return `
+              <div style="margin-top:${index > 0 ? '16px' : '0'};border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
+                ${productImage ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />` : ""}
+                <div style="font-size:13px;flex:1;">
+                  <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
+                  ${creation.color ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>` : ""}
+                  <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
+                  ${index === 0 ? `<p style="margin:0 0 4px 0;">📦 Mode de livraison : <strong>${deliveryLabel}</strong></p>` : ""}
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          // Envoyer l'email à l'acheteur
+          try {
+            await sendEmail({
+              to: firstReservation.contact,
+              subject: `🎉 Paiement confirmé - Votre commande de ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''} chez MailleMum`,
+              html: emailTemplate(`
+                <h1 style="font-size:20px;margin:0 0 12px 0;">Paiement confirmé 🎉</h1>
+                <p style="font-size:14px;margin:0 0 16px 0;">
+                  Bonjour <strong>${firstReservation.name || "👋"}</strong>,<br/>
+                  Votre paiement a été confirmé avec succès. Votre commande de ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''} est en cours de préparation.
+                </p>
+
+                ${itemsHTML}
+
+                <div style="margin-top:20px;padding-top:16px;border-top:2px solid #e5e7eb;">
+                  <p style="margin:0;font-size:14px;font-weight:600;text-align:right;">
+                    Total : <strong>${total.toFixed(2)} €</strong>
+                  </p>
+                </div>
+
+                <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+                  Vous pouvez consulter vos commandes à tout moment depuis votre espace :
+                  <br/>
+                  <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Voir mes commandes</a>
+                </p>
+              `),
+            });
+            console.log("[VERIFY-SESSION] Email de confirmation groupé envoyé à l'acheteur:", firstReservation.contact);
+          } catch (emailError: any) {
+            console.error("[VERIFY-SESSION] Erreur lors de l'envoi de l'email groupé:", emailError?.message || emailError);
+          }
+
+          // Envoyer l'email au vendeur (avec tous les articles)
+          if (process.env.SELLER_EMAIL) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            try {
+              const sellerItemsHTML = processedCreations.map((creation, index) => {
+                const reservation = processedReservations[index];
+                const productImage = (Array.isArray(creation.images) && creation.images.length > 0 ? creation.images[0] : creation.imageUrl) ?? null;
+                const priceLabel = creation.price != null ? `${creation.price} €` : "Prix sur demande";
+
+                return `
+                  <div style="margin-top:${index > 0 ? '12px' : '0'};border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
+                    ${productImage ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />` : ""}
+                    <div style="font-size:13px;flex:1;">
+                      <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
+                      ${creation.color ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>` : ""}
+                      <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
+                    </div>
+                  </div>
+                `;
+              }).join('');
+
+              await sendEmail({
+                to: process.env.SELLER_EMAIL,
+                subject: `💳 Nouvelle commande : ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''}`,
+                html: emailTemplate(`
+                  <h1 style="font-size:18px;margin:0 0 12px 0;">Nouvelle commande confirmée</h1>
+                  <p style="font-size:14px;margin:0 0 12px 0;">
+                    <strong>${firstReservation.name}</strong> (${firstReservation.contact}) a effectué un paiement pour ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''} :
+                  </p>
+
+                  ${sellerItemsHTML}
+
+                  <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+                    <a href="${appUrl}/admin/reservations" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer les commandes</a>
+                  </p>
+                `),
+              });
+            } catch (emailError: any) {
+              console.error("[VERIFY-SESSION] Erreur lors de l'envoi de l'email au vendeur:", emailError?.message || emailError);
+            }
+          }
+        }
       }
 
       // Récupérer les line items pour avoir les détails

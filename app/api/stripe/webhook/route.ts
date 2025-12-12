@@ -130,6 +130,10 @@ export async function POST(req: NextRequest) {
         console.log("==========================================");
       }
 
+      // Traiter toutes les réservations d'abord
+      const processedReservations: any[] = [];
+      const processedCreations: any[] = [];
+      
       await Promise.all(
         reservations.map(async (reservation, index) => {
           // Mettre à jour la réservation
@@ -160,123 +164,127 @@ export async function POST(req: NextRequest) {
             creation.sold = true;
             creation.salesCount = (creation.salesCount || 0) + 1;
             await creation.save();
-          }
-
-          // Envoyer l'email de confirmation à l'acheteur
-          const user = await User.findOne({ email: reservation.contact });
-          const shouldSendEmail = user?.emailNotifications !== false;
-
-          // Utiliser le deliveryMode déjà récupéré
-          const deliveryLabel = deliveryMode === "shipping" ? "Livraison postale" : "Remise en main propre";
-
-          if (shouldSendEmail && creation) {
-            const productImage =
-              (Array.isArray(creation.images) && creation.images.length > 0
-                ? creation.images[0]
-                : creation.imageUrl) ?? null;
-
-            const priceLabel =
-              creation.price != null
-                ? `${creation.price} €`
-                : "Prix sur demande";
-
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-            await sendEmail({
-              to: reservation.contact,
-              subject: "🎉 Paiement confirmé - Votre commande chez MailleMum",
-              html: emailTemplate(`
-                <h1 style="font-size:20px;margin:0 0 12px 0;">Paiement confirmé 🎉</h1>
-                <p style="font-size:14px;margin:0 0 16px 0;">
-                  Bonjour <strong>${reservation.name || "👋"}</strong>,<br/>
-                  Votre paiement a été confirmé avec succès. Votre commande est en cours de préparation.
-                </p>
-
-                <div style="margin-top:16px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
-                  ${
-                    productImage
-                      ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                      : ""
-                  }
-                  <div style="font-size:13px;flex:1;">
-                    <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                    ${
-                      creation.color
-                        ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                        : ""
-                    }
-                    <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
-                    <p style="margin:0 0 4px 0;">📦 Mode de livraison : <strong>${deliveryLabel}</strong></p>
-                    <p style="margin:4px 0 0 0;font-size:12px;color:#6b7280;">
-                      Numéro de commande : ${reservation._id.toString().slice(-8)}
-                    </p>
-                  </div>
-                </div>
-
-                <p style="font-size:12px;margin-top:20px;color:#6b7280;">
-                  Vous pouvez consulter vos commandes à tout moment depuis votre espace :
-                  <br/>
-                  <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Voir mes commandes</a>
-                </p>
-              `),
-            });
-          }
-
-          // Envoyer l'email au vendeur
-          if (process.env.SELLER_EMAIL && creation) {
-            const productImage =
-              (Array.isArray(creation.images) && creation.images.length > 0
-                ? creation.images[0]
-                : creation.imageUrl) ?? null;
-
-            const priceLabel =
-              creation.price != null
-                ? `${creation.price} €`
-                : "Prix sur demande";
-
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-            await sendEmail({
-              to: process.env.SELLER_EMAIL,
-              subject: `💳 Nouvelle commande : ${creation.title}`,
-              html: emailTemplate(`
-                <h1 style="font-size:18px;margin:0 0 12px 0;">Nouvelle commande confirmée</h1>
-                <p style="font-size:14px;margin:0 0 12px 0;">
-                  <strong>${reservation.name}</strong> (${reservation.contact}) a effectué un paiement pour :
-                </p>
-
-                <div style="margin-top:12px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
-                  ${
-                    productImage
-                      ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
-                      : ""
-                  }
-                  <div style="font-size:13px;flex:1;">
-                    <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                    ${
-                      creation.color
-                        ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
-                        : ""
-                    }
-                    <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
-                    <p style="margin:0 0 4px 0;">📦 Mode de livraison : <strong>${deliveryLabel}</strong></p>
-                    <p style="margin:0 0 4px 0;font-size:12px;color:#6b7280;">
-                      Paiement effectué le : ${new Date().toLocaleString("fr-FR")}
-                    </p>
-                    <p style="margin:4px 0 0 0;font-size:12px;color:#6b7280;">
-                      ID de commande : ${reservation._id.toString()}
-                    </p>
-                  </div>
-                </div>
-
-                <p style="font-size:12px;margin-top:20px;color:#6b7280;">
-                  <a href="${appUrl}/admin/reservations?creationId=${creation._id}" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer cette commande</a>
-                </p>
-              `),
-            });
+            processedReservations.push(reservation);
+            processedCreations.push(creation);
           }
         })
       );
+
+      // Envoyer un seul email groupé avec tous les articles
+      if (processedReservations.length > 0 && processedCreations.length > 0) {
+        const firstReservation = processedReservations[0];
+        const deliveryLabel = deliveryMode === "shipping" ? "Livraison postale" : "Remise en main propre";
+
+        // Détecter l'URL de base
+        const headersList = await headers();
+        const host = headersList.get("host") || "";
+        const protocol = headersList.get("x-forwarded-proto") || 
+                       (host.includes("localhost") ? "http" : "https");
+        
+        let appUrl: string;
+        
+        if (host && (host.includes("localhost") || host.includes("127.0.0.1"))) {
+          appUrl = "http://localhost:3000";
+        } else if (host) {
+          appUrl = `${protocol}://${host}`;
+        } else {
+          appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.maillemum.fr";
+        }
+
+        // Calculer le total
+        const total = processedCreations.reduce((sum, creation) => sum + (creation.price || 0), 0) + (deliveryMode === "shipping" ? totalShippingCost : 0);
+
+        // Générer le HTML pour tous les articles
+        const itemsHTML = processedCreations.map((creation, index) => {
+          const productImage = (Array.isArray(creation.images) && creation.images.length > 0 ? creation.images[0] : creation.imageUrl) ?? null;
+          const priceLabel = creation.price != null ? `${creation.price} €` : "Prix sur demande";
+
+          return `
+            <div style="margin-top:${index > 0 ? '16px' : '0'};border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
+              ${productImage ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />` : ""}
+              <div style="font-size:13px;flex:1;">
+                <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
+                ${creation.color ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>` : ""}
+                <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
+                ${index === 0 ? `<p style="margin:0 0 4px 0;">📦 Mode de livraison : <strong>${deliveryLabel}</strong></p>` : ""}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Envoyer l'email à l'acheteur
+        try {
+          await sendEmail({
+            to: firstReservation.contact,
+            subject: `🎉 Paiement confirmé - Votre commande de ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''} chez MailleMum`,
+            html: emailTemplate(`
+              <h1 style="font-size:20px;margin:0 0 12px 0;">Paiement confirmé 🎉</h1>
+              <p style="font-size:14px;margin:0 0 16px 0;">
+                Bonjour <strong>${firstReservation.name || "👋"}</strong>,<br/>
+                Votre paiement a été confirmé avec succès. Votre commande de ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''} est en cours de préparation.
+              </p>
+
+              ${itemsHTML}
+
+              <div style="margin-top:20px;padding-top:16px;border-top:2px solid #e5e7eb;">
+                <p style="margin:0;font-size:14px;font-weight:600;text-align:right;">
+                  Total : <strong>${total.toFixed(2)} €</strong>
+                </p>
+              </div>
+
+              <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+                Vous pouvez consulter vos commandes à tout moment depuis votre espace :
+                <br/>
+                <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Voir mes commandes</a>
+              </p>
+            `),
+          });
+          console.log("[WEBHOOK] Email de confirmation groupé envoyé à l'acheteur:", firstReservation.contact);
+        } catch (emailError: any) {
+          console.error("[WEBHOOK] Erreur lors de l'envoi de l'email groupé:", emailError?.message || emailError);
+        }
+
+        // Envoyer l'email au vendeur
+        if (process.env.SELLER_EMAIL) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          try {
+            const sellerItemsHTML = processedCreations.map((creation) => {
+              const productImage = (Array.isArray(creation.images) && creation.images.length > 0 ? creation.images[0] : creation.imageUrl) ?? null;
+              const priceLabel = creation.price != null ? `${creation.price} €` : "Prix sur demande";
+
+              return `
+                <div style="margin-top:12px;border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
+                  ${productImage ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />` : ""}
+                  <div style="font-size:13px;flex:1;">
+                    <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
+                    ${creation.color ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>` : ""}
+                    <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
+                  </div>
+                </div>
+              `;
+            }).join('');
+
+            await sendEmail({
+              to: process.env.SELLER_EMAIL,
+              subject: `💳 Nouvelle commande : ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''}`,
+              html: emailTemplate(`
+                <h1 style="font-size:18px;margin:0 0 12px 0;">Nouvelle commande confirmée</h1>
+                <p style="font-size:14px;margin:0 0 12px 0;">
+                  <strong>${firstReservation.name}</strong> (${firstReservation.contact}) a effectué un paiement pour ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''} :
+                </p>
+
+                ${sellerItemsHTML}
+
+                <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+                  <a href="${appUrl}/admin/reservations" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Gérer les commandes</a>
+                </p>
+              `),
+            });
+          } catch (emailError: any) {
+            console.error("[WEBHOOK] Erreur lors de l'envoi de l'email au vendeur:", emailError?.message || emailError);
+          }
+        }
+      }
 
       // Invalider le cache
       revalidatePath("/");

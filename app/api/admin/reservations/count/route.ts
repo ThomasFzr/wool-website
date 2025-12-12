@@ -13,16 +13,33 @@ export async function GET() {
     await connectToDatabase();
 
     // Compter les nouvelles commandes payées non vues
-    const newCount = await Reservation.countDocuments({ 
+    // On compte les sessions Stripe uniques (commandes) plutôt que les réservations individuelles
+    const newReservations = await Reservation.find({ 
       paymentStatus: "paid",
       seenByAdmin: { $ne: true }
-    });
+    }).select("stripeCheckoutSessionId").lean();
+
+    // Compter les sessions uniques (commandes) au lieu des réservations
+    const uniqueSessions = new Set(
+      newReservations
+        .map(r => r.stripeCheckoutSessionId)
+        .filter(id => id != null)
+    );
+    const newCount = uniqueSessions.size;
 
     // Compter les commandes en cours de préparation (payées mais pas encore expédiées)
-    const pendingCount = await Reservation.countDocuments({ 
+    // Même logique : compter les sessions uniques
+    const pendingReservations = await Reservation.find({ 
       paymentStatus: "paid",
       status: "pending"
-    });
+    }).select("stripeCheckoutSessionId").lean();
+
+    const uniquePendingSessions = new Set(
+      pendingReservations
+        .map(r => r.stripeCheckoutSessionId)
+        .filter(id => id != null)
+    );
+    const pendingCount = uniquePendingSessions.size;
 
     return NextResponse.json({ 
       pending: pendingCount,
