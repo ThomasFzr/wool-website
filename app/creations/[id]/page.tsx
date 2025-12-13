@@ -25,11 +25,12 @@ async function getCreation(slug: string) {
   if (!creation) return null;
   
   const creationData: any = creation;
+  const creationId = creationData._id.toString();
   
   // Formater les articles liés
-  const relatedCreations = Array.isArray(creationData.relatedCreations)
+  let relatedCreations = Array.isArray(creationData.relatedCreations)
     ? creationData.relatedCreations
-        .filter((item: any) => item && !item.sold)
+        .filter((item: any) => item && !item.sold && item._id.toString() !== creationId)
         .map((item: any) => ({
           _id: item._id.toString(),
           title: item.title,
@@ -42,8 +43,114 @@ async function getCreation(slug: string) {
         }))
     : [];
   
+  // Si pas d'articles liés, récupérer d'autres créations similaires (même type ou couleur, non vendues)
+  if (relatedCreations.length === 0) {
+    const targetLimit = 5;
+    const currentId = creationData._id;
+    const excludeIds: mongoose.Types.ObjectId[] = [];
+    
+    // Essayer d'abord par type si disponible
+    if (creationData.type) {
+      const byType = await CreationModel.find({
+        _id: { $ne: currentId },
+        sold: { $ne: true },
+        type: creationData.type,
+      })
+        .select('title imageUrl images price color type slug sold')
+        .sort({ displayOrder: -1, createdAt: -1 })
+        .limit(targetLimit)
+        .lean();
+      
+      if (byType.length > 0) {
+        relatedCreations = byType.map((item: any) => ({
+          _id: item._id.toString(),
+          title: item.title,
+          imageUrl: item.imageUrl,
+          images: item.images,
+          price: item.price,
+          color: item.color,
+          type: item.type,
+          slug: item.slug,
+        }));
+        excludeIds.push(...byType.map((item: any) => item._id));
+      }
+    }
+    
+    // Si pas assez de résultats, compléter par couleur
+    if (relatedCreations.length < targetLimit && creationData.color) {
+      const query: any = {
+        sold: { $ne: true },
+        color: creationData.color,
+      };
+      
+      if (excludeIds.length > 0) {
+        query._id = { $ne: currentId, $nin: excludeIds };
+      } else {
+        query._id = { $ne: currentId };
+      }
+      
+      const byColor = await CreationModel.find(query)
+        .select('title imageUrl images price color type slug sold')
+        .sort({ displayOrder: -1, createdAt: -1 })
+        .limit(targetLimit - relatedCreations.length)
+        .lean();
+      
+      if (byColor.length > 0) {
+        relatedCreations = [
+          ...relatedCreations,
+          ...byColor.map((item: any) => ({
+            _id: item._id.toString(),
+            title: item.title,
+            imageUrl: item.imageUrl,
+            images: item.images,
+            price: item.price,
+            color: item.color,
+            type: item.type,
+            slug: item.slug,
+          }))
+        ];
+        excludeIds.push(...byColor.map((item: any) => item._id));
+      }
+    }
+    
+    // Si toujours pas assez (ou si ni type ni couleur ne sont définis), prendre n'importe quelles autres créations non vendues
+    if (relatedCreations.length < targetLimit) {
+      const query: any = {
+        sold: { $ne: true },
+      };
+      
+      if (excludeIds.length > 0) {
+        query._id = { $ne: currentId, $nin: excludeIds };
+      } else {
+        query._id = { $ne: currentId };
+      }
+      
+      const others = await CreationModel.find(query)
+        .select('title imageUrl images price color type slug sold')
+        .sort({ displayOrder: -1, createdAt: -1 })
+        .limit(targetLimit - relatedCreations.length)
+        .lean();
+      
+      if (others.length > 0) {
+        relatedCreations = [
+          ...relatedCreations,
+          ...others.map((item: any) => ({
+            _id: item._id.toString(),
+            title: item.title,
+            imageUrl: item.imageUrl,
+            images: item.images,
+            price: item.price,
+            color: item.color,
+            type: item.type,
+            slug: item.slug,
+          }))
+        ];
+      }
+    }
+  }
+  
   return {
-    _id: creationData._id.toString(),
+    _id: creationId,
     slug: creationData.slug,
     title: creationData.title,
     description: creationData.description,

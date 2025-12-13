@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Badge } from "@/components/ui";
+import { Button, Badge, Accordion } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import { useCart } from "@/contexts/CartContext";
 import { Toast } from "@/components/Toast";
+import { CreationCard } from "@/components/CreationCard";
 
 export type Creation = {
   _id: string;
@@ -492,11 +493,43 @@ export function CreationDetail({ creation }: CreationDetailProps) {
             {creation.type && <Badge>{creation.type.charAt(0).toUpperCase() + creation.type.slice(1)}</Badge>}
           </div>
 
-          {creation.description && (
-            <div className="prose prose-slate max-w-none">
-              <p className="text-slate-700 whitespace-pre-wrap">{creation.description}</p>
-            </div>
-          )}
+          {/* Actions - Mobile */}
+          <div className="md:hidden space-y-3">
+            {!creation.sold ? (
+              <Button
+                onClick={handleAddToCart}
+                disabled={isInCart || justAddedToCart}
+                className={`w-full cursor-pointer transition-all duration-300 ${
+                  justAddedToCart
+                    ? "bg-green-500 hover:bg-green-500 scale-105"
+                    : ""
+                }`}
+                size="lg"
+              >
+                {justAddedToCart
+                  ? "✓ Ajouté !"
+                  : isInCart
+                  ? "Déjà dans le panier"
+                  : "Ajouter au panier"}
+              </Button>
+            ) : (
+              <>
+                <div className="rounded-lg p-3 text-center bg-gray-100">
+                  <p className="text-sm font-medium text-gray-900">Article vendu</p>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Cet article n'est plus disponible
+                  </p>
+                </div>
+                <Button
+                  onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)}
+                  className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
+                  size="lg"
+                >
+                  Commander un article identique
+                </Button>
+              </>
+            )}
+          </div>
 
           {/* Actions - Desktop */}
           <div className="hidden md:block space-y-3">
@@ -538,57 +571,42 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         </div>
       </div>
 
-      {/* Description SEO - Desktop */}
-      {creation.seoDescription && (
-        <div className="hidden md:block mt-8 prose prose-slate max-w-none">
-          <p className="text-slate-700 whitespace-pre-wrap">{creation.seoDescription}</p>
+      {/* Accordéon avec description et informations */}
+      <div className="mt-8 md:mt-12 max-w-4xl">
+        <Accordion
+          items={[
+            {
+              title: "Description",
+              content: creation.description || creation.seoDescription || "Aucune description disponible.",
+            },
+            ...(creation.seoDescription && creation.description !== creation.seoDescription
+              ? [
+                  {
+                    title: "Informations supplémentaires",
+                    content: creation.seoDescription,
+                  },
+                ]
+              : []),
+          ]}
+          defaultOpen={0}
+        />
+      </div>
+
+      {/* Créations suggérées */}
+      {creation.relatedCreations && Array.isArray(creation.relatedCreations) && creation.relatedCreations.length > 0 && (
+        <div className="mt-12 md:mt-16">
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">Vous pourriez aussi aimer</h2>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {creation.relatedCreations.map((relatedCreation) => (
+              <CreationCard
+                key={relatedCreation._id}
+                creation={relatedCreation}
+                priority={false}
+              />
+            ))}
+          </div>
         </div>
       )}
-
-      {/* Mobile Actions */}
-      <div className="md:hidden p-4 space-y-2">
-        {!creation.sold ? (
-          <Button
-            onClick={handleAddToCart}
-            disabled={isInCart || justAddedToCart}
-            className={`w-full cursor-pointer transition-all duration-300 ${
-              justAddedToCart
-                ? "bg-green-500 hover:bg-green-500 scale-105"
-                : ""
-            }`}
-            size="lg"
-          >
-            {justAddedToCart
-              ? "✓ Ajouté !"
-              : isInCart
-              ? "Déjà dans le panier"
-              : "Ajouter au panier"}
-          </Button>
-        ) : (
-          <>
-            <div className="rounded-lg p-3 text-center bg-gray-100">
-              <p className="text-sm font-medium text-gray-900">Article vendu</p>
-              <p className="mt-1 text-xs text-gray-600">
-                Cet article n'est plus disponible
-              </p>
-            </div>
-            <Button
-              onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)}
-              className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
-              size="lg"
-            >
-              Commander un article identique
-            </Button>
-          </>
-        )}
-
-        {/* Description SEO - Mobile */}
-        {creation.seoDescription && (
-          <div className="mt-4 prose prose-slate max-w-none">
-            <p className="text-slate-700 whitespace-pre-wrap text-sm">{creation.seoDescription}</p>
-          </div>
-        )}
-      </div>
 
       {/* Toast pour mobile */}
       <Toast
