@@ -231,7 +231,7 @@ export default function CartPage() {
     <>
       <Header />
       <main className="min-h-screen bg-linear-to-br from-slate-50 via-pink-50/30 to-slate-50">
-        <div className="mx-auto max-w-4xl px-4 py-8 pb-24 md:pb-8">
+        <div className="mx-auto max-w-4xl px-4 py-8 pb-8 md:pb-8">
           <h1 className="mb-8 text-3xl font-bold text-slate-900">Panier</h1>
 
           <div className="space-y-4">
@@ -310,9 +310,93 @@ export default function CartPage() {
             })}
           </div>
 
-          <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+          {/* Section "Vous pourriez aussi aimer" */}
+          {relatedCreations.length > 0 && (
+            <div className="mt-6 md:mt-8 rounded-2xl bg-white p-4 md:p-6 shadow-sm ring-1 ring-slate-100">
+              <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-3 md:mb-4">
+                Vous pourriez aussi aimer
+              </h3>
+              <div className="space-y-4">
+                {relatedCreations.map((related) => {
+                  const imageUrl = related.images?.[0] || related.imageUrl;
+                  const optimizedImage = imageUrl
+                    ? optimizeCloudinaryUrl(imageUrl, {
+                        width: 200,
+                        quality: 70,
+                        format: "auto",
+                      })
+                    : undefined;
+                  const isInCart = items.some((item) => item.creationId === related._id);
+
+                  return (
+                    <div
+                      key={related._id}
+                      className="flex gap-4 rounded-lg border border-slate-200 p-4"
+                    >
+                      <Link
+                        href={`/creations/${related.slug || related._id}`}
+                        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100"
+                      >
+                        {optimizedImage ? (
+                          <img
+                            src={optimizedImage}
+                            alt={related.title}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
+                            Pas d&apos;image
+                          </div>
+                        )}
+                      </Link>
+
+                      <div className="flex flex-1 flex-col gap-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <Link
+                              href={`/creations/${related.slug || related._id}`}
+                              className="text-sm font-semibold text-slate-900 hover:text-slate-700"
+                            >
+                              {related.title}
+                            </Link>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {related.price != null ? `${related.price.toFixed(2)} €` : "—"}
+                          </p>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              if (!isInCart) {
+                                addItem({
+                                  creationId: related._id,
+                                  slug: related.slug,
+                                  title: related.title,
+                                  imageUrl: imageUrl,
+                                  price: related.price,
+                                });
+                              }
+                            }}
+                            disabled={isInCart}
+                            className="cursor-pointer"
+                            variant={isInCart ? "secondary" : "primary"}
+                          >
+                            {isInCart ? "✓ Ajouté" : "+ Ajouter"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-8 rounded-2xl bg-white p-4 md:p-6 shadow-sm ring-1 ring-slate-100">
             {/* Choix du mode de livraison */}
-            <div className="mb-6">
+            <div className="mb-4 md:mb-6">
               <h3 className="text-sm font-semibold text-slate-900 mb-3">
                 Mode de récupération
               </h3>
@@ -414,7 +498,7 @@ export default function CartPage() {
             </div>
 
             {/* Récapitulatif des prix */}
-            <div className="border-t border-slate-200 pt-4 space-y-2">
+            <div className="border-t border-slate-200 pt-3 md:pt-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-600">Sous-total</span>
                 <span className="text-slate-900">{subtotal.toFixed(2)} €</span>
@@ -435,7 +519,7 @@ export default function CartPage() {
               </div>
             </div>
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-4 md:mt-6 space-y-3">
               <Button
                 onClick={handleCheckout}
                 disabled={isProcessing}
@@ -460,90 +544,6 @@ export default function CartPage() {
               </Link>
             </div>
           </div>
-
-          {/* Section "Vous pourriez aussi aimer" */}
-          {relatedCreations.length > 0 && (
-            <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                Vous pourriez aussi aimer
-              </h3>
-              <div className="space-y-4">
-                {relatedCreations.map((related) => {
-                  const imageUrl = related.images?.[0] || related.imageUrl;
-                  const optimizedImage = imageUrl
-                    ? optimizeCloudinaryUrl(imageUrl, {
-                        width: 200,
-                        quality: 70,
-                        format: "auto",
-                      })
-                    : undefined;
-                  const isInCart = items.some((item) => item.creationId === related._id);
-
-                  return (
-                    <div
-                      key={related._id}
-                      className="flex gap-4 rounded-lg border border-slate-200 p-4"
-                    >
-                      <Link
-                        href={`/creations/${related.slug || related._id}`}
-                        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100"
-                      >
-                        {optimizedImage ? (
-                          <img
-                            src={optimizedImage}
-                            alt={related.title}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
-                            Pas d&apos;image
-                          </div>
-                        )}
-                      </Link>
-
-                      <div className="flex flex-1 flex-col gap-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <Link
-                              href={`/creations/${related.slug || related._id}`}
-                              className="text-sm font-semibold text-slate-900 hover:text-slate-700"
-                            >
-                              {related.title}
-                            </Link>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-slate-900">
-                            {related.price != null ? `${related.price.toFixed(2)} €` : "—"}
-                          </p>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              if (!isInCart) {
-                                addItem({
-                                  creationId: related._id,
-                                  slug: related.slug,
-                                  title: related.title,
-                                  imageUrl: imageUrl,
-                                  price: related.price,
-                                });
-                              }
-                            }}
-                            disabled={isInCart}
-                            className="cursor-pointer"
-                            variant={isInCart ? "secondary" : "primary"}
-                          >
-                            {isInCart ? "✓ Ajouté" : "+ Ajouter"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </main>
     </>
