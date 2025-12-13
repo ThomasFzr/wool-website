@@ -151,6 +151,66 @@ export function CreationFormModal({
     }
   };
 
+  // Fonction pour calculer la similarité entre deux chaînes (algorithme simple)
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+    
+    // Si les chaînes sont identiques
+    if (s1 === s2) return 1;
+    
+    // Si l'une contient l'autre
+    if (s1.includes(s2) || s2.includes(s1)) return 0.8;
+    
+    // Calculer le nombre de mots communs
+    const words1 = s1.split(/\s+/);
+    const words2 = s2.split(/\s+/);
+    const commonWords = words1.filter(word => words2.includes(word));
+    
+    if (commonWords.length === 0) return 0;
+    
+    // Score basé sur le ratio de mots communs
+    return commonWords.length / Math.max(words1.length, words2.length);
+  };
+
+  // Trier les articles liés par pertinence
+  const getSortedRelatedCreations = () => {
+    const currentTitle = form.title.toLowerCase();
+    const currentColor = form.color?.toLowerCase() || "";
+    const currentType = form.type?.toLowerCase() || "";
+
+    return [...availableCreations]
+      .filter((c) => c._id !== currentCreationId && !c.sold)
+      .sort((a, b) => {
+        // 1. Priorité : Nom similaire
+        const similarityA = calculateSimilarity(currentTitle, a.title?.toLowerCase() || "");
+        const similarityB = calculateSimilarity(currentTitle, b.title?.toLowerCase() || "");
+        
+        if (Math.abs(similarityA - similarityB) > 0.1) {
+          return similarityB - similarityA; // Plus similaire en premier
+        }
+        
+        // 2. Priorité : Même couleur
+        const colorMatchA = a.color?.toLowerCase() === currentColor ? 1 : 0;
+        const colorMatchB = b.color?.toLowerCase() === currentColor ? 1 : 0;
+        
+        if (colorMatchA !== colorMatchB) {
+          return colorMatchB - colorMatchA; // Même couleur en premier
+        }
+        
+        // 3. Priorité : Même type
+        const typeMatchA = a.type?.toLowerCase() === currentType ? 1 : 0;
+        const typeMatchB = b.type?.toLowerCase() === currentType ? 1 : 0;
+        
+        if (typeMatchA !== typeMatchB) {
+          return typeMatchB - typeMatchA; // Même type en premier
+        }
+        
+        // 4. Sinon, ordre alphabétique par titre
+        return (a.title || "").localeCompare(b.title || "", 'fr');
+      });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -314,8 +374,7 @@ export function CreationFormModal({
               Sélectionnez les articles à proposer comme recommandations sur la page de cet article
             </p>
             <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2">
-              {availableCreations
-                .filter((c) => c._id !== currentCreationId && !c.sold)
+              {getSortedRelatedCreations()
                 .map((creation) => {
                   const isSelected = form.relatedCreations.includes(creation._id);
                   const imageUrl = creation.images?.[0] || creation.imageUrl;
@@ -367,7 +426,7 @@ export function CreationFormModal({
                     </label>
                   );
                 })}
-              {availableCreations.filter((c) => c._id !== currentCreationId && !c.sold).length === 0 && (
+              {getSortedRelatedCreations().length === 0 && (
                 <p className="text-xs text-slate-500 text-center py-4">
                   Aucun autre article disponible
                 </p>
