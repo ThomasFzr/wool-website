@@ -10,12 +10,12 @@ import { Metadata } from "next";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "MailleMum - Créations artisanales en laine",
-  description: "Découvrez nos créations artisanales en laine : tours de cou, bandeaux et bonnets faits main avec passion.",
+  title: "MailleMum - Créations tricotées à la main",
+  description: "Découvrez nos créations tricotées à la main : tours de cou, bandeaux et bonnets faits main avec passion.",
   keywords: ["laine", "artisanat", "créations", "fait main", "tour de cou", "bandeau", "bonnet", "tricot", "crochet"],
   openGraph: {
-    title: "MailleMum - Créations artisanales en laine",
-    description: "Découvrez nos créations artisanales en laine : tours de cou, bandeaux et bonnets faits main avec passion.",
+    title: "MailleMum - Créations tricotées à la main",
+    description: "Découvrez nos créations tricotées à la main : tours de cou, bandeaux et bonnets faits main avec passion.",
     type: "website",
     locale: "fr_FR",
     images: [
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
         url: '/images/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'MailleMum - Créations artisanales en laine',
+        alt: 'MailleMum - Créations tricotées à la main',
       },
     ],
   },

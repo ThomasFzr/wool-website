@@ -100,7 +100,7 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
 
           {/* Titre H1 pour le SEO */}
           <h1 className="sr-only">
-            {title || "MailleMum - Créations artisanales en laine"}
+            {title || "MailleMum - Créations tricotées à la main"}
           </h1>
 
           {/* Panier et compte */}
