@@ -56,6 +56,32 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     const body = await req.json();
 
+    // Validation des champs obligatoires
+    if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
+      return NextResponse.json(
+        { error: "Le titre est obligatoire." },
+        { status: 400 }
+      );
+    }
+    if (!body.type || typeof body.type !== 'string' || body.type.trim() === '') {
+      return NextResponse.json(
+        { error: "Le type d'article est obligatoire." },
+        { status: 400 }
+      );
+    }
+    if (!body.price || typeof body.price !== 'number' || body.price <= 0) {
+      return NextResponse.json(
+        { error: "Le prix est obligatoire et doit être supérieur à 0." },
+        { status: 400 }
+      );
+    }
+    if (!body.color || typeof body.color !== 'string' || body.color.trim() === '') {
+      return NextResponse.json(
+        { error: "La couleur est obligatoire." },
+        { status: 400 }
+      );
+    }
+
     const images: string[] =
       Array.isArray(body.images) && body.images.length
         ? body.images
@@ -82,7 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     const creation = await Creation.create({
-      title: body.title,
+      title: body.title.trim(),
       slug,
       description: body.description,
       seoDescription: body.seoDescription,
@@ -90,8 +116,8 @@ export async function POST(req: NextRequest) {
       images,
       imagePublicIds,
       price: body.price,
-      color: body.color,
-      type: body.type && body.type !== "" ? body.type : undefined,
+      color: body.color.trim(),
+      type: body.type.trim(),
       displayOrder: nextDisplayOrder,
       showAsNew: body.showAsNew !== undefined ? body.showAsNew : true,
       yarnBrand: body.yarnBrand,

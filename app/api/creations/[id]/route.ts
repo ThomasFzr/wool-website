@@ -105,13 +105,50 @@ export async function PATCH(
     await connectToDatabase();
     const body = await req.json();
 
+    // Récupérer la création existante pour valider les champs obligatoires
+    const existingCreation = await Creation.findById(id);
+    if (!existingCreation) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+
+    // Validation des champs obligatoires (vérifier les valeurs finales après mise à jour)
+    const finalTitle = body.title !== undefined ? body.title : existingCreation.title;
+    const finalType = body.type !== undefined ? body.type : existingCreation.type;
+    const finalPrice = body.price !== undefined ? body.price : existingCreation.price;
+    const finalColor = body.color !== undefined ? body.color : existingCreation.color;
+
+    if (!finalTitle || typeof finalTitle !== 'string' || finalTitle.trim() === '') {
+      return NextResponse.json(
+        { error: "Le titre est obligatoire." },
+        { status: 400 }
+      );
+    }
+    if (!finalType || typeof finalType !== 'string' || finalType.trim() === '') {
+      return NextResponse.json(
+        { error: "Le type d'article est obligatoire." },
+        { status: 400 }
+      );
+    }
+    if (!finalPrice || typeof finalPrice !== 'number' || finalPrice <= 0) {
+      return NextResponse.json(
+        { error: "Le prix est obligatoire et doit être supérieur à 0." },
+        { status: 400 }
+      );
+    }
+    if (!finalColor || typeof finalColor !== 'string' || finalColor.trim() === '') {
+      return NextResponse.json(
+        { error: "La couleur est obligatoire." },
+        { status: 400 }
+      );
+    }
+
     // Construire l'objet de mise à jour avec les opérateurs MongoDB
     const setData: any = {};
     const unsetData: any = {};
     const incData: any = {};
 
     if (body.title !== undefined) {
-      setData.title = body.title;
+      setData.title = body.title.trim();
       // Régénérer le slug si le titre change
       let baseSlug = generateSlug(body.title);
       let slug = baseSlug;
@@ -130,17 +167,13 @@ export async function PATCH(
       setData.imagePublicIds = body.imagePublicIds;
     }
     if (body.price !== undefined) setData.price = body.price;
-    if (body.color !== undefined) setData.color = body.color;
+    if (body.color !== undefined) setData.color = body.color.trim();
     if (body.yarnBrand !== undefined) setData.yarnBrand = body.yarnBrand;
     if (body.weight !== undefined) setData.weight = body.weight;
     if (body.yarnPrice !== undefined) setData.yarnPrice = body.yarnPrice;
     if (body.type !== undefined) {
-      // Si type est vide, on le supprime du document, sinon on le met à jour
-      if (body.type === "" || body.type === null) {
-        unsetData.type = "";
-      } else {
-        setData.type = body.type;
-      }
+      // Le type est maintenant obligatoire, on ne peut plus le supprimer
+      setData.type = body.type.trim();
     }
 
     if (body.reserved !== undefined) setData.reserved = body.reserved;

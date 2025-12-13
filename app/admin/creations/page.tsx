@@ -110,6 +110,38 @@ function AdminCreationsContent() {
     )
   ).sort((a, b) => a.localeCompare(b, 'fr'));
 
+  // Fonction pour détecter les informations manquantes
+  function getMissingFields(creation: Creation): string[] {
+    const missing: string[] = [];
+    
+    if (!creation.description || creation.description.trim() === "") {
+      missing.push("Description");
+    }
+    if (!creation.color || creation.color.trim() === "") {
+      missing.push("Couleur");
+    }
+    if (!creation.type || creation.type.trim() === "") {
+      missing.push("Type");
+    }
+    if (!creation.price || creation.price <= 0) {
+      missing.push("Prix");
+    }
+    if (!creation.imageUrl && (!creation.images || creation.images.length === 0)) {
+      missing.push("Image");
+    }
+    
+    return missing;
+  }
+
+  // Articles avec des informations manquantes
+  const creationsWithMissingFields = creations
+    .map((c) => ({
+      creation: c,
+      missingFields: getMissingFields(c),
+    }))
+    .filter((item) => item.missingFields.length > 0)
+    .sort((a, b) => b.missingFields.length - a.missingFields.length); // Plus de champs manquants en premier
+
   const filteredCreations = creations
     .filter((c) => {
       if (statusFilter === "disponible" && c.sold) return false;
@@ -232,16 +264,34 @@ function AdminCreationsContent() {
     e.preventDefault();
     setMessage(null);
 
+    // Validation des champs obligatoires
+    if (!form.title.trim()) {
+      setMessage("Le titre est obligatoire.");
+      return;
+    }
+    if (!form.type || form.type.trim() === "") {
+      setMessage("Le type d'article est obligatoire.");
+      return;
+    }
+    if (!form.price || parseFloat(form.price) <= 0) {
+      setMessage("Le prix est obligatoire et doit être supérieur à 0.");
+      return;
+    }
+    if (!form.color || form.color.trim() === "") {
+      setMessage("La couleur est obligatoire.");
+      return;
+    }
+
     const payload = {
-      title: form.title,
+      title: form.title.trim(),
       description: form.description || undefined,
       seoDescription: form.seoDescription || undefined,
       imageUrl: form.images[0] || undefined,
       images: form.images,
       imagePublicIds: form.imagePublicIds,
-      price: form.price ? Number(form.price) : undefined,
-      color: form.color || undefined,
-      type: form.type || undefined,
+      price: Number(form.price),
+      color: form.color.trim(),
+      type: form.type.trim(),
       showAsNew: form.showAsNew,
       yarnBrand: form.yarnBrand || undefined,
       weight: form.weight ? Number(form.weight) : undefined,
@@ -259,7 +309,8 @@ function AdminCreationsContent() {
     });
 
     if (!res.ok) {
-      setMessage("Erreur lors de l'enregistrement.");
+      const errorData = await res.json().catch(() => ({}));
+      setMessage(errorData.error || "Erreur lors de l'enregistrement.");
       return;
     }
 
@@ -437,6 +488,63 @@ function AdminCreationsContent() {
               ➕ Ajouter une création
             </Button>
           </div>
+
+          {/* Suggestions d'amélioration */}
+          {creationsWithMissingFields.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <h2 className="text-lg font-semibold text-amber-900">
+                  💡 Suggestions d&apos;amélioration
+                </h2>
+                <span className="bg-amber-200 text-amber-900 text-xs font-semibold px-2 py-1 rounded-full">
+                  {creationsWithMissingFields.length}
+                </span>
+              </div>
+              <p className="text-sm text-amber-800 mb-4">
+                Les articles suivants ont des informations manquantes. Complétez-les pour améliorer leur visibilité.
+              </p>
+              <div className="space-y-3">
+                {creationsWithMissingFields.map(({ creation, missingFields }) => (
+                  <div
+                    key={creation._id}
+                    className="bg-white rounded-lg p-4 border border-amber-300 hover:border-amber-400 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-semibold text-slate-900">{creation.title}</h3>
+                          {creation.sold && (
+                            <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
+                              Vendu
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {missingFields.map((field) => (
+                            <span
+                              key={field}
+                              className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-xs font-medium px-2 py-1 rounded"
+                            >
+                              <span className="text-amber-600">⚠️</span>
+                              {field}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleEditClick(creation)}
+                        className="cursor-pointer whitespace-nowrap"
+                      >
+                        ✏️ Modifier
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Liste des créations */}
           <CreationsList

@@ -8,9 +8,9 @@ const schema = new Schema(
     seoDescription: String, // Description complète pour le référencement
     imageUrl: String,
     images: [String],
-    price: Number,
-    color: String,
-    type: String,
+    price: { type: Number, required: true },
+    color: { type: String, required: true },
+    type: { type: String, required: true },
     
     // Champs admin uniquement (non visibles pour les utilisateurs)
     yarnBrand: String, // Marque de laine

@@ -280,10 +280,11 @@ export function CreationFormModal({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">Type d'article</label>
+            <label className="text-xs font-medium text-slate-700">Type d'article *</label>
             <select
               value={form.type}
               onChange={(e) => onFormChange({ ...form, type: e.target.value })}
+              required
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
             >
               <option value="">-- Sélectionner --</option>
@@ -297,18 +298,22 @@ export function CreationFormModal({
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Prix (€)"
+              label="Prix (€) *"
               type="number"
               placeholder="25"
               value={form.price}
               onChange={(e) => onFormChange({ ...form, price: e.target.value })}
+              required
+              min="0"
+              step="0.01"
             />
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-700">Couleur</label>
+              <label className="text-xs font-medium text-slate-700">Couleur *</label>
               <select
                 value={form.color}
                 onChange={(e) => onFormChange({ ...form, color: e.target.value })}
+                required
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
               >
                 <option value="">-- Sélectionner --</option>
@@ -517,7 +522,18 @@ export function CreationFormModal({
           
           {/* Boutons */}
           <div className="flex gap-2 p-6 border-t border-slate-200 bg-white shrink-0">
-            <Button type="submit" disabled={isUploading || !form.title} className="flex-1 cursor-pointer">
+            <Button 
+              type="submit" 
+              disabled={
+                isUploading || 
+                !form.title.trim() || 
+                !form.type || 
+                !form.price || 
+                parseFloat(form.price) <= 0 || 
+                !form.color
+              } 
+              className="flex-1 cursor-pointer"
+            >
               {isUploading ? "⏳ Upload..." : (isEdit ? "💾 Mettre à jour" : "➕ Créer")}
             </Button>
             <Button type="button" variant="secondary" onClick={onCancel} className="cursor-pointer">
