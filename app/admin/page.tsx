@@ -11,6 +11,7 @@ function AdminContent() {
   const router = useRouter();
 
   const [message, setMessage] = useState<string | null>(null);
+  const [promptMessage, setPromptMessage] = useState<string | null>(null);
   const [settings, setSettings] = useState({ 
     title: "", 
     subtitle: "",
@@ -22,7 +23,8 @@ function AdminContent() {
       minimumAmount: 0,
       allowedPostalCodes: [] as string[],
       message: "",
-    }
+    },
+    systemPrompt: "",
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [pendingReservations, setPendingReservations] = useState(0);
@@ -65,6 +67,7 @@ function AdminContent() {
             allowedPostalCodes: [],
             message: "",
           },
+          systemPrompt: s.systemPrompt ?? "",
         });
       } catch (err) {
         console.error(err);
@@ -137,6 +140,7 @@ function AdminContent() {
         types: savedData.types ?? settings.types,
         shippingCost: savedData.shippingCost ?? settings.shippingCost,
         pickupConditions: savedData.pickupConditions ?? settings.pickupConditions,
+        systemPrompt: savedData.systemPrompt ?? settings.systemPrompt,
       });
 
       setMessage("Paramètres enregistrés ✔️");
@@ -169,6 +173,7 @@ function AdminContent() {
           types: savedData.types ?? settingsToSave.types,
           shippingCost: savedData.shippingCost ?? settingsToSave.shippingCost,
           pickupConditions: savedData.pickupConditions ?? settingsToSave.pickupConditions,
+          systemPrompt: savedData.systemPrompt ?? settingsToSave.systemPrompt,
         });
       }
     } catch (err) {
@@ -615,7 +620,7 @@ function AdminContent() {
                   + Ajouter
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mb-6">
                 {settings.types.map((type) => (
                   <div
                     key={type}
@@ -642,6 +647,60 @@ function AdminContent() {
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-6">
+              <h3 className="text-base font-semibold text-slate-900 mb-4">🤖 Prompt système pour la génération de descriptions</h3>
+              <div className="space-y-2 mb-4">
+                <p className="text-xs text-slate-600">
+                  Ce prompt est utilisé par l&apos;IA (Gemini) pour générer les descriptions de produits. 
+                  Vous pouvez le personnaliser selon vos besoins.
+                </p>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">Prompt système</label>
+                  <Textarea
+                    placeholder="Entrez le prompt système..."
+                    value={settings.systemPrompt}
+                    onChange={(e) => setSettings((s) => ({ ...s, systemPrompt: e.target.value }))}
+                    rows={12}
+                    className="font-mono text-sm"
+                  />
+                </div>
+                {promptMessage && (
+                  <div className={`rounded-lg p-3 text-sm ${
+                    promptMessage.includes("✔️") 
+                      ? "bg-green-50 text-green-800 border border-green-200" 
+                      : "bg-red-50 text-red-800 border border-red-200"
+                  }`}>
+                    {promptMessage}
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setPromptMessage(null);
+                      const res = await fetch("/api/settings", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(settings),
+                      });
+                      if (res.ok) {
+                        setPromptMessage("Prompt système enregistré ✔️");
+                        setTimeout(() => setPromptMessage(null), 3000);
+                      } else {
+                        setPromptMessage("Erreur lors de l'enregistrement du prompt.");
+                      }
+                    } catch (err) {
+                      console.error(err);
+                      setPromptMessage("Erreur serveur lors de l'enregistrement.");
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
+                  💾 Enregistrer le prompt
+                </Button>
               </div>
             </div>
           </Card>

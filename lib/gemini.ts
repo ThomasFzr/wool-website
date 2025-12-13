@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { connectToDatabase } from "@/lib/db";
+import Settings from "@/models/Settings";
 
-const SYSTEM_PROMPT = `Tu es un expert en copywriting pour "MailleMum", une boutique de créations artisanales tricotées main.
+const DEFAULT_SYSTEM_PROMPT = `Tu es un expert en copywriting pour "MailleMum", une boutique de créations artisanales tricotées main.
 Rédige une description produit optimisée SEO (environ 150 mots).
 Ton : Chaleureux, artisanal, authentique, mettant en avant le fait-main français.
 Formatage : Utilise du HTML simple (<p>, <strong>) pour aérer le texte.
@@ -9,6 +11,17 @@ RÈGLES STRICTES :
 - Si la matière fournie contient "acrylique", "synthétique" ou "polyester", il est INTERDIT d'utiliser le mot "laine". Utilise à la place : "maille", "fil doux", "tricot", "fibre".
 - Si la matière est "laine", "alpaga" ou "mérinos", tu peux utiliser le mot "laine".
 - INTERDICTION ABSOLUE : Ne mentionne JAMAIS la marque de laine ou de fil utilisée dans la description. Parle uniquement de la qualité du fil, de sa douceur, de sa texture, mais jamais de sa marque commerciale.`;
+
+async function getSystemPrompt(): Promise<string> {
+  try {
+    await connectToDatabase();
+    const settings = await Settings.findById("main").lean();
+    return (settings as any)?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+  } catch (error) {
+    console.error("Erreur lors de la récupération du prompt système:", error);
+    return DEFAULT_SYSTEM_PROMPT;
+  }
+}
 
 export async function generateProductDescription(data: {
   type: string;
@@ -22,6 +35,7 @@ export async function generateProductDescription(data: {
     throw new Error("GEMINI_API_KEY n'est pas définie dans les variables d'environnement");
   }
 
+  const systemPrompt = await getSystemPrompt();
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -31,7 +45,7 @@ export async function generateProductDescription(data: {
 - Matière : ${data.material || "non spécifiée"}
 - Prix : ${data.price ? `${data.price}€` : "non spécifié"}
 
-${SYSTEM_PROMPT}`;
+${systemPrompt}`;
 
   try {
     const result = await model.generateContent(userPrompt);
