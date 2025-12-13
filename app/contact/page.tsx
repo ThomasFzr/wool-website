@@ -72,6 +72,14 @@ function ContactForm() {
     setShowCreationsSelector(shouldShow);
     if (!shouldShow) {
       setSelectedCreationIds([]);
+    } else {
+      // Si on passe à un sujet à sélection unique et qu'on a plusieurs créations sélectionnées,
+      // on ne garde que la première
+      const isSingleSelection = form.subject === "Commander un article identique" || 
+                                form.subject === "Question sur une création";
+      if (isSingleSelection) {
+        setSelectedCreationIds(prev => prev.length > 1 ? [prev[0]] : prev);
+      }
     }
   }, [form.subject]);
 
@@ -210,7 +218,9 @@ function ContactForm() {
             {showCreationsSelector && (
               <div className="space-y-2">
                 <label className="text-xs font-medium text-slate-700">
-                  Sélectionnez une ou plusieurs créations *
+                  {form.subject === "Commander un article identique" || form.subject === "Question sur une création"
+                    ? "Sélectionnez une création *"
+                    : "Sélectionnez une ou plusieurs créations *"}
                 </label>
                 {loadingCreations ? (
                   <p className="text-sm text-slate-500">Chargement des créations...</p>
@@ -233,10 +243,21 @@ function ContactForm() {
                           <div
                             key={creation._id}
                             onClick={() => {
+                              // Pour "Commander un article identique" et "Question sur une création", 
+                              // on ne peut sélectionner qu'une seule création
+                              const isSingleSelection = form.subject === "Commander un article identique" || 
+                                                       form.subject === "Question sur une création";
+                              
                               if (isSelected) {
                                 setSelectedCreationIds(selectedCreationIds.filter(id => id !== creation._id));
                               } else {
-                                setSelectedCreationIds([...selectedCreationIds, creation._id]);
+                                if (isSingleSelection) {
+                                  // Remplacer la sélection par la nouvelle
+                                  setSelectedCreationIds([creation._id]);
+                                } else {
+                                  // Ajouter à la sélection existante
+                                  setSelectedCreationIds([...selectedCreationIds, creation._id]);
+                                }
                               }
                             }}
                             className={`relative p-1.5 rounded-lg border-2 cursor-pointer transition-all ${

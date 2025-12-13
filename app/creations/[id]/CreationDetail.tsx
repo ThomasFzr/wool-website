@@ -479,7 +479,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                     Vendu
                   </span>
                 ) : isNewArticle ? (
-                  <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                  <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
                     Nouveau
                   </span>
                 ) : null}

@@ -61,7 +61,7 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
             Vendu
           </span>
         ) : isNewArticle ? (
-          <span className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+          <span className="absolute left-2 top-2 z-10 rounded-full bg-red-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
             Nouveau
           </span>
         ) : null}
