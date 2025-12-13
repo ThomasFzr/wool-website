@@ -243,7 +243,7 @@ function AdminContent() {
             >
               <span>📋 Commandes</span>
               {pendingReservations > 0 && (
-                <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-blue-500 text-white text-[10px] font-semibold animate-pulse">
+                <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold animate-pulse">
                   {pendingReservations}
                 </span>
               )}
