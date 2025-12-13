@@ -66,18 +66,20 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
           </span>
         ) : null}
 
-      <div className="relative h-56 w-full overflow-hidden bg-slate-100">
+      <div className="relative h-64 w-full overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
         {cover ? (
-          <img
-            src={cover}
-            alt={creation.title}
-            width={600}
-            height={450}
-            loading={priority ? "eager" : "lazy"}
-            fetchPriority={priority ? "high" : "low"}
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-          />
+          <div className="flex h-full w-full items-center justify-center">
+            <img
+              src={cover}
+              alt={creation.title}
+              width={600}
+              height={450}
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : "low"}
+              decoding="async"
+              className="max-h-full max-w-full object-contain transition-transform duration-300 hover:scale-105"
+            />
+          </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
             Pas d&apos;image
