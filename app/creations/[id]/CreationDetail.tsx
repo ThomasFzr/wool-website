@@ -435,16 +435,6 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               </div>
             )}
 
-            {/* Badges */}
-            {creation.sold ? (
-              <span className="absolute left-4 top-4 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                Vendu
-              </span>
-            ) : isNewArticle ? (
-              <span className="absolute left-4 top-4 rounded-full bg-red-500 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                Nouveau
-              </span>
-            ) : null}
 
             {/* Navigation images - Desktop uniquement */}
             {images.length > 1 && (
@@ -476,21 +466,30 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         </div>
 
         {/* Informations */}
-        <div className="space-y-6">
+        <div className="space-y-6 md:sticky md:top-8 md:self-start">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{creation.title}</h1>
             {creation.price && (
-              <div className="mt-3">
+              <div className="mt-3 flex items-center gap-3 flex-wrap">
                 <span className="text-3xl font-bold text-slate-900">
                   {Number.isInteger(creation.price) ? creation.price : creation.price.toFixed(2)} €
                 </span>
+                {creation.sold ? (
+                  <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                    Vendu
+                  </span>
+                ) : isNewArticle ? (
+                  <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                    Nouveau
+                  </span>
+                ) : null}
               </div>
             )}
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {creation.color && <Badge>{creation.color.charAt(0).toUpperCase() + creation.color.slice(1)}</Badge>}
             {creation.type && <Badge>{creation.type.charAt(0).toUpperCase() + creation.type.slice(1)}</Badge>}
+            {creation.color && <Badge>{creation.color.charAt(0).toUpperCase() + creation.color.slice(1)}</Badge>}
           </div>
 
           {/* Actions - Mobile */}
@@ -600,7 +599,10 @@ export function CreationDetail({ creation }: CreationDetailProps) {
             {creation.relatedCreations.map((relatedCreation) => (
               <CreationCard
                 key={relatedCreation._id}
-                creation={relatedCreation}
+                creation={{
+                  ...relatedCreation,
+                  type: relatedCreation.type as "bonnet" | "tour de cou" | "bandeau" | undefined,
+                }}
                 priority={false}
               />
             ))}
