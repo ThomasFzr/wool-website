@@ -87,6 +87,7 @@ function AdminCreationsContent() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   
   const hasLoadedCreations = useRef(false);
 
@@ -116,6 +117,9 @@ function AdminCreationsContent() {
     
     if (!creation.description || creation.description.trim() === "") {
       missing.push("Description");
+    }
+    if (!creation.seoDescription || creation.seoDescription.trim() === "") {
+      missing.push("Description SEO");
     }
     if (!creation.color || creation.color.trim() === "") {
       missing.push("Couleur");
@@ -504,7 +508,10 @@ function AdminCreationsContent() {
                 Les articles suivants ont des informations manquantes. Complétez-les pour améliorer leur visibilité.
               </p>
               <div className="space-y-3">
-                {creationsWithMissingFields.map(({ creation, missingFields }) => (
+                {(showAllSuggestions 
+                  ? creationsWithMissingFields 
+                  : creationsWithMissingFields.slice(0, 5)
+                ).map(({ creation, missingFields }) => (
                   <div
                     key={creation._id}
                     className="bg-white rounded-lg p-4 border border-amber-300 hover:border-amber-400 transition-colors"
@@ -543,6 +550,21 @@ function AdminCreationsContent() {
                   </div>
                 ))}
               </div>
+              {creationsWithMissingFields.length > 5 && (
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowAllSuggestions(!showAllSuggestions)}
+                    className="cursor-pointer"
+                  >
+                    {showAllSuggestions 
+                      ? `▲ Voir moins (afficher 5 sur ${creationsWithMissingFields.length})` 
+                      : `▼ Voir tout (${creationsWithMissingFields.length - 5} autres articles)`
+                    }
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 

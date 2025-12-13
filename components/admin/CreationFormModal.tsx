@@ -28,6 +28,8 @@ type Creation = {
   imageUrl?: string;
   images?: string[];
   sold?: boolean;
+  color?: string;
+  type?: string;
 };
 
 interface CreationFormModalProps {
