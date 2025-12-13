@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ChangeEvent } from "react";
+import { FormEvent, ChangeEvent, useState } from "react";
 import { Button, Input, Textarea } from "@/components";
 import { generateSeoDescription } from "@/lib/seoGenerator";
 import { useImageUpload } from "@/hooks/useImageUpload";
@@ -69,6 +69,8 @@ export function CreationFormModal({
     handleTouchEnd,
   } = useImageUpload();
 
+  const [generatingDescription, setGeneratingDescription] = useState(false);
+
   const images = form.images;
   const publicIds = form.imagePublicIds;
 
@@ -111,6 +113,42 @@ export function CreationFormModal({
       price: form.price,
     });
     onFormChange({ ...form, seoDescription: generated });
+  };
+
+  const handleGenerateDescriptionWithAI = async () => {
+    if (!form.type || !form.color || !form.yarnBrand || !form.price) {
+      alert("Veuillez remplir les champs Type, Couleur, Marque de laine et Prix avant de générer la description.");
+      return;
+    }
+
+    setGeneratingDescription(true);
+    try {
+      const response = await fetch("/api/generate-description", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: form.type,
+          color: form.color,
+          material: form.yarnBrand, // Utilise yarnBrand comme material
+          price: parseFloat(form.price) || 0,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erreur lors de la génération");
+      }
+
+      const data = await response.json();
+      onFormChange({ ...form, seoDescription: data.description });
+    } catch (error) {
+      console.error("Erreur lors de la génération:", error);
+      alert(error instanceof Error ? error.message : "Erreur lors de la génération de la description");
+    } finally {
+      setGeneratingDescription(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -165,10 +203,11 @@ export function CreationFormModal({
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={handleGenerateSeoDescription}
+                onClick={handleGenerateDescriptionWithAI}
+                disabled={generatingDescription}
                 className="text-xs cursor-pointer"
               >
-                ✨ Générer automatiquement
+                {generatingDescription ? "⏳ Génération..." : "✨ Générer avec l'IA"}
               </Button>
             </div>
             <Textarea

@@ -572,12 +572,14 @@ export function CreationDetail({ creation }: CreationDetailProps) {
             {
               title: "Description",
               content: creation.description || creation.seoDescription || "Aucune description disponible.",
+              renderAsHtml: !creation.description && !!creation.seoDescription, // Rendre en HTML si on utilise seoDescription
             },
             ...(creation.seoDescription && creation.description !== creation.seoDescription
               ? [
                   {
                     title: "Informations supplémentaires",
                     content: creation.seoDescription,
+                    renderAsHtml: true, // Toujours rendre en HTML pour la description SEO
                   },
                 ]
               : []),
