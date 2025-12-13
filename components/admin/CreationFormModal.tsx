@@ -161,9 +161,9 @@ export function CreationFormModal({
         onClick={onCancel}
       />
       
-      <div className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white shadow-2xl p-6 z-50 overflow-y-auto animate-slideInRight">
+      <div className="fixed top-0 right-0 h-full w-full sm:w-[600px] bg-white shadow-2xl z-50 animate-slideInRight flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 shrink-0">
           <h2 className="text-xl font-bold text-slate-900">
             {isEdit ? "✏️ Modifier la création" : "➕ Ajouter une création"}
           </h2>
@@ -177,7 +177,8 @@ export function CreationFormModal({
         </div>
 
         {/* Formulaire */}
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
           <Input
             label="Titre *"
             placeholder="Ex : Snood rose poudré"
@@ -453,8 +454,10 @@ export function CreationFormModal({
             )}
           </div>
 
+          </div>
+          
           {/* Boutons */}
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 p-6 border-t border-slate-200 bg-white shrink-0">
             <Button type="submit" disabled={isUploading || !form.title} className="flex-1 cursor-pointer">
               {isUploading ? "⏳ Upload..." : (isEdit ? "💾 Mettre à jour" : "➕ Créer")}
             </Button>

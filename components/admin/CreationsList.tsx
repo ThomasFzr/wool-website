@@ -28,6 +28,8 @@ interface CreationsListProps {
   yarnBrandFilter: string;
   onYarnBrandFilterChange: (filter: string) => void;
   yarnBrandOptions: string[];
+  sortByDate: "custom" | "asc" | "desc";
+  onSortByDateChange: (sort: "custom" | "asc" | "desc") => void;
   onEdit: (creation: Creation) => void;
   onDelete: (id: string) => void;
   onViewDetails: (creation: Creation) => void;
@@ -48,6 +50,8 @@ export function CreationsList({
   yarnBrandFilter,
   onYarnBrandFilterChange,
   yarnBrandOptions,
+  sortByDate,
+  onSortByDateChange,
   onEdit,
   onDelete,
   onViewDetails,
@@ -115,6 +119,8 @@ export function CreationsList({
             soldCount={creations.filter(c => c.sold).length}
             yarnBrandOptions={yarnBrandOptions}
             creations={creations}
+            sortByDate={sortByDate}
+            onSortByDateChange={onSortByDateChange}
           />
         </>
       )}

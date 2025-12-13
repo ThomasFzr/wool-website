@@ -83,6 +83,7 @@ function AdminCreationsContent() {
   const [availableTypes, setAvailableTypes] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("tous");
   const [yarnBrandFilter, setYarnBrandFilter] = useState<string>("toutes");
+  const [sortByDate, setSortByDate] = useState<"custom" | "asc" | "desc">("custom");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -109,25 +110,43 @@ function AdminCreationsContent() {
     )
   ).sort((a, b) => a.localeCompare(b, 'fr'));
 
-  const filteredCreations = creations.filter((c) => {
-    if (statusFilter === "disponible" && c.sold) return false;
-    if (statusFilter === "vendu" && !c.sold) return false;
-    
-    if (yarnBrandFilter !== "toutes" && c.yarnBrand !== yarnBrandFilter) return false;
-    
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const matchTitle = c.title?.toLowerCase().includes(query);
-      const matchDescription = c.description?.toLowerCase().includes(query);
-      const matchColor = c.color?.toLowerCase().includes(query);
-      const matchType = c.type?.toLowerCase().includes(query);
-      const matchPrice = c.price?.toString().includes(query);
-      const matchYarnBrand = c.yarnBrand?.toLowerCase().includes(query);
-      return matchTitle || matchDescription || matchColor || matchType || matchPrice || matchYarnBrand;
-    }
-    
-    return true;
-  });
+  const filteredCreations = creations
+    .filter((c) => {
+      if (statusFilter === "disponible" && c.sold) return false;
+      if (statusFilter === "vendu" && !c.sold) return false;
+      
+      if (yarnBrandFilter === "sans marque") {
+        if (c.yarnBrand && c.yarnBrand.trim() !== "") return false;
+      } else if (yarnBrandFilter !== "toutes" && c.yarnBrand !== yarnBrandFilter) {
+        return false;
+      }
+      
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchTitle = c.title?.toLowerCase().includes(query);
+        const matchDescription = c.description?.toLowerCase().includes(query);
+        const matchColor = c.color?.toLowerCase().includes(query);
+        const matchType = c.type?.toLowerCase().includes(query);
+        const matchPrice = c.price?.toString().includes(query);
+        const matchYarnBrand = c.yarnBrand?.toLowerCase().includes(query);
+        return matchTitle || matchDescription || matchColor || matchType || matchPrice || matchYarnBrand;
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortByDate === "custom") {
+        // Ordre personnalisé : utiliser displayOrder (décroissant, plus grand = en premier)
+        const orderA = a.displayOrder ?? 0;
+        const orderB = b.displayOrder ?? 0;
+        return orderB - orderA;
+      } else {
+        // Tri par date
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return sortByDate === "desc" ? dateB - dateA : dateA - dateB;
+      }
+    });
 
   useEffect(() => {
     if (status === "loading") return;
@@ -431,6 +450,8 @@ function AdminCreationsContent() {
             yarnBrandFilter={yarnBrandFilter}
             onYarnBrandFilterChange={setYarnBrandFilter}
             yarnBrandOptions={yarnBrandOptions}
+            sortByDate={sortByDate}
+            onSortByDateChange={setSortByDate}
             onEdit={handleEditClick}
             onDelete={handleDelete}
             onViewDetails={(c) => {
