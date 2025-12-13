@@ -487,11 +487,6 @@ export function CreationDetail({ creation }: CreationDetailProps) {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {creation.type && <Badge>{creation.type.charAt(0).toUpperCase() + creation.type.slice(1)}</Badge>}
-            {creation.color && <Badge>{creation.color.charAt(0).toUpperCase() + creation.color.slice(1)}</Badge>}
-          </div>
-
           {/* Actions - Mobile */}
           <div className="md:hidden space-y-3">
             {!creation.sold ? (
