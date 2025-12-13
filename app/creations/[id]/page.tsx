@@ -186,9 +186,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const imageUrl = images[0] || '/images/og-image.jpg';
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://maille-mum.fr';
 
+  // Utiliser seoDescription si disponible, sinon description, sinon description par défaut
+  const metaDescription = creation.seoDescription 
+    ? creation.seoDescription.replace(/<[^>]*>/g, '').substring(0, 160) // Retirer le HTML et limiter à 160 caractères
+    : creation.description || `${creation.title} - Création artisanale en laine fait main`;
+
   return {
     title: `${creation.title} - MailleMum`,
-    description: creation.description || `${creation.title} - Création artisanale en laine fait main`,
+    description: metaDescription,
     keywords: [
       "laine",
       "artisanat",
@@ -200,7 +205,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ].filter(Boolean),
     openGraph: {
       title: `${creation.title} - MailleMum`,
-      description: creation.description || `${creation.title} - Création artisanale en laine fait main`,
+      description: metaDescription,
       type: "website",
       locale: "fr_FR",
       url: `${baseUrl}/creations/${id}`,
