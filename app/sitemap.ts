@@ -3,7 +3,7 @@ import { connectToDatabase } from '@/lib/db';
 import CreationModel from '@/models/Creation';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://maille-mum.fr';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.maillemum.fr';
 
   // Pages statiques
   const staticPages = [
