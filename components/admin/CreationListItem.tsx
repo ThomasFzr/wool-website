@@ -11,6 +11,9 @@ type Creation = {
   color?: string;
   type?: "bonnet" | "tour de cou" | "bandeau";
   sold?: boolean;
+  yarnBrand?: string;
+  weight?: number;
+  yarnPrice?: number;
 };
 
 interface CreationListItemProps {
@@ -89,21 +92,36 @@ export function CreationListItem({
             {creation.price != null && (
               <Badge variant="default">{creation.price} €</Badge>
             )}
-            {creation.type && (
-              <Badge variant="default">
-                {creation.type.charAt(0).toUpperCase() + creation.type.slice(1)}
-              </Badge>
-            )}
-            {creation.color && (
-              <Badge variant="default">
-                {creation.color.charAt(0).toUpperCase() + creation.color.slice(1)}
-              </Badge>
-            )}
           </div>
           {creation.description && (
-            <p className="text-xs text-slate-600 line-clamp-2">
+            <p className="text-xs text-slate-600 line-clamp-2 mb-2">
               {creation.description}
             </p>
+          )}
+          {/* Informations admin */}
+          {(creation.yarnBrand || creation.weight || creation.yarnPrice) && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              {creation.yarnBrand && (
+                <span className="px-2 py-1 rounded bg-slate-100">
+                  🧶 {creation.yarnBrand}
+                </span>
+              )}
+              {creation.weight != null && (
+                <span className="px-2 py-1 rounded bg-slate-100">
+                  ⚖️ {creation.weight} g
+                </span>
+              )}
+              {creation.yarnPrice != null && (
+                <span className="px-2 py-1 rounded bg-slate-100">
+                  💰 {creation.yarnPrice} €/100g
+                </span>
+              )}
+              {creation.weight != null && creation.yarnPrice != null && (
+                <span className="px-2 py-1 rounded bg-slate-100 font-semibold">
+                  💵 {((creation.weight / 100) * creation.yarnPrice).toFixed(2)} €
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>

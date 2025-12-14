@@ -15,6 +15,8 @@ type Creation = {
   type?: "bonnet" | "tour de cou" | "bandeau";
   sold?: boolean;
   yarnBrand?: string;
+  weight?: number;
+  yarnPrice?: number;
 };
 
 interface CreationsListProps {
