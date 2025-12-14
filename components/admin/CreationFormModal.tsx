@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ChangeEvent, useState } from "react";
+import { FormEvent, ChangeEvent, useState, useEffect, useRef } from "react";
 import { Button, Input, Textarea } from "@/components";
 import { generateSeoDescription } from "@/lib/seoGenerator";
 import { useImageUpload } from "@/hooks/useImageUpload";
@@ -72,9 +72,81 @@ export function CreationFormModal({
   } = useImageUpload();
 
   const [generatingDescription, setGeneratingDescription] = useState(false);
+  const [yarnBrands, setYarnBrands] = useState<string[]>([]);
+  const [showBrandSuggestions, setShowBrandSuggestions] = useState(false);
+  const [filteredBrands, setFilteredBrands] = useState<string[]>([]);
+  const yarnBrandInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const images = form.images;
   const publicIds = form.imagePublicIds;
+
+  // Charger les marques de laine depuis l'API
+  useEffect(() => {
+    const fetchYarnBrands = async () => {
+      try {
+        const response = await fetch("/api/creations/yarn-brands");
+        if (response.ok) {
+          const brands = await response.json();
+          setYarnBrands(brands);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des marques:", error);
+      }
+    };
+    fetchYarnBrands();
+  }, []);
+
+  // Filtrer les suggestions basées sur la saisie
+  useEffect(() => {
+    const trimmedValue = form.yarnBrand.trim();
+    
+    if (trimmedValue === "") {
+      setFilteredBrands([]);
+      setShowBrandSuggestions(false);
+      return;
+    }
+
+    // Vérifier si la valeur actuelle correspond exactement à une marque existante
+    const exactMatch = yarnBrands.some(
+      (brand) => brand.toLowerCase() === trimmedValue.toLowerCase()
+    );
+
+    // Si c'est une correspondance exacte, ne pas afficher de suggestions
+    if (exactMatch) {
+      setFilteredBrands([]);
+      setShowBrandSuggestions(false);
+      return;
+    }
+
+    // Filtrer les marques qui contiennent la saisie, en excluant la valeur exacte
+    const filtered = yarnBrands.filter(
+      (brand) =>
+        brand.toLowerCase().includes(trimmedValue.toLowerCase()) &&
+        brand.toLowerCase() !== trimmedValue.toLowerCase()
+    );
+    setFilteredBrands(filtered);
+    setShowBrandSuggestions(filtered.length > 0);
+  }, [form.yarnBrand, yarnBrands]);
+
+  // Fermer les suggestions quand on clique en dehors
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        yarnBrandInputRef.current &&
+        !yarnBrandInputRef.current.contains(event.target as Node)
+      ) {
+        setShowBrandSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
     try {
@@ -334,12 +406,41 @@ export function CreationFormModal({
               🔒 Informations admin (non visibles pour les utilisateurs)
             </p>
             <div className="grid grid-cols-3 gap-3">
-              <Input
-                label="Marque de laine"
-                placeholder="Ex : Drops, Phildar..."
-                value={form.yarnBrand}
-                onChange={(e) => onFormChange({ ...form, yarnBrand: e.target.value })}
-              />
+              <div className="relative">
+                <Input
+                  ref={yarnBrandInputRef}
+                  label="Marque de laine"
+                  placeholder="Ex : Drops, Phildar..."
+                  value={form.yarnBrand}
+                  onChange={(e) => onFormChange({ ...form, yarnBrand: e.target.value })}
+                  onFocus={() => {
+                    if (filteredBrands.length > 0) {
+                      setShowBrandSuggestions(true);
+                    }
+                  }}
+                />
+                {showBrandSuggestions && filteredBrands.length > 0 && (
+                  <div
+                    ref={suggestionsRef}
+                    className="absolute z-50 mt-1 w-full max-h-48 overflow-auto bg-white border border-slate-200 rounded-lg shadow-lg"
+                  >
+                    {filteredBrands.map((brand, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 first:rounded-t-lg last:rounded-b-lg transition-colors"
+                        onClick={() => {
+                          onFormChange({ ...form, yarnBrand: brand });
+                          setShowBrandSuggestions(false);
+                          yarnBrandInputRef.current?.blur();
+                        }}
+                      >
+                        {brand}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <Input
                 label="Poids (grammes)"
                 type="number"
