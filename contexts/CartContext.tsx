@@ -187,9 +187,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return [...prevItems, { ...newItem, quantity: 1 }];
       }
     });
-    // Ouvrir la modale après ajout (sur desktop)
+    // Ouvrir la modale après ajout (sur desktop) sauf si on est déjà sur la page panier
     if (typeof window !== "undefined" && window.innerWidth >= 768) {
-      setIsOpen(true);
+      const isOnCartPage = window.location.pathname === "/cart";
+      if (!isOnCartPage) {
+        setIsOpen(true);
+      }
     }
   };
 
