@@ -51,7 +51,7 @@ export default function RootLayout({
       <head>
         <link rel="preload" href="/fonts/ClashDisplay-Variable.ttf" as="font" type="font/ttf" crossOrigin="anonymous" />
       </head>
-      <body className="font-sans bg-slate-50 text-slate-900">
+      <body className="font-sans bg-slate-50 text-slate-900" suppressHydrationWarning>
         <EnvironmentBanner />
         <AuthSessionProvider>
           <CartProvider>
