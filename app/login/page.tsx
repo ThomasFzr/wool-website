@@ -1,10 +1,20 @@
 // app/login/page.tsx
 import { Suspense } from "react";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import LoginForm from "./LoginForm";
 
 export const dynamic = "force-dynamic";
 
-export default function Page() {
+export default async function Page() {
+  const session = await getServerSession(authOptions);
+
+  // Si l'utilisateur est déjà connecté, rediriger vers la home
+  if (session?.user) {
+    redirect("/");
+  }
+
   return (
     <Suspense
       fallback={
