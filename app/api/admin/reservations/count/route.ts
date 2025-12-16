@@ -31,7 +31,7 @@ export async function GET() {
     // Même logique : compter les sessions uniques
     const pendingReservations = await Reservation.find({ 
       paymentStatus: "paid",
-      status: "pending"
+      status: { $in: ["pending", "preparing"] }
     }).select("stripeCheckoutSessionId").lean();
 
     const uniquePendingSessions = new Set(

@@ -25,7 +25,6 @@ export function OrderCard({ order, onItemClick }: OrderCardProps) {
   const getStatusInfo = (status: string) => {
     switch (status) {
       case "pending":
-        return { variant: "success" as const, label: "En cours de préparation" };
       case "preparing":
         return { variant: "warning" as const, label: "En préparation" };
       case "shipped":
@@ -35,7 +34,7 @@ export function OrderCard({ order, onItemClick }: OrderCardProps) {
       case "delivered":
         return { variant: "success" as const, label: "Livrée" };
       case "validated":
-        return { variant: "warning" as const, label: "En cours de préparation" };
+        return { variant: "warning" as const, label: "En préparation" };
       case "cancelled":
         return { variant: "danger" as const, label: "Annulée" };
       default:

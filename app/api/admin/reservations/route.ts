@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
+import Creation from "@/models/Creation";
+import User from "@/models/User";
 import "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
 export async function GET(req: Request) {
     try {
@@ -68,5 +71,120 @@ export async function GET(req: Request) {
     } catch (err) {
         console.error(err);
         return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+}
+
+/**
+ * POST /api/admin/reservations
+ * Créer une ou plusieurs réservations depuis l'admin
+ */
+export async function POST(req: Request) {
+    try {
+        const session = await checkAdminAuth();
+        if (!session) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        await connectToDatabase();
+
+        const body = await req.json();
+        const { userId, creationIds, name, contact, message, status = "preparing" } = body;
+
+        // Validation
+        if (!userId) {
+            return NextResponse.json(
+                { error: "L'utilisateur est requis" },
+                { status: 400 }
+            );
+        }
+
+        if (!creationIds || !Array.isArray(creationIds) || creationIds.length === 0) {
+            return NextResponse.json(
+                { error: "Au moins une création est requise" },
+                { status: 400 }
+            );
+        }
+
+        // Vérifier que l'utilisateur existe
+        const user = await User.findById(userId);
+        if (!user) {
+            return NextResponse.json(
+                { error: "Utilisateur introuvable" },
+                { status: 404 }
+            );
+        }
+
+        // Vérifier que les créations existent
+        const creations = await Creation.find({ _id: { $in: creationIds } });
+        if (creations.length !== creationIds.length) {
+            return NextResponse.json(
+                { error: "Certaines créations n'existent pas" },
+                { status: 404 }
+            );
+        }
+
+        // Plus de vérification de réservation nécessaire - toutes les créations peuvent être commandées
+
+        // Utiliser le nom et contact de l'utilisateur si non fournis
+        const reservationName = name || user.name || user.email;
+        const reservationContact = contact || user.email;
+
+        // Créer les réservations
+        const reservations = [];
+        const now = new Date();
+
+        for (const creation of creations) {
+            const reservation = await Reservation.create({
+                creationId: creation._id,
+                userId: user._id,
+                name: reservationName,
+                contact: reservationContact,
+                userEmail: user.email,
+                message: message || "",
+                status: status,
+                paymentStatus: "paid", // Les commandes admin sont considérées comme payées
+                paidAt: now,
+                seenByAdmin: true, // Déjà vue par l'admin
+            });
+
+            // Marquer la création comme réservée ET vendue (puisque créée par l'admin)
+            // Si la création est déjà vendue, on ne réincrémente pas salesCount
+            const updateData: any = {
+                $set: {
+                    reserved: true,
+                    reservedName: reservationName,
+                    reservedContact: reservationContact,
+                    reservedMessage: message || "",
+                    reservedAt: now,
+                    sold: true,
+                },
+            };
+
+            // Incrémenter salesCount seulement si pas déjà vendu
+            if (!creation.sold) {
+                updateData.$inc = {
+                    salesCount: 1,
+                };
+            }
+
+            await Creation.findByIdAndUpdate(creation._id, updateData);
+
+            reservations.push(reservation);
+        }
+
+        // 🔄 Invalider le cache après création des ventes
+        revalidatePath('/');
+        revalidatePath('/api/creations');
+
+        return NextResponse.json({
+            message: `${reservations.length} réservation(s) créée(s) avec succès`,
+            reservations,
+        }, { status: 201 });
+    } catch (err) {
+        console.error("Erreur POST /api/admin/reservations:", err);
+        return NextResponse.json(
+            { error: "Erreur serveur" },
+            { status: 500 }
+        );
     }
 }

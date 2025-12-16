@@ -201,7 +201,6 @@ function AdminReservationsContent() {
     const getStatusLabel = (status: string) => {
         switch (status) {
             case "pending":
-                return "En cours de préparation";
             case "preparing":
                 return "En préparation";
             case "shipped":
@@ -246,9 +245,10 @@ function AdminReservationsContent() {
             const totalPrice = subtotal + shippingCost;
             
             // Déterminer le statut global (prendre le plus avancé)
+            // Note: pending et preparing sont traités de la même manière
             const statusPriority: Record<string, number> = {
                 cancelled: 0,
-                pending: 1,
+                pending: 2, // Traité comme preparing
                 preparing: 2,
                 shipped: 3,
                 in_transit: 4,
@@ -289,7 +289,7 @@ function AdminReservationsContent() {
         );
     }, [reservations]);
 
-    const pendingCount = groupedOrders.filter(o => o.status === "pending").length;
+    const pendingCount = groupedOrders.filter(o => o.status === "pending" || o.status === "preparing").length;
     const totalCount = groupedOrders.length;
 
     return (
@@ -317,6 +317,13 @@ function AdminReservationsContent() {
                                 )}
                             </p>
                         </div>
+                        <Link
+                            href="/admin/reservations/create"
+                            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
+                        >
+                            <span>+</span>
+                            <span>Créer une commande</span>
+                        </Link>
                     </div>
                 </div>
 
@@ -337,7 +344,6 @@ function AdminReservationsContent() {
                             className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                         >
                             <option value="">📊 Tous les statuts</option>
-                            <option value="pending">⏳ En cours de préparation</option>
                             <option value="preparing">📦 En préparation</option>
                             <option value="shipped">📮 Expédiées</option>
                             <option value="in_transit">🚚 En cours de livraison</option>
@@ -791,135 +797,91 @@ function AdminReservationsContent() {
                             <p className="text-xs font-semibold text-slate-700 mb-2">⚡ Actions</p>
                             
                             {/* Gestion des statuts */}
-                            {selected.status === "pending" && (
+                            {(selected.status === "pending" || selected.status === "preparing") && (
                                 <>
                                     {!showValidateConfirm && !showCancelConfirm ? (
                                         <div className="flex flex-col gap-2">
+                                            {/* Si remise en main propre : Livré */}
+                                            {selected.deliveryMode === "pickup" && (
+                                                <Button
+                                                    onClick={() => updateStatus(selected._id, "delivered")}
+                                                    className="w-full bg-green-600 hover:bg-green-700 cursor-pointer"
+                                                    size="md"
+                                                >
+                                                    ✅ Livré
+                                                </Button>
+                                            )}
+                                            
+                                            {/* Si livraison : Marquer comme expédié */}
+                                            {selected.deliveryMode === "shipping" && (
+                                                <Button
+                                                    onClick={() => {
+                                                        const tracking = prompt("Numéro de suivi (optionnel) :");
+                                                        updateStatus(selected._id, "shipped", tracking || undefined);
+                                                    }}
+                                                    className="w-full bg-purple-600 hover:bg-purple-700 cursor-pointer"
+                                                    size="md"
+                                                >
+                                                    📦 Marquer comme expédiée
+                                                </Button>
+                                            )}
+                                            
+                                            {/* Bouton Annuler toujours disponible */}
                                             <Button
-                                                onClick={() => updateStatus(selected._id, "preparing")}
-                                                className="w-full bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                                                variant="danger"
+                                                onClick={() => setShowCancelConfirm(true)}
+                                                className="w-full cursor-pointer"
                                                 size="md"
                                             >
-                                                📦 Passer en préparation
+                                                ❌ Annuler
                                             </Button>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    onClick={() => setShowValidateConfirm(true)}
-                                                    className="flex-1 bg-green-600 hover:bg-green-700 cursor-pointer"
-                                                    size="md"
-                                                >
-                                                    ✅ Valider
-                                                </Button>
-                                                <Button
-                                                    variant="danger"
-                                                    onClick={() => setShowCancelConfirm(true)}
-                                                    className="flex-1 cursor-pointer"
-                                                    size="md"
-                                                >
-                                                    ❌ Annuler
-                                                </Button>
-                                            </div>
                                         </div>
                                     ) : null}
 
-{/* Confirmation de validation */}
-                                                    {showValidateConfirm && (
-                                                        <Card className="p-4 bg-green-50 border-green-200">
-                                                            <p className="text-sm font-semibold text-green-900 mb-3">
-                                                                ✅ Confirmer la commande ?
-                                                            </p>
-                                                            <p className="text-xs text-green-700 mb-4">
-                                                                L'article sera marqué comme vendu et un email sera envoyé au client.
-                                                            </p>
-                                                            <div className="flex gap-2">
-                                                                <Button
-                                                                    onClick={() => {
-                                                                        updateStatus(selected._id, "validated");
-                                                                    }}
-                                                                    className="flex-1 bg-green-600 hover:bg-green-700 cursor-pointer"
-                                                                    size="sm"
-                                                                >
-                                                                    Confirmer
-                                                                </Button>
-                                                                <Button
-                                                                    variant="secondary"
-                                                                    onClick={() => setShowValidateConfirm(false)}
-                                                                    className="flex-1 cursor-pointer"
-                                                                    size="sm"
-                                                                >
-                                                                    Annuler
-                                                                </Button>
-                                                            </div>
-                                                        </Card>
-                                                    )}
-
-                                                    {/* Confirmation d'annulation avec raison */}
-                                                    {showCancelConfirm && (
-                                                        <Card className="p-4 bg-red-50 border-red-200">
-                                                            <p className="text-sm font-semibold text-red-900 mb-3">
-                                                                ❌ Annuler la commande ?
-                                                            </p>
-                                                            <p className="text-xs text-red-700 mb-3">
-                                                                La commande sera annulée et l'article redeviendra disponible.
-                                                            </p>
-                                                            
-                                                            <textarea
-                                                                value={cancelReason}
-                                                                onChange={(e) => setCancelReason(e.target.value)}
-                                                                placeholder="Raison de l'annulation (optionnel)..."
-                                                                className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-200 mb-3"
-                                                                rows={3}
-                                                            />
-                                                            
-                                                            <div className="flex gap-2">
-                                                                <Button
-                                                                    variant="danger"
-                                                                    onClick={() => {
-                                                                        updateStatus(selected._id, "cancelled");
-                                                                    }}
-                                                                    className="flex-1 cursor-pointer"
-                                                                    size="sm"
-                                                                >
-                                                                    Confirmer l'annulation
-                                                                </Button>
-                                                                <Button
-                                                                    variant="secondary"
-                                                                    onClick={() => {
-                                                                        setShowCancelConfirm(false);
-                                                                        setCancelReason("");
-                                                                    }}
-                                                                    className="flex-1 cursor-pointer"
-                                                                    size="sm"
-                                                                >
-                                                                    Annuler
-                                                                </Button>
-                                                            </div>
-                                                        </Card>
-                                                    )}
+                                    {/* Confirmation d'annulation avec raison */}
+                                    {showCancelConfirm && (
+                                        <Card className="p-4 bg-red-50 border-red-200">
+                                            <p className="text-sm font-semibold text-red-900 mb-3">
+                                                ❌ Annuler la commande ?
+                                            </p>
+                                            <p className="text-xs text-red-700 mb-3">
+                                                La commande sera annulée et l'article redeviendra disponible.
+                                            </p>
+                                            
+                                            <textarea
+                                                value={cancelReason}
+                                                onChange={(e) => setCancelReason(e.target.value)}
+                                                placeholder="Raison de l'annulation (optionnel)..."
+                                                className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-200 mb-3"
+                                                rows={3}
+                                            />
+                                            
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="danger"
+                                                    onClick={() => {
+                                                        updateStatus(selected._id, "cancelled");
+                                                    }}
+                                                    className="flex-1 cursor-pointer"
+                                                    size="sm"
+                                                >
+                                                    Confirmer l'annulation
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={() => {
+                                                        setShowCancelConfirm(false);
+                                                        setCancelReason("");
+                                                    }}
+                                                    className="flex-1 cursor-pointer"
+                                                    size="sm"
+                                                >
+                                                    Annuler
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    )}
                                 </>
-                            )}
-
-{selected.status === "preparing" && (
-                                <div className="space-y-2">
-                                    <Button
-                                        onClick={() => {
-                                            const tracking = prompt("Numéro de suivi (optionnel) :");
-                                            updateStatus(selected._id, "shipped", tracking || undefined);
-                                        }}
-                                        className="w-full bg-purple-600 hover:bg-purple-700 cursor-pointer"
-                                        size="md"
-                                    >
-                                        📦 Marquer comme expédiée
-                                    </Button>
-                                    <Button
-                                        onClick={() => updateStatus(selected._id, "pending")}
-                                        variant="secondary"
-                                        className="w-full cursor-pointer"
-                                        size="md"
-                                    >
-                                        ← Retour en préparation
-                                    </Button>
-                                </div>
                             )}
 
                             {selected.status === "shipped" && (
@@ -936,14 +898,6 @@ function AdminReservationsContent() {
                                         size="md"
                                     >
                                         🚚 Marquer en cours de livraison
-                                    </Button>
-                                    <Button
-                                        onClick={() => updateStatus(selected._id, "preparing")}
-                                        variant="secondary"
-                                        className="w-full cursor-pointer"
-                                        size="md"
-                                    >
-                                        ← Retour en préparation
                                     </Button>
                                 </div>
                             )}

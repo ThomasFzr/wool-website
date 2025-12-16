@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       name,
       contact,
       message,
-      status: "pending",
+      status: "preparing",
     });
 
     creation.reserved = true;

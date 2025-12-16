@@ -205,6 +205,15 @@ export async function PATCH(
       if (body.sold === true && currentCreation && !currentCreation.sold) {
         incData.salesCount = 1;
       }
+      
+      // Si on remet disponible (sold: false), nettoyer aussi les champs reserved
+      if (body.sold === false) {
+        setData.reserved = false;
+        unsetData.reservedName = "";
+        unsetData.reservedContact = "";
+        unsetData.reservedMessage = "";
+        unsetData.reservedAt = "";
+      }
     }
     
     if (body.showAsNew !== undefined) setData.showAsNew = body.showAsNew;

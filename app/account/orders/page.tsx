@@ -36,9 +36,10 @@ export default function OrdersPage() {
       const totalPrice = subtotal + shippingCost;
       
       // Déterminer le statut global de la commande (prendre le statut le plus avancé)
+      // Note: pending et preparing sont traités de la même manière
       const statusPriority: Record<string, number> = {
         cancelled: 0,
-        pending: 1,
+        pending: 2, // Traité comme preparing
         preparing: 2,
         shipped: 3,
         in_transit: 4,

@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
           userId: (session.user as any).id,
           name: session.user?.name || "",
           contact: session.user?.email || "",
-          status: "pending",
+          status: "preparing",
           paymentStatus: "pending",
           deliveryMode,
           // Mettre les frais de livraison uniquement sur le premier article

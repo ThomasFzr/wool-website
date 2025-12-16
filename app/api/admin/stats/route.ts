@@ -15,7 +15,7 @@ export async function GET() {
 
         // Statistiques des réservations
         const totalReservations = await Reservation.countDocuments();
-        const pendingReservations = await Reservation.countDocuments({ status: "pending" });
+        const pendingReservations = await Reservation.countDocuments({ status: { $in: ["pending", "preparing"] } });
         const validatedReservations = await Reservation.countDocuments({ status: "validated" });
         const cancelledReservations = await Reservation.countDocuments({ status: "cancelled" });
 
