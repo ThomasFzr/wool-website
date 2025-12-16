@@ -222,7 +222,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       : [];
 
   const imageUrl = images[0] || '/images/og-image.jpg';
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://maille-mum.fr';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://maillemum.fr';
 
   // Utiliser seoDescription si disponible, sinon description, sinon description par défaut
   const rawDescription = creation.seoDescription || creation.description;

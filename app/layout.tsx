@@ -7,7 +7,10 @@ import { Analytics } from "@vercel/analytics/react";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://maille-mum.fr'),
+  metadataBase: new URL('https://www.maillemum.fr'),
+  alternates: {
+    canonical: './',
+  },
   title: {
     default: "MailleMum - Créations tricotées à la main",
     template: "%s | MailleMum",
