@@ -230,8 +230,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? cleanDescriptionForSEO(rawDescription)
     : `${creation.title} - Création artisanale en laine fait main`;
 
-  // Format du titre : [Nom du produit] - MailleMum
-  const pageTitle = `${creation.title} - MailleMum`;
+  // Format du titre : juste le nom du produit (Next.js ajoute " | MailleMum" via le template du layout)
+  const pageTitle = creation.title;
 
   return {
     title: pageTitle,

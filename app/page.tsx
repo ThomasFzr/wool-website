@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "MailleMum - Créations tricotées à la main",
   description: "Découvrez nos créations tricotées à la main : tours de cou, bandeaux et bonnets faits main avec passion.",
-  keywords: ["laine", "artisanat", "créations", "fait main", "tour de cou", "bandeau", "bonnet", "tricot", "crochet"],
+  keywords: ["maille", "artisanat", "créations", "fait main", "tour de cou", "bandeau", "bonnet", "tricot", "crochet"],
   openGraph: {
     title: "MailleMum - Créations tricotées à la main",
     description: "Découvrez nos créations tricotées à la main : tours de cou, bandeaux et bonnets faits main avec passion.",

@@ -45,7 +45,7 @@ export default function GenerateSlugsPage() {
             Cette action va générer des slugs SEO-friendly pour toutes les créations qui n'en ont pas encore.
           </p>
           <p className="text-sm text-slate-500">
-            Exemple : <code className="bg-slate-100 px-2 py-1 rounded">bonnet-rouge-laine</code> au lieu de <code className="bg-slate-100 px-2 py-1 rounded">693695e4d922f39c20910b1a</code>
+            Exemple : <code className="bg-slate-100 px-2 py-1 rounded">bonnet-rouge-maille</code> au lieu de <code className="bg-slate-100 px-2 py-1 rounded">693695e4d922f39c20910b1a</code>
           </p>
 
           <Button
