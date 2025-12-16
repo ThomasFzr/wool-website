@@ -98,10 +98,10 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
             />
           </Link>
 
-          {/* Titre H1 pour le SEO */}
-          <h1 className="sr-only">
+          {/* Titre caché pour l'accessibilité (div au lieu de h1 pour éviter les conflits SEO) */}
+          <div className="sr-only">
             {title || "MailleMum - Créations tricotées à la main"}
-          </h1>
+          </div>
 
           {/* Panier et compte */}
           <div className="flex items-center gap-3">

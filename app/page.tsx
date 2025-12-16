@@ -105,6 +105,11 @@ export default async function HomePage() {
         title={settings?.title}
         subtitle={settings?.subtitle}
       />
+      <div className="mx-auto max-w-5xl px-4 mb-4">
+        <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">
+          {settings?.title || "MailleMum - Créations tricotées à la main"}
+        </h1>
+      </div>
       <HomeClient 
         initialCreations={creations}
         availableColors={settings?.colors || []}
