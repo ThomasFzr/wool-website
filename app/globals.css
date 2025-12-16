@@ -41,6 +41,21 @@ body {
   }
 }
 
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 120ms ease-out;
+}
+
+.animate-\[slideUp_0\.3s_ease-out\] {
+  animation: slideUp 0.3s ease-out;
 }

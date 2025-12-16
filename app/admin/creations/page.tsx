@@ -88,6 +88,7 @@ function AdminCreationsContent() {
   const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const [initialOrder, setInitialOrder] = useState<string[]>([]);
   
   const hasLoadedCreations = useRef(false);
 
@@ -146,7 +147,22 @@ function AdminCreationsContent() {
     .filter((item) => item.missingFields.length > 0)
     .sort((a, b) => b.missingFields.length - a.missingFields.length); // Plus de champs manquants en premier
 
-  const filteredCreations = creations
+  // En mode custom, on garde l'ordre du tableau (qui reflète le displayOrder)
+  // En mode date, on trie par date
+  const sortedCreations = sortByDate === "custom" 
+    ? [...creations].sort((a, b) => {
+        // Trier par displayOrder décroissant (plus grand = en premier)
+        const orderA = a.displayOrder ?? 0;
+        const orderB = b.displayOrder ?? 0;
+        return orderB - orderA;
+      })
+    : [...creations].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return sortByDate === "desc" ? dateB - dateA : dateA - dateB;
+      });
+
+  const filteredCreations = sortedCreations
     .filter((c) => {
       if (statusFilter === "disponible" && c.sold) return false;
       if (statusFilter === "vendu" && !c.sold) return false;
@@ -169,19 +185,6 @@ function AdminCreationsContent() {
       }
       
       return true;
-    })
-    .sort((a, b) => {
-      if (sortByDate === "custom") {
-        // Ordre personnalisé : utiliser displayOrder (décroissant, plus grand = en premier)
-        const orderA = a.displayOrder ?? 0;
-        const orderB = b.displayOrder ?? 0;
-        return orderB - orderA;
-      } else {
-        // Tri par date
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return sortByDate === "desc" ? dateB - dateA : dateA - dateB;
-      }
     });
 
   useEffect(() => {
@@ -256,6 +259,8 @@ function AdminCreationsContent() {
       const res = await fetch("/api/creations");
       const data = await res.json();
       setCreations(data);
+      // Sauvegarder l'ordre initial pour détecter les changements
+      setInitialOrder(data.map((c: Creation) => c._id));
       hasLoadedCreations.current = true;
     } catch (err) {
       console.error(err);
@@ -400,7 +405,7 @@ function AdminCreationsContent() {
 
       setMessage("Ordre d'affichage sauvegardé ✔️");
       setTimeout(() => setMessage(null), 3000);
-      await loadCreations();
+      await loadCreations(); // Cela mettra à jour initialOrder aussi
     } catch (err) {
       console.error(err);
       setMessage("Erreur lors de la sauvegarde de l'ordre.");
@@ -409,8 +414,20 @@ function AdminCreationsContent() {
     }
   }
 
+  // Vérifier si l'ordre a changé
+  const hasOrderChanged = initialOrder.length > 0 && 
+    (creations.length !== initialOrder.length ||
+     creations.some((c, index) => c._id !== initialOrder[index]));
+
   function handleReorder(newCreations: Creation[]) {
-    setCreations(newCreations);
+    // Mettre à jour les displayOrder pour refléter le nouvel ordre
+    const updatedCreations = newCreations.map((creation, index) => ({
+      ...creation,
+      displayOrder: newCreations.length - index, // Plus grand = en premier
+    }));
+    // Trier par displayOrder pour maintenir l'ordre visuel
+    updatedCreations.sort((a, b) => (b.displayOrder ?? 0) - (a.displayOrder ?? 0));
+    setCreations(updatedCreations);
   }
 
   async function handleMakeAvailableAgain(id: string) {
@@ -592,6 +609,7 @@ function AdminCreationsContent() {
             onReorder={handleReorder}
             onSaveOrder={saveCreationOrder}
             savingOrder={savingOrder}
+            hasOrderChanged={hasOrderChanged}
           />
         </div>
       </div>
