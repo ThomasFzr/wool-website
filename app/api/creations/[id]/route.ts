@@ -54,14 +54,21 @@ export async function GET(
     const { id } = await params;
     await connectToDatabase();
     
+    // Vérifier si l'utilisateur est admin pour voir les créations cachées
+    const session = await checkAdminAuth();
+    const isAdmin = session !== null;
+    
+    // Construire la requête avec ou sans filtre hidden selon le rôle
+    const baseQuery = isAdmin ? {} : { hidden: { $ne: true } };
+    
     // Récupérer la création par ID ou slug avec les articles liés
-    let creation = await Creation.findById(id)
-      .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+    let creation = await Creation.findOne({ _id: id, ...baseQuery })
+      .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
       .lean();
     if (!creation) {
       // Essayer par slug si ce n'est pas un ObjectId valide
-      creation = await Creation.findOne({ slug: id })
-        .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+      creation = await Creation.findOne({ slug: id, ...baseQuery })
+        .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
         .lean();
     }
     
@@ -71,6 +78,13 @@ export async function GET(
     
     // Convertir en format JSON
     const creationData: any = creation;
+    
+    // Filtrer les relatedCreations cachées pour les utilisateurs publics
+    let relatedCreations = creationData.relatedCreations || [];
+    if (!isAdmin && Array.isArray(relatedCreations)) {
+      relatedCreations = relatedCreations.filter((related: any) => !related.hidden);
+    }
+    
     return NextResponse.json({
       _id: creationData._id.toString(),
       slug: creationData.slug,
@@ -85,7 +99,7 @@ export async function GET(
       sold: creationData.sold,
       showAsNew: creationData.showAsNew,
       createdAt: creationData.createdAt ? creationData.createdAt.toString() : undefined,
-      relatedCreations: creationData.relatedCreations || [],
+      relatedCreations,
     });
   } catch (err) {
     console.error("❌ GET error:", err);
@@ -194,6 +208,7 @@ export async function PATCH(
     }
     
     if (body.showAsNew !== undefined) setData.showAsNew = body.showAsNew;
+    if (body.hidden !== undefined) setData.hidden = body.hidden;
     if (body.displayOrder !== undefined) setData.displayOrder = body.displayOrder;
     if (body.relatedCreations !== undefined) setData.relatedCreations = body.relatedCreations;
 

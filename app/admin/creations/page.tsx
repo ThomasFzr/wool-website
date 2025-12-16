@@ -24,6 +24,7 @@ type Creation = {
   showAsNew?: boolean;
   displayOrder?: number;
   sold?: boolean;
+  hidden?: boolean;
   slug?: string;
   createdAt?: string;
   yarnBrand?: string;
@@ -456,6 +457,29 @@ function AdminCreationsContent() {
     }
   }
 
+  async function handleToggleHidden(id: string, hidden: boolean) {
+    try {
+      const res = await fetch(`/api/creations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hidden,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur lors de la mise à jour");
+      }
+
+      setMessage(hidden ? "Article caché ✔️" : "Article affiché ✔️");
+      setTimeout(() => setMessage(null), 3000);
+      loadCreations();
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la mise à jour");
+    }
+  }
+
   if (status === "loading") {
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -606,6 +630,7 @@ function AdminCreationsContent() {
                         setShowDetailModal(true);
                       }}
             onMakeAvailable={handleMakeAvailableAgain}
+            onToggleHidden={handleToggleHidden}
             onReorder={handleReorder}
             onSaveOrder={saveCreationOrder}
             savingOrder={savingOrder}

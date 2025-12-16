@@ -11,6 +11,7 @@ type Creation = {
   color?: string;
   type?: "bonnet" | "tour de cou" | "bandeau";
   sold?: boolean;
+  hidden?: boolean;
   yarnBrand?: string;
   weight?: number;
   yarnPrice?: number;
@@ -25,6 +26,7 @@ interface CreationListItemProps {
   onDelete: (id: string) => void;
   onViewDetails: (creation: Creation) => void;
   onMakeAvailable: (id: string) => void;
+  onToggleHidden: (id: string, hidden: boolean) => void;
   onDragStart: (index: number) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
   onDragEnd: () => void;
@@ -42,6 +44,7 @@ export function CreationListItem({
   onDelete,
   onViewDetails,
   onMakeAvailable,
+  onToggleHidden,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -127,10 +130,17 @@ export function CreationListItem({
                 Vendu
               </span>
             )}
+            {creation.hidden && (
+              <span className="absolute right-1 top-1 z-10 rounded-full bg-amber-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                Caché
+              </span>
+            )}
             <img
               src={creation.imageUrl}
               alt={creation.title}
-              className="h-16 w-16 rounded-lg object-cover sm:h-20 sm:w-20"
+              className={`h-16 w-16 rounded-lg object-cover sm:h-20 sm:w-20 ${
+                creation.hidden ? "opacity-50" : ""
+              }`}
               draggable={false}
             />
           </div>
@@ -179,6 +189,24 @@ export function CreationListItem({
 
       {/* Boutons d'action */}
       <div className="flex items-center gap-2 sm:shrink-0 flex-wrap sm:flex-nowrap">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => onToggleHidden(creation._id, !creation.hidden)}
+          title={creation.hidden ? "Afficher l'article" : "Cacher l'article"}
+          className={`cursor-pointer text-xs sm:text-sm ${
+            creation.hidden 
+              ? "bg-amber-100 hover:bg-amber-200 text-amber-900" 
+              : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+          }`}
+        >
+          <span className="hidden sm:inline">
+            {creation.hidden ? "👁️ Afficher" : "🙈 Cacher"}
+          </span>
+          <span className="sm:hidden">
+            {creation.hidden ? "👁️" : "🙈"}
+          </span>
+        </Button>
         {creation.sold && (
           <Button
             variant="primary"

@@ -30,15 +30,32 @@ export async function GET(req: NextRequest) {
     
     // Exclure les champs admin (yarnBrand, weight, yarnPrice) pour les utilisateurs publics
     // Les admins voient tous les champs
+    // Filtrer les créations cachées pour les utilisateurs publics
     let query = Creation.find();
     if (!isAdmin) {
-      query = query.select("-yarnBrand -weight -yarnPrice");
+      query = query
+        .select("-yarnBrand -weight -yarnPrice")
+        .where({ hidden: { $ne: true } }); // Exclure les créations cachées
     }
     
     const creations = await query
-      .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+      .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
       .sort({ displayOrder: -1, createdAt: -1 })
       .lean();
+    
+    // Filtrer les relatedCreations cachées pour les utilisateurs publics
+    if (!isAdmin) {
+      const filteredCreations = creations.map((creation: any) => {
+        if (creation.relatedCreations && Array.isArray(creation.relatedCreations)) {
+          creation.relatedCreations = creation.relatedCreations.filter(
+            (related: any) => !related.hidden
+          );
+        }
+        return creation;
+      });
+      return NextResponse.json(filteredCreations);
+    }
+    
     return NextResponse.json(creations);
   } catch (err) {
     console.error(err);

@@ -42,7 +42,7 @@ type SettingsType = {
 
 async function getCreations(): Promise<CreationType[]> {
   await connectToDatabase();
-  const creations = await CreationModel.find()
+  const creations = await CreationModel.find({ hidden: { $ne: true } })
     .sort({ displayOrder: -1, createdAt: -1 })
     .lean();
   

@@ -13,12 +13,13 @@ type Props = {
 async function getCreation(slug: string) {
   await connectToDatabase();
   // Essayer d'abord par slug, sinon par ID (rétrocompatibilité)
-  let creation = await CreationModel.findOne({ slug })
-    .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+  // Exclure les créations cachées pour les utilisateurs publics
+  let creation = await CreationModel.findOne({ slug, hidden: { $ne: true } })
+    .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
     .lean();
   if (!creation && mongoose.Types.ObjectId.isValid(slug)) {
-    creation = await CreationModel.findById(slug)
-      .populate('relatedCreations', 'title imageUrl images price color type slug sold')
+    creation = await CreationModel.findOne({ _id: slug, hidden: { $ne: true } })
+      .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
       .lean();
   }
   
@@ -27,10 +28,10 @@ async function getCreation(slug: string) {
   const creationData: any = creation;
   const creationId = creationData._id.toString();
   
-  // Formater les articles liés
+  // Formater les articles liés (exclure les créations cachées et vendues)
   let relatedCreations = Array.isArray(creationData.relatedCreations)
     ? creationData.relatedCreations
-        .filter((item: any) => item && !item.sold && item._id.toString() !== creationId)
+        .filter((item: any) => item && !item.sold && !item.hidden && item._id.toString() !== creationId)
         .map((item: any) => ({
           _id: item._id.toString(),
           title: item.title,
@@ -54,9 +55,10 @@ async function getCreation(slug: string) {
       const byType = await CreationModel.find({
         _id: { $ne: currentId },
         sold: { $ne: true },
+        hidden: { $ne: true },
         type: creationData.type,
       })
-        .select('title imageUrl images price color type slug sold')
+        .select('title imageUrl images price color type slug sold hidden')
         .sort({ displayOrder: -1, createdAt: -1 })
         .limit(targetLimit)
         .lean();
@@ -80,6 +82,7 @@ async function getCreation(slug: string) {
     if (relatedCreations.length < targetLimit && creationData.color) {
       const query: any = {
         sold: { $ne: true },
+        hidden: { $ne: true },
         color: creationData.color,
       };
       
@@ -90,7 +93,7 @@ async function getCreation(slug: string) {
       }
       
       const byColor = await CreationModel.find(query)
-        .select('title imageUrl images price color type slug sold')
+        .select('title imageUrl images price color type slug sold hidden')
         .sort({ displayOrder: -1, createdAt: -1 })
         .limit(targetLimit - relatedCreations.length)
         .lean();
@@ -117,6 +120,7 @@ async function getCreation(slug: string) {
     if (relatedCreations.length < targetLimit) {
       const query: any = {
         sold: { $ne: true },
+        hidden: { $ne: true },
       };
       
       if (excludeIds.length > 0) {
@@ -126,7 +130,7 @@ async function getCreation(slug: string) {
       }
       
       const others = await CreationModel.find(query)
-        .select('title imageUrl images price color type slug sold')
+        .select('title imageUrl images price color type slug sold hidden')
         .sort({ displayOrder: -1, createdAt: -1 })
         .limit(targetLimit - relatedCreations.length)
         .lean();
