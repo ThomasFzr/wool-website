@@ -67,6 +67,30 @@ export async function POST(req: NextRequest) {
       // Récupérer la session complète avec toutes les informations (y compris shipping)
       const fullSession = await stripe.checkout.sessions.retrieve(session.id);
 
+      // ⚠️ VÉRIFICATION CRITIQUE : Ne traiter que les paiements réellement validés
+      // Stripe envoie checkout.session.completed même si le paiement est annulé
+      if (fullSession.payment_status !== "paid" || fullSession.status !== "complete") {
+        console.log(`[WEBHOOK] Session ${fullSession.id} ignorée : payment_status=${fullSession.payment_status}, status=${fullSession.status}`);
+        return new NextResponse("OK", { status: 200 });
+      }
+
+      const paymentIntentId = fullSession.payment_intent as string;
+      
+      // Vérification supplémentaire : vérifier le statut du PaymentIntent
+      if (paymentIntentId) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+          if (paymentIntent.status !== "succeeded") {
+            console.log(`[WEBHOOK] Session ${fullSession.id} ignorée : PaymentIntent ${paymentIntentId} status=${paymentIntent.status} (attendu: succeeded)`);
+            return new NextResponse("OK", { status: 200 });
+          }
+        } catch (err) {
+          console.error(`[WEBHOOK] Erreur lors de la vérification du PaymentIntent ${paymentIntentId}:`, err);
+          // En cas d'erreur, on ne traite pas la commande par sécurité
+          return new NextResponse("OK", { status: 200 });
+        }
+      }
+
       // Récupérer les IDs des réservations depuis les metadata
       const reservationIds = fullSession.metadata?.reservationIds
         ? JSON.parse(fullSession.metadata.reservationIds)
@@ -81,8 +105,6 @@ export async function POST(req: NextRequest) {
       const reservations = await Reservation.find({
         _id: { $in: reservationIds },
       });
-
-      const paymentIntentId = fullSession.payment_intent as string;
 
       // Récupérer le mode de livraison et les frais de livraison depuis les metadata
       const deliveryMode = fullSession.metadata?.deliveryMode || "pickup";
@@ -136,27 +158,37 @@ export async function POST(req: NextRequest) {
       
       await Promise.all(
         reservations.map(async (reservation, index) => {
-          // Mettre à jour la réservation
-          reservation.stripePaymentIntentId = paymentIntentId;
-          reservation.stripeCustomerId = fullSession.customer as string;
-          reservation.paymentStatus = "paid";
-          reservation.status = "validated";
-          reservation.paidAt = new Date();
-          reservation.deliveryMode = deliveryMode;
-          
-          // Mettre les frais de livraison uniquement sur le premier article
-          if (deliveryMode === "shipping" && totalShippingCost > 0) {
-            reservation.shippingCost = index === 0 ? totalShippingCost : 0;
-          } else {
-            reservation.shippingCost = 0;
+          // Protection contre les appels concurrents et les doubles traitements
+          // Utiliser findOneAndUpdate avec condition pour s'assurer qu'on ne traite qu'une seule fois
+          const now = new Date();
+          const updatedReservation = await Reservation.findOneAndUpdate(
+            {
+              _id: reservation._id,
+              paymentStatus: "pending", // Seulement si encore pending
+            },
+            {
+              $set: {
+                stripePaymentIntentId: paymentIntentId,
+                stripeCustomerId: fullSession.customer as string,
+                paymentStatus: "paid",
+                status: "validated",
+                paidAt: now,
+                deliveryMode: deliveryMode,
+                shippingCost: deliveryMode === "shipping" && totalShippingCost > 0 && index === 0 ? totalShippingCost : 0,
+                ...(shippingAddress && { shippingAddress: shippingAddress }),
+              },
+            },
+            { new: true } // Retourner le document mis à jour
+          );
+
+          // Si updatedReservation est null, c'est que la réservation a déjà été traitée
+          if (!updatedReservation) {
+            console.log(`[WEBHOOK] Réservation ${reservation._id} déjà traitée, skip`);
+            return;
           }
-          
-          // Ajouter l'adresse de livraison si disponible
-          if (shippingAddress) {
-            reservation.shippingAddress = shippingAddress;
-          }
-          
-          await reservation.save();
+
+          // Utiliser la réservation mise à jour
+          reservation = updatedReservation;
 
           // Mettre à jour la création - marquer comme vendue
           const creation = await Creation.findById(reservation.creationId);

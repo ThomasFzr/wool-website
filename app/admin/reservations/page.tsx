@@ -21,6 +21,7 @@ type Reservation = {
     shippedAt?: string;
     seenByAdmin?: boolean;
     stripeCheckoutSessionId?: string;
+    paymentStatus?: "pending" | "paid" | "failed" | "refunded";
     shippingAddress?: {
         name: string;
         line1: string;
@@ -42,6 +43,7 @@ type GroupedOrder = {
     deliveryMode?: string;
     totalPrice: number;
     seenByAdmin: boolean;
+    paymentStatus?: "pending" | "paid" | "failed" | "refunded";
 };
 
 function AdminReservationsContent() {
@@ -261,6 +263,11 @@ function AdminReservationsContent() {
             
             // Vérifier si la commande a été vue
             const seenByAdmin = items.some(i => i.seenByAdmin);
+            
+            // Déterminer le statut de paiement (prendre "paid" si au moins un item est payé)
+            const paymentStatus = items.some(i => i.paymentStatus === "paid") 
+                ? "paid" 
+                : (items[0]?.paymentStatus || "pending");
 
             orders.push({
                 id,
@@ -272,6 +279,7 @@ function AdminReservationsContent() {
                 deliveryMode: firstItem.deliveryMode,
                 totalPrice,
                 seenByAdmin,
+                paymentStatus,
             });
         });
 
@@ -403,7 +411,7 @@ function AdminReservationsContent() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-semibold text-slate-900 truncate">{order.customerName}</p>
-                                                        {!order.seenByAdmin && (
+                                                        {order.paymentStatus === "paid" && (
                                                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-500 text-white">
                                                                 Paiement validé
                                                             </span>
@@ -974,7 +982,7 @@ function AdminReservationsContent() {
                                 </div>
                             )}
 
-                            {selected.status === "validated" && (
+                            {selected.status === "validated" && selected.paymentStatus === "paid" && (
                                 <div className="space-y-2">
                                     <Badge variant="success" className="text-sm py-2 px-4 w-full justify-center">
                                         ✔️ Paiement validé

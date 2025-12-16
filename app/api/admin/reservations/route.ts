@@ -21,19 +21,35 @@ export async function GET(req: Request) {
         const creationId = searchParams.get("creationId");
         const search = searchParams.get("search");
 
-        const query: any = {};
+        // ⚠️ FILTRE CRITIQUE : Ne montrer que les réservations payées ou les réservations manuelles (sans Stripe)
+        // Les réservations avec stripeCheckoutSessionId mais paymentStatus !== "paid" sont des paiements annulés
+        const paymentFilter = {
+            $or: [
+                { paymentStatus: "paid" }, // Paiements validés
+                { stripeCheckoutSessionId: { $exists: false } }, // Réservations manuelles (sans Stripe)
+                { stripeCheckoutSessionId: null }, // Réservations manuelles (sans Stripe)
+            ],
+        };
 
-        if (status) query.status = status;
-        if (creationId) query.creationId = creationId;
-
+        // Construire toutes les conditions
+        const conditions: any[] = [paymentFilter];
+        
+        if (status) conditions.push({ status });
+        if (creationId) conditions.push({ creationId });
+        
         if (search) {
             const regex = { $regex: search, $options: "i" };
-            query.$or = [
-                { name: regex },
-                { contact: regex },
-                { message: regex },
-            ];
+            conditions.push({
+                $or: [
+                    { name: regex },
+                    { contact: regex },
+                    { message: regex },
+                ],
+            });
         }
+
+        // Utiliser $and si plusieurs conditions, sinon utiliser directement
+        const query: any = conditions.length > 1 ? { $and: conditions } : conditions[0];
 
         const total = await Reservation.countDocuments(query);
 

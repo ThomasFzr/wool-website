@@ -60,10 +60,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ valid: false }, { status: 403 });
     }
 
+    // ⚠️ VÉRIFICATION CRITIQUE : Ne traiter que les paiements réellement validés
     // Vérifier que le paiement a été complété
-    const isValid =
+    let isValid =
       checkoutSession.payment_status === "paid" &&
       checkoutSession.status === "complete";
+
+    // Vérification supplémentaire : vérifier le statut du PaymentIntent
+    if (isValid && checkoutSession.payment_intent) {
+      try {
+        const paymentIntentId = checkoutSession.payment_intent as string;
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (paymentIntent.status !== "succeeded") {
+          console.log(`[VERIFY-SESSION] PaymentIntent ${paymentIntentId} status=${paymentIntent.status} (attendu: succeeded)`);
+          isValid = false;
+        }
+      } catch (err) {
+        console.error(`[VERIFY-SESSION] Erreur lors de la vérification du PaymentIntent:`, err);
+        isValid = false;
+      }
+    }
+
+    // Log pour déboguer
+    console.log(`[VERIFY-SESSION] Session ${checkoutSession.id}: payment_status=${checkoutSession.payment_status}, status=${checkoutSession.status}, isValid=${isValid}`);
+
+    // Si le paiement n'est pas validé, ne rien faire
+    if (!isValid) {
+      console.log(`[VERIFY-SESSION] Session ${checkoutSession.id} ignorée : paiement non validé (payment_status=${checkoutSession.payment_status}, status=${checkoutSession.status})`);
+      return NextResponse.json({ valid: false });
+    }
 
     // Récupérer les détails de la session si valide
     if (isValid) {
