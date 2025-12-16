@@ -329,23 +329,42 @@ export async function GET() {
                 $unwind: "$creation"
             },
             {
+                $group: {
+                    _id: {
+                        year: { $year: "$saleDate" },
+                        month: { $month: "$saleDate" }
+                    },
+                    count: { $sum: 1 },
+                    revenue: { $sum: "$creation.price" }
+                }
+            }
+        ]);
+
+        // Agrégation des coûts par mois (basé sur la date de création des créations)
+        // Le coût est la somme de toutes les créations créées ce mois-là
+        const costsAgg = await Creation.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: twelveMonthsAgo }
+                }
+            },
+            {
                 $project: {
-                    saleDate: 1,
-                    revenue: "$creation.price",
+                    createdAt: 1,
                     // Calculer le coût unitaire fixe depuis la création dans la BDD : (weight / 100) * yarnPrice
                     // Le coût est fixe et ne change pas, basé sur les valeurs stockées dans la création
                     unitCost: {
                         $cond: {
                             if: {
                                 $and: [
-                                    { $ne: ["$creation.weight", null] },
-                                    { $ne: ["$creation.yarnPrice", null] }
+                                    { $ne: ["$weight", null] },
+                                    { $ne: ["$yarnPrice", null] }
                                 ]
                             },
                             then: {
                                 $multiply: [
-                                    { $divide: ["$creation.weight", 100] },
-                                    "$creation.yarnPrice"
+                                    { $divide: ["$weight", 100] },
+                                    "$yarnPrice"
                                 ]
                             },
                             else: 0
@@ -356,11 +375,9 @@ export async function GET() {
             {
                 $group: {
                     _id: {
-                        year: { $year: "$saleDate" },
-                        month: { $month: "$saleDate" }
+                        year: { $year: "$createdAt" },
+                        month: { $month: "$createdAt" }
                     },
-                    count: { $sum: 1 },
-                    revenue: { $sum: "$revenue" },
                     cost: { $sum: "$unitCost" }
                 }
             }
@@ -379,6 +396,12 @@ export async function GET() {
             salesMap.set(key, s);
         });
 
+        const costsMap = new Map();
+        costsAgg.forEach(c => {
+            const key = `${c._id.year}-${c._id.month}`;
+            costsMap.set(key, c);
+        });
+
         // Construire les données mensuelles
         const monthlyData = [];
         for (let i = 11; i >= 0; i--) {
@@ -389,10 +412,11 @@ export async function GET() {
 
             const resData = resMap.get(key);
             const salesData = salesMap.get(key);
+            const costData = costsMap.get(key);
 
             const revenue = salesData?.revenue || 0;
-            const cost = salesData?.cost || 0;
-            const profit = revenue - cost;
+            const cost = costData?.cost || 0; // Coût de toutes les créations créées ce mois
+            const profit = revenue - cost; // Les ventes compensent les coûts
             
             monthlyData.push({
                 month: monthStart.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
