@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: './',
   },
+  authors: [{ name: 'MailleMum', url: 'https://www.maillemum.fr' }],
+  creator: 'MailleMum',
+  publisher: 'MailleMum',
   title: {
     default: "MailleMum - Créations tricotées à la main",
     template: "%s | MailleMum",
