@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
     
-    // Récupérer toutes les marques de laine uniques et non vides
+    // Récupérer toutes les marques de fil uniques et non vides
     const creations = await Creation.find({
       yarnBrand: { $exists: true, $nin: [null, ""] }
     })

@@ -251,7 +251,7 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
                 Adresse de livraison
               </label>
               <textarea
-                placeholder="12 rue de la Laine"
+                placeholder="12 rue de la Maille"
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 rows={2}

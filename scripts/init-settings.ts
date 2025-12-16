@@ -50,7 +50,7 @@ async function initSettings() {
       // Créer les paramètres par défaut
       const settings = new Settings({
         _id: "main",
-        title: "Les créations en laine de maman",
+        title: "Les créations de maman",
         subtitle: "Clique sur une création pour voir toutes les photos.",
         colors: [
           "Blanc",

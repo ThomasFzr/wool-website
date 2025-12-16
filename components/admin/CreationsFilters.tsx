@@ -65,7 +65,7 @@ export function CreationsFilters({
   };
 
   const getYarnBrandLabel = () => {
-    if (yarnBrandFilter === "toutes") return `Marque de laine (${totalCount})`;
+    if (yarnBrandFilter === "toutes") return `Marque de fil (${totalCount})`;
     if (yarnBrandFilter === "sans marque") {
       const count = creations.filter(c => !c.yarnBrand || c.yarnBrand.trim() === "").length;
       return `Sans marque (${count})`;
@@ -87,7 +87,7 @@ export function CreationsFilters({
       <div className="mb-4">
         <Input
           type="text"
-          placeholder="🔍 Rechercher par titre, couleur, type, prix ou marque de laine..."
+          placeholder="🔍 Rechercher par titre, couleur, type, prix ou marque de fil..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full"
@@ -153,7 +153,7 @@ export function CreationsFilters({
           )}
         </div>
 
-        {/* Dropdown Marque de laine */}
+        {/* Dropdown Marque de fil */}
         <div className="relative" ref={yarnBrandDropdownRef}>
           <button
             type="button"

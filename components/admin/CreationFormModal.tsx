@@ -81,7 +81,7 @@ export function CreationFormModal({
   const images = form.images;
   const publicIds = form.imagePublicIds;
 
-  // Charger les marques de laine depuis l'API
+  // Charger les marques de fil depuis l'API
   useEffect(() => {
     const fetchYarnBrands = async () => {
       try {
@@ -191,7 +191,7 @@ export function CreationFormModal({
 
   const handleGenerateDescriptionWithAI = async () => {
     if (!form.type || !form.color || !form.yarnBrand || !form.price) {
-      alert("Veuillez remplir les champs Type, Couleur, Marque de laine et Prix avant de générer la description.");
+      alert("Veuillez remplir les champs Type, Couleur, Marque de fil et Prix avant de générer la description.");
       return;
     }
 
@@ -410,7 +410,7 @@ export function CreationFormModal({
                 <div className="relative">
                   <Input
                     ref={yarnBrandInputRef}
-                    label="Marque de laine"
+                    label="Marque de fil"
                     placeholder="Ex : Drops, Phildar..."
                     value={form.yarnBrand}
                     onChange={(e) => onFormChange({ ...form, yarnBrand: e.target.value })}
@@ -450,7 +450,7 @@ export function CreationFormModal({
                   onChange={(e) => onFormChange({ ...form, weight: e.target.value })}
                 />
                 <Input
-                  label="Prix de la laine (€/100g)"
+                  label="Prix du fil (€/100g)"
                   type="number"
                   step="0.01"
                   placeholder="Ex : 12.50"

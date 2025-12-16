@@ -228,7 +228,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const rawDescription = creation.seoDescription || creation.description;
   const metaDescription = rawDescription
     ? cleanDescriptionForSEO(rawDescription)
-    : `${creation.title} - Création artisanale en laine fait main`;
+    : `${creation.title} - Création artisanale fait main`;
 
   // Format du titre : juste le nom du produit (Next.js ajoute " | MailleMum" via le template du layout)
   const pageTitle = creation.title;
@@ -237,7 +237,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: pageTitle,
     description: metaDescription,
     keywords: [
-      "laine",
       "artisanat",
       "fait main",
       creation.type || "",

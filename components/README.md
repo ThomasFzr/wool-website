@@ -88,7 +88,7 @@ En-tête réutilisable avec :
 import { Header } from "@/components";
 
 <Header
-  title="Les créations en laine"
+  title="Les créations"
   subtitle="Artisanat fait main"
   pendingReservations={5}
 />

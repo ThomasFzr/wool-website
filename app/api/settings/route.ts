@@ -14,7 +14,7 @@ RÈGLES STRICTES :
 - INTERDICTION ABSOLUE : Ne mentionne JAMAIS la marque de laine ou de fil utilisée dans la description. Parle uniquement de la qualité du fil, de sa douceur, de sa texture, mais jamais de sa marque commerciale.`;
 
 const DEFAULT_SETTINGS = {
-  title: "Les créations en laine de maman",
+  title: "Les créations de maman",
   subtitle: "Clique sur une création pour voir toutes les photos.",
   colors: [
     "Blanc",

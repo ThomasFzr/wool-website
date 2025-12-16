@@ -56,7 +56,7 @@ function AdminContent() {
         const sortedTypes = uniqueTypes.sort((a, b) => a.localeCompare(b, 'fr'));
         
         setSettings({
-          title: s.title ?? "Les créations en laine de maman",
+          title: s.title ?? "Les créations de maman",
           subtitle: s.subtitle ?? "Clique sur une création pour voir toutes les photos.",
           colors: sortedColors,
           types: sortedTypes,
@@ -278,7 +278,7 @@ function AdminContent() {
               <div className="space-y-4">
                 <Input
                   label="Titre principal"
-                  placeholder="Les créations en laine de maman 🧶"
+                  placeholder="Les créations de maman 🧶"
                   value={settings.title}
                   onChange={(e) => setSettings((s) => ({ ...s, title: e.target.value }))}
                 />
