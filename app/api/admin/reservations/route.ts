@@ -129,6 +129,10 @@ export async function POST(req: Request) {
         const reservationName = name || user.name || user.email;
         const reservationContact = contact || user.email;
 
+        // Générer un identifiant unique pour cette commande admin (pour grouper les réservations)
+        // Format: admin_ + timestamp + random pour garantir l'unicité
+        const adminOrderId = `admin_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
         // Créer les réservations
         const reservations = [];
         const now = new Date();
@@ -145,6 +149,7 @@ export async function POST(req: Request) {
                 paymentStatus: "paid", // Les commandes admin sont considérées comme payées
                 paidAt: now,
                 seenByAdmin: true, // Déjà vue par l'admin
+                stripeCheckoutSessionId: adminOrderId, // Utiliser un ID unique pour grouper les réservations de cette commande
             });
 
             // Marquer la création comme réservée ET vendue (puisque créée par l'admin)

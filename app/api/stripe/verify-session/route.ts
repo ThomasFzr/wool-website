@@ -222,53 +222,96 @@ export async function GET(req: NextRequest) {
           const user = await User.findOne({ email: firstReservation.contact });
           const deliveryLabel = deliveryMode === "shipping" ? "Livraison postale" : "Remise en main propre";
           
-          // Calculer le total
-          const total = processedCreations.reduce((sum, creation) => sum + (creation.price || 0), 0) + (deliveryMode === "shipping" ? totalShippingCost : 0);
-
-          // Générer le HTML pour tous les articles
-          const itemsHTML = processedCreations.map((creation, index) => {
-            const reservation = processedReservations[index];
+          // Calculer les totaux
+          const subtotal = processedCreations.reduce((sum, creation) => sum + (creation.price || 0), 0);
+          const shippingCost = deliveryMode === "shipping" ? totalShippingCost : 0;
+          const total = subtotal + shippingCost;
+          
+          // Générer le HTML pour tous les articles du résumé
+          const orderSummaryItems = processedCreations.map((creation) => {
             const productImage = (Array.isArray(creation.images) && creation.images.length > 0 ? creation.images[0] : creation.imageUrl) ?? null;
-            const priceLabel = creation.price != null ? `${creation.price} €` : "Prix sur demande";
+            const priceLabel = creation.price != null ? `${creation.price.toFixed(2)} €` : "Prix sur demande";
 
             return `
-              <div style="margin-top:${index > 0 ? '16px' : '0'};border-radius:12px;border:1px solid #e5e7eb;padding:12px;display:flex;gap:12px;">
-                ${productImage ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />` : ""}
-                <div style="font-size:13px;flex:1;">
-                  <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
-                  ${creation.color ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>` : ""}
-                  <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
-                  ${index === 0 ? `<p style="margin:0 0 4px 0;">📦 Mode de livraison : <strong>${deliveryLabel}</strong></p>` : ""}
-                </div>
-              </div>
+              <tr style="border-bottom:1px solid #e5e7eb;">
+                <td style="padding:12px 0;">
+                  <div style="display:flex;gap:12px;align-items:center;">
+                    ${productImage ? `<img src="${productImage}" alt="${creation.title}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;" />` : ""}
+                    <div style="flex:1;">
+                      <p style="margin:0 0 4px 0;font-weight:600;font-size:14px;color:#0f172a;">${creation.title}</p>
+                      ${creation.color ? `<p style="margin:0;font-size:12px;color:#64748b;">Couleur : ${creation.color}</p>` : ""}
+                    </div>
+                  </div>
+                </td>
+                <td style="padding:12px 0;text-align:right;font-size:14px;font-weight:600;color:#0f172a;">
+                  ${priceLabel}
+                </td>
+              </tr>
             `;
           }).join('');
+
+          // Générer le résumé de commande complet
+          const orderSummaryHTML = `
+            <div style="margin:24px 0;padding:20px;background:#f8fafc;border-radius:12px;border:1px solid #e5e7eb;">
+              <h2 style="font-size:16px;font-weight:700;margin:0 0 16px 0;color:#0f172a;">Résumé de votre commande</h2>
+              
+              <table style="width:100%;border-collapse:collapse;">
+                ${orderSummaryItems}
+                
+                ${shippingCost > 0 ? `
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                  <td style="padding:12px 0;">
+                    <p style="margin:0;font-weight:600;font-size:14px;color:#0f172a;">Frais de livraison</p>
+                  </td>
+                  <td style="padding:12px 0;text-align:right;font-size:14px;font-weight:600;color:#0f172a;">
+                    ${shippingCost.toFixed(2)} €
+                  </td>
+                </tr>
+                ` : ''}
+                
+                <tr>
+                  <td style="padding:16px 0 0 0;">
+                    <p style="margin:0;font-weight:700;font-size:16px;color:#0f172a;">Total</p>
+                  </td>
+                  <td style="padding:16px 0 0 0;text-align:right;">
+                    <p style="margin:0;font-weight:700;font-size:16px;color:#0f172a;">${total.toFixed(2)} €</p>
+                  </td>
+                </tr>
+              </table>
+              
+              <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
+                <p style="margin:0 0 8px 0;font-size:12px;color:#64748b;">
+                  <strong style="color:#0f172a;">Email de confirmation :</strong> 
+                  <a href="mailto:${firstReservation.contact}" style="color:#3b82f6;text-decoration:underline;">${firstReservation.contact}</a>
+                </p>
+                <p style="margin:0;font-size:12px;color:#64748b;">
+                  <strong style="color:#0f172a;">Numéro de commande :</strong> 
+                  <a href="${appUrl}/account/orders" style="color:#3b82f6;text-decoration:underline;font-family:monospace;word-break:break-all;">${firstReservation.stripeCheckoutSessionId || firstReservation._id}</a>
+                </p>
+              </div>
+            </div>
+          `;
 
           // Envoyer l'email à l'acheteur
           try {
             await sendEmail({
               to: firstReservation.contact,
-              subject: `🎉 Paiement confirmé - Votre commande de ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''} chez MailleMum`,
+              subject: `🎉 Paiement confirmé - Votre commande chez MailleMum`,
               html: emailTemplate(`
-                <h1 style="font-size:20px;margin:0 0 12px 0;">Paiement confirmé 🎉</h1>
-                <p style="font-size:14px;margin:0 0 16px 0;">
-                  Bonjour <strong>${firstReservation.name || "👋"}</strong>,<br/>
-                  Votre paiement a été confirmé avec succès. Votre commande de ${processedCreations.length} article${processedCreations.length > 1 ? 's' : ''} est en cours de préparation.
+                <h1 style="font-size:24px;font-weight:700;margin:0 0 12px 0;color:#0f172a;">Paiement confirmé 🎉</h1>
+                <p style="font-size:15px;margin:0 0 24px 0;color:#475569;line-height:1.6;">
+                  Bonjour <strong style="color:#0f172a;">${firstReservation.name || "👋"}</strong>,<br/>
+                  Votre paiement a été confirmé avec succès. Votre commande est en cours de préparation.
                 </p>
 
-                ${itemsHTML}
+                ${orderSummaryHTML}
 
-                <div style="margin-top:20px;padding-top:16px;border-top:2px solid #e5e7eb;">
-                  <p style="margin:0;font-size:14px;font-weight:600;text-align:right;">
-                    Total : <strong>${total.toFixed(2)} €</strong>
+                <div style="margin-top:24px;padding-top:20px;border-top:1px solid #e5e7eb;">
+                  <p style="font-size:13px;margin:0 0 12px 0;color:#64748b;">
+                    Vous pouvez consulter vos commandes à tout moment depuis votre espace :
                   </p>
+                  <a href="${appUrl}/account/orders" style="display:inline-block;background:#0f172a;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Voir mes commandes</a>
                 </div>
-
-                <p style="font-size:12px;margin-top:20px;color:#6b7280;">
-                  Vous pouvez consulter vos commandes à tout moment depuis votre espace :
-                  <br/>
-                  <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Voir mes commandes</a>
-                </p>
               `),
             });
             console.log("[VERIFY-SESSION] Email de confirmation groupé envoyé à l'acheteur:", firstReservation.contact);

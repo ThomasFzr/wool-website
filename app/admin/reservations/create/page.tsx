@@ -114,21 +114,23 @@ function CreateReservationContent() {
 
       if (!res.ok) {
         setError(data.error || "Erreur lors de la création de la commande");
+        setLoading(false);
         return;
       }
 
       setSuccess(`${data.message}. Redirection...`);
       
       // Rediriger vers la page des réservations après 1.5 secondes
+      // Ne pas remettre loading à false pour garder le bouton désactivé
       setTimeout(() => {
         router.push("/admin/reservations");
       }, 1500);
     } catch (err) {
       console.error(err);
       setError("Erreur serveur lors de la création de la commande");
-    } finally {
       setLoading(false);
     }
+    // Pas de finally ici : on garde loading à true en cas de succès pour éviter les doubles soumissions
   };
 
   if (status === "loading") {
