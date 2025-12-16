@@ -10,6 +10,39 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
+/**
+ * Nettoie et tronque une description pour la meta description SEO
+ * - Enlève les balises HTML
+ * - Tronque à 160 caractères maximum
+ * - Ajoute "..." si le texte est tronqué
+ */
+function cleanDescriptionForSEO(text: string | undefined | null): string {
+  if (!text) return "";
+  
+  // Enlever les balises HTML
+  let cleaned = text.replace(/<[^>]*>/g, "");
+  
+  // Remplacer les entités HTML courantes
+  cleaned = cleaned
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  
+  // Nettoyer les espaces multiples
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+  
+  // Tronquer à 160 caractères
+  if (cleaned.length > 160) {
+    // Tronquer à 157 caractères pour laisser la place aux "..."
+    cleaned = cleaned.substring(0, 157).trim() + "...";
+  }
+  
+  return cleaned;
+}
+
 async function getCreation(slug: string) {
   await connectToDatabase();
   // Essayer d'abord par slug, sinon par ID (rétrocompatibilité)
@@ -181,6 +214,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
+  // Récupérer les images : priorité à seoDescription puis description
   const images = creation.images && creation.images.length > 0 
     ? creation.images 
     : creation.imageUrl 
@@ -191,12 +225,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://maille-mum.fr';
 
   // Utiliser seoDescription si disponible, sinon description, sinon description par défaut
-  const metaDescription = creation.seoDescription 
-    ? creation.seoDescription.replace(/<[^>]*>/g, '').substring(0, 160) // Retirer le HTML et limiter à 160 caractères
-    : creation.description || `${creation.title} - Création artisanale en laine fait main`;
+  const rawDescription = creation.seoDescription || creation.description;
+  const metaDescription = rawDescription
+    ? cleanDescriptionForSEO(rawDescription)
+    : `${creation.title} - Création artisanale en laine fait main`;
+
+  // Format du titre : [Nom du produit] - MailleMum
+  const pageTitle = `${creation.title} - MailleMum`;
 
   return {
-    title: `${creation.title} - MailleMum`,
+    title: pageTitle,
     description: metaDescription,
     keywords: [
       "laine",
@@ -208,11 +246,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       "crochet",
     ].filter(Boolean),
     openGraph: {
-      title: `${creation.title} - MailleMum`,
+      title: pageTitle,
       description: metaDescription,
       type: "website",
       locale: "fr_FR",
-      url: `${baseUrl}/creations/${id}`,
+      url: `${baseUrl}/creations/${creation.slug || id}`,
       images: [
         {
           url: imageUrl,
@@ -221,6 +259,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           alt: creation.title,
         },
       ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: pageTitle,
+      description: metaDescription,
+      images: [imageUrl],
     },
     robots: {
       index: true,
