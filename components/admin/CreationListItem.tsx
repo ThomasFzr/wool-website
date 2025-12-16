@@ -25,7 +25,7 @@ interface CreationListItemProps {
   onEdit: (creation: Creation) => void;
   onDelete: (id: string) => void;
   onViewDetails: (creation: Creation) => void;
-  onMakeAvailable: (id: string) => void;
+  onToggleSold: (id: string, currentSoldStatus: boolean) => void;
   onToggleHidden: (id: string, hidden: boolean) => void;
   onDragStart: (index: number) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
@@ -43,7 +43,7 @@ export function CreationListItem({
   onEdit,
   onDelete,
   onViewDetails,
-  onMakeAvailable,
+  onToggleSold,
   onToggleHidden,
   onDragStart,
   onDragOver,
@@ -74,7 +74,7 @@ export function CreationListItem({
       }`}
     >
       {/* Conteneur principal avec poignée à gauche */}
-      <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
+      <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
         {/* Poignée de drag */}
         {isDragEnabled && (
           <div
@@ -207,18 +207,24 @@ export function CreationListItem({
             {creation.hidden ? "👁️" : "🙈"}
           </span>
         </Button>
-        {creation.sold && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onMakeAvailable(creation._id)}
-            title="Remettre disponible"
-            className="bg-green-600 hover:bg-green-700 cursor-pointer text-xs sm:text-sm"
-          >
-            <span className="hidden sm:inline">↻ Disponible</span>
-            <span className="sm:hidden">↻</span>
-          </Button>
-        )}
+        <Button
+          variant={creation.sold ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => onToggleSold(creation._id, creation.sold || false)}
+          title={creation.sold ? "Remettre disponible" : "Marquer comme vendu"}
+          className={`cursor-pointer text-xs sm:text-sm ${
+            creation.sold 
+              ? "bg-green-600 hover:bg-green-700 text-white" 
+              : "bg-red-100 hover:bg-red-200 text-red-900"
+          }`}
+        >
+          <span className="hidden sm:inline">
+            {creation.sold ? "↻ Disponible" : "✓ Vendu"}
+          </span>
+          <span className="sm:hidden">
+            {creation.sold ? "↻" : "✓"}
+          </span>
+        </Button>
         <Button
           variant="secondary"
           size="sm"

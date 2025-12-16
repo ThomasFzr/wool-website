@@ -36,7 +36,7 @@ interface CreationsListProps {
   onEdit: (creation: Creation) => void;
   onDelete: (id: string) => void;
   onViewDetails: (creation: Creation) => void;
-  onMakeAvailable: (id: string) => void;
+  onToggleSold: (id: string, currentSoldStatus: boolean) => void;
   onToggleHidden: (id: string, hidden: boolean) => void;
   onReorder: (newCreations: Creation[]) => void;
   onSaveOrder: () => void;
@@ -60,7 +60,7 @@ export function CreationsList({
   onEdit,
   onDelete,
   onViewDetails,
-  onMakeAvailable,
+  onToggleSold,
   onToggleHidden,
   onReorder,
   onSaveOrder,
@@ -214,7 +214,7 @@ export function CreationsList({
               onEdit={onEdit}
               onDelete={onDelete}
               onViewDetails={onViewDetails}
-              onMakeAvailable={onMakeAvailable}
+              onToggleSold={onToggleSold}
               onToggleHidden={onToggleHidden}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}

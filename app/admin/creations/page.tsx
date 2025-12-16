@@ -431,8 +431,10 @@ function AdminCreationsContent() {
     setCreations(updatedCreations);
   }
 
-  async function handleMakeAvailableAgain(id: string) {
-    const ok = confirm("Remettre cet article disponible ?");
+  async function handleToggleSold(id: string, currentSoldStatus: boolean) {
+    const newStatus = !currentSoldStatus;
+    const action = newStatus ? "Marquer comme vendu" : "Remettre disponible";
+    const ok = confirm(`${action} cet article ?`);
     if (!ok) return;
 
     try {
@@ -440,7 +442,7 @@ function AdminCreationsContent() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sold: false,
+          sold: newStatus,
         }),
       });
 
@@ -448,12 +450,12 @@ function AdminCreationsContent() {
         throw new Error("Erreur lors de la mise à jour");
       }
 
-      setMessage("Article remis disponible ✔️");
+      setMessage(newStatus ? "Article marqué comme vendu ✔️" : "Article remis disponible ✔️");
       setTimeout(() => setMessage(null), 3000);
       loadCreations();
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de la remise en disponibilité");
+      alert("Erreur lors de la mise à jour");
     }
   }
 
@@ -629,7 +631,7 @@ function AdminCreationsContent() {
                         setSelectedCreation(c);
                         setShowDetailModal(true);
                       }}
-            onMakeAvailable={handleMakeAvailableAgain}
+            onToggleSold={handleToggleSold}
             onToggleHidden={handleToggleHidden}
             onReorder={handleReorder}
             onSaveOrder={saveCreationOrder}
