@@ -275,6 +275,7 @@ function CreateReservationContent() {
                             <img
                               src={creation.imageUrl}
                               alt={creation.title}
+                              title={creation.title}
                               className="mt-2 w-20 h-20 object-cover rounded"
                             />
                           )}

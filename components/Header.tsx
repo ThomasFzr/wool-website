@@ -90,6 +90,7 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
             <Image
               src="/images/logo.png"
               alt={title || "MailleMum"}
+              title={title || "MailleMum"}
               width={112}
               height={112}
               className="h-20 sm:h-28 w-auto object-contain"

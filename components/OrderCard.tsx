@@ -92,6 +92,7 @@ export function OrderCard({ order, onItemClick }: OrderCardProps) {
                 <Image
                   src={image}
                   alt={creation?.title ?? "Article"}
+                  title={creation?.title ?? "Article"}
                   width={64}
                   height={64}
                   className="h-16 w-16 rounded-md object-cover shrink-0"

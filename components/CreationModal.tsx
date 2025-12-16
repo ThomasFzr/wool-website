@@ -277,6 +277,7 @@ export function CreationModal({ creation, isOpen, onClose, hideActions = false }
             <img
               src={optimizeCloudinaryUrl(images[currentIndex], { width: 800, quality: 80, format: 'auto' })}
               alt={`${creation.title} ${currentIndex + 1}`}
+              title={`${creation.title} ${currentIndex + 1}`}
               onClick={() => {
                 // Ne pas dé-zoomer si on vient de drag
                 if (hasDragged) {
@@ -344,6 +345,7 @@ export function CreationModal({ creation, isOpen, onClose, hideActions = false }
                 <img
                   src={optimizeCloudinaryUrl(url, { width: 100, quality: 70, format: 'auto' })}
                   alt={`miniature ${i + 1}`}
+                  title={`miniature ${i + 1}`}
                   className="h-full w-full rounded-md object-cover"
                 />
               </button>

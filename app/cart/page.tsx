@@ -257,6 +257,7 @@ export default function CartPage() {
                       <img
                         src={imageUrl}
                         alt={item.title}
+                        title={item.title}
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -341,6 +342,7 @@ export default function CartPage() {
                           <img
                             src={optimizedImage}
                             alt={related.title}
+                            title={related.title}
                             className="h-full w-full object-cover"
                           />
                         ) : (

@@ -338,6 +338,7 @@ export default function AdminContactPage() {
                           selectedContact.creationId.imageUrl
                         }
                         alt={selectedContact.creationId.title}
+                        title={selectedContact.creationId.title}
                         className="h-16 w-16 rounded-lg object-cover"
                       />
                     )}

@@ -72,6 +72,7 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
             <img
               src={cover}
               alt={creation.title}
+              title={creation.title}
               width={600}
               height={450}
               loading={priority ? "eager" : "lazy"}

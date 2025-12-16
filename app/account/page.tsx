@@ -58,6 +58,7 @@ export default async function AccountPage() {
                 <img
                   src={user.image}
                   alt="Avatar"
+                  title="Avatar"
                   className="h-12 w-12 sm:h-14 sm:w-14 rounded-full object-cover"
                 />
               ) : (

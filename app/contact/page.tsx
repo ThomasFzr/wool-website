@@ -271,6 +271,7 @@ function ContactForm() {
                               <img
                                 src={creation.imageUrl || creation.images?.[0]}
                                 alt={creation.title}
+                                title={creation.title}
                                 className="w-full aspect-square object-cover rounded"
                               />
                             ) : (

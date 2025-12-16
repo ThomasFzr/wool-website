@@ -90,6 +90,7 @@ export function ReservationCard({ reservation, onClick }: ReservationCardProps) 
           <Image
             src={image}
             alt={creation?.title ?? "Article réservé"}
+            title={creation?.title ?? "Article réservé"}
             width={80}
             height={80}
             className="h-20 w-20 rounded-md object-cover shrink-0"

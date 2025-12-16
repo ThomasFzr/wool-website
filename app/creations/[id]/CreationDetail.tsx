@@ -372,6 +372,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                       <img
                         src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })}
                         alt={`Miniature ${idx + 1}`}
+                        title={`Miniature ${idx + 1}`}
                         className="h-full w-full object-cover"
                       />
                     </button>
@@ -420,6 +421,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                   <img
                     src={currentImageUrl}
                     alt={`${creation.title} - Image ${currentIndex + 1}`}
+                    title={`${creation.title} - Image ${currentIndex + 1}`}
                     className="h-full w-full object-contain transition-transform duration-150 ease-out will-change-transform"
                     style={{
                       transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,

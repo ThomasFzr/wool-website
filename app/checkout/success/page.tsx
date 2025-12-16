@@ -180,6 +180,7 @@ function CheckoutSuccessContent() {
                               format: "auto",
                             })}
                             alt={item.description || "Article"}
+                            title={item.description || "Article"}
                             fill
                             className="object-cover"
                             sizes="80px"

@@ -527,6 +527,7 @@ export function CreationFormModal({
                         <img
                           src={imageUrl}
                           alt={creation.title}
+                          title={creation.title}
                           className="w-12 h-12 object-cover rounded"
                         />
                       )}

@@ -147,6 +147,7 @@ function StatsContent() {
                                   <img
                                     src={creation.imageUrl}
                                     alt={creation.title}
+                                    title={creation.title}
                                     className="w-16 h-16 object-cover rounded shrink-0"
                                   />
                                 )}

@@ -401,6 +401,7 @@ function AdminReservationsContent() {
                                                         key={idx}
                                                         src={image}
                                                         alt={creation?.title || "Article"}
+                                                        title={creation?.title || "Article"}
                                                         className="h-16 w-16 rounded-lg object-cover border border-slate-200"
                                                     />
                                                 ) : null;
@@ -674,6 +675,7 @@ function AdminReservationsContent() {
                                                                     <img
                                                                         src={creation.images?.[0] ?? creation.imageUrl!}
                                                                         alt={creation.title}
+                                                                        title={creation.title}
                                                                         className="h-24 w-24 rounded-lg object-cover shrink-0 ring-1 ring-slate-200"
                                                                     />
                                                                 )}
@@ -725,6 +727,7 @@ function AdminReservationsContent() {
                                         <img
                                             src={selected.creationId.images?.[0] ?? selected.creationId.imageUrl!}
                                             alt={selected.creationId.title}
+                                            title={selected.creationId.title}
                                             className="h-24 w-24 rounded-lg object-cover shrink-0 ring-1 ring-slate-200"
                                         />
                                     )}

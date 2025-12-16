@@ -262,6 +262,7 @@ export function CartModal() {
                           <img
                             src={imageUrl}
                             alt={item.title}
+                            title={item.title}
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -345,6 +346,7 @@ export function CartModal() {
                                 <img
                                   src={optimizedImage}
                                   alt={related.title}
+                                  title={related.title}
                                   className="h-full w-full object-cover"
                                 />
                               ) : (

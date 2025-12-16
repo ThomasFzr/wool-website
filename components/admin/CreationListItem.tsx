@@ -138,6 +138,7 @@ export function CreationListItem({
             <img
               src={creation.imageUrl}
               alt={creation.title}
+              title={creation.title}
               className={`h-16 w-16 rounded-lg object-cover sm:h-20 sm:w-20 ${
                 creation.hidden ? "opacity-50" : ""
               }`}
