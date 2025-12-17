@@ -59,3 +59,12 @@ body {
 .animate-\[slideUp_0\.3s_ease-out\] {
   animation: slideUp 0.3s ease-out;
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}

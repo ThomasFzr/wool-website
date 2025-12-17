@@ -594,17 +594,20 @@ export function CreationDetail({ creation }: CreationDetailProps) {
       {creation.relatedCreations && Array.isArray(creation.relatedCreations) && creation.relatedCreations.length > 0 && (
         <div className="mt-12 md:mt-16">
           <h2 className="text-2xl font-bold text-slate-900 mb-6">Vous pourriez aussi aimer</h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {creation.relatedCreations.map((relatedCreation) => (
-              <CreationCard
-                key={relatedCreation._id}
-                creation={{
-                  ...relatedCreation,
-                  type: relatedCreation.type as "bonnet" | "tour de cou" | "bandeau" | undefined,
-                }}
-                priority={false}
-              />
-            ))}
+          <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
+            <div className="flex gap-6 pb-2">
+              {creation.relatedCreations.map((relatedCreation) => (
+                <div key={relatedCreation._id} className="shrink-0 w-64 md:w-72">
+                  <CreationCard
+                    creation={{
+                      ...relatedCreation,
+                      type: relatedCreation.type as "bonnet" | "tour de cou" | "bandeau" | undefined,
+                    }}
+                    priority={false}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
