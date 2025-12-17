@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Badge, Accordion } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
@@ -59,6 +59,10 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   const [thumbnailScroll, setThumbnailScroll] = useState(0);
   const [showToast, setShowToast] = useState(false);
   const [justAddedToCart, setJustAddedToCart] = useState(false);
+  const relatedCreationsScrollRef = useRef<HTMLDivElement>(null);
+  const [isHoveringRelated, setIsHoveringRelated] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const images = creation?.images && creation.images.length > 0 
     ? creation.images 
@@ -310,6 +314,52 @@ export function CreationDetail({ creation }: CreationDetailProps) {
       setShowToast(true);
     }
   }
+
+  // Fonctions pour le scroll des créations suggérées
+  const checkScrollButtons = () => {
+    if (!relatedCreationsScrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = relatedCreationsScrollRef.current;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+  };
+
+  const scrollRelatedCreations = (direction: 'left' | 'right') => {
+    if (!relatedCreationsScrollRef.current) return;
+    const scrollAmount = 300; // Largeur d'une carte + gap
+    const currentScroll = relatedCreationsScrollRef.current.scrollLeft;
+    const targetScroll = direction === 'left' 
+      ? currentScroll - scrollAmount 
+      : currentScroll + scrollAmount;
+    
+    relatedCreationsScrollRef.current.scrollTo({
+      left: targetScroll,
+      behavior: 'smooth'
+    });
+  };
+
+  // Vérifier les boutons de scroll au chargement et lors du scroll
+  useEffect(() => {
+    if (!creation.relatedCreations || creation.relatedCreations.length === 0) return;
+    
+    // Attendre que le DOM soit rendu
+    const timer = setTimeout(() => {
+      checkScrollButtons();
+    }, 100);
+    
+    const scrollContainer = relatedCreationsScrollRef.current;
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', checkScrollButtons);
+      window.addEventListener('resize', checkScrollButtons);
+      
+      return () => {
+        clearTimeout(timer);
+        scrollContainer.removeEventListener('scroll', checkScrollButtons);
+        window.removeEventListener('resize', checkScrollButtons);
+      };
+    }
+    
+    return () => clearTimeout(timer);
+  }, [creation.relatedCreations]);
 
   const currentImageUrl = images[currentIndex]
     ? optimizeCloudinaryUrl(images[currentIndex], { width: 800, quality: 80, format: 'auto' })
@@ -592,21 +642,60 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
       {/* Créations suggérées */}
       {creation.relatedCreations && Array.isArray(creation.relatedCreations) && creation.relatedCreations.length > 0 && (
-        <div className="mt-12 md:mt-16">
+        <div 
+          className="mt-12 md:mt-16 relative"
+          onMouseEnter={() => setIsHoveringRelated(true)}
+          onMouseLeave={() => setIsHoveringRelated(false)}
+        >
           <h2 className="text-2xl font-bold text-slate-900 mb-6">Vous pourriez aussi aimer</h2>
-          <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
-            <div className="flex gap-6 pb-2">
-              {creation.relatedCreations.map((relatedCreation) => (
-                <div key={relatedCreation._id} className="shrink-0 w-64 md:w-72">
-                  <CreationCard
-                    creation={{
-                      ...relatedCreation,
-                      type: relatedCreation.type as "bonnet" | "tour de cou" | "bandeau" | undefined,
-                    }}
-                    priority={false}
-                  />
-                </div>
-              ))}
+          <div className="relative -mx-4 px-4">
+            {/* Flèche gauche */}
+            {canScrollLeft && (
+              <button
+                onClick={() => scrollRelatedCreations('left')}
+                className={`absolute left-6 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 backdrop-blur-sm p-2 shadow-lg hover:bg-white transition-all duration-200 cursor-pointer ${
+                  isHoveringRelated ? 'opacity-100' : 'opacity-0'
+                }`}
+                aria-label="Défiler vers la gauche"
+              >
+                <svg className="h-5 w-5 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+            
+            {/* Flèche droite */}
+            {canScrollRight && (
+              <button
+                onClick={() => scrollRelatedCreations('right')}
+                className={`absolute right-6 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 backdrop-blur-sm p-2 shadow-lg hover:bg-white transition-all duration-200 cursor-pointer ${
+                  isHoveringRelated ? 'opacity-100' : 'opacity-0'
+                }`}
+                aria-label="Défiler vers la droite"
+              >
+                <svg className="h-5 w-5 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+            
+            <div 
+              ref={relatedCreationsScrollRef}
+              className="overflow-x-auto scrollbar-hide"
+            >
+              <div className="flex gap-6 pb-2">
+                {creation.relatedCreations.map((relatedCreation) => (
+                  <div key={relatedCreation._id} className="shrink-0 w-64 md:w-72">
+                    <CreationCard
+                      creation={{
+                        ...relatedCreation,
+                        type: relatedCreation.type as "bonnet" | "tour de cou" | "bandeau" | undefined,
+                      }}
+                      priority={false}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
