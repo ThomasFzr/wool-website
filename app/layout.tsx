@@ -5,6 +5,7 @@ import { CartModal } from "@/components/CartModal";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import { Analytics } from "@vercel/analytics/react";
 import { Metadata } from "next";
+import SnowfallClient from "@/components/SnowfallClient";
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.maillemum.fr'),
@@ -58,6 +59,7 @@ export default function RootLayout({
         <link rel="preload" href="/fonts/ClashDisplay-Variable.ttf" as="font" type="font/ttf" crossOrigin="anonymous" />
       </head>
       <body className="font-sans bg-slate-50 text-slate-900" suppressHydrationWarning>
+        <SnowfallClient />
         <EnvironmentBanner />
         <AuthSessionProvider>
           <CartProvider>
