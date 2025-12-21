@@ -1,8 +1,30 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Snowfall from "react-snowfall";
 
 export default function SnowfallClient() {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    // Vérifier si on est sur un écran de bureau (>= 1024px)
+    const checkIsDesktop = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+
+    // Vérification initiale
+    checkIsDesktop();
+
+    // Écouter les changements de taille d'écran
+    window.addEventListener("resize", checkIsDesktop);
+    return () => window.removeEventListener("resize", checkIsDesktop);
+  }, []);
+
+  // Ne pas afficher les flocons sur mobile/tablette
+  if (!isDesktop) {
+    return null;
+  }
+
   return (
     <Snowfall
       snowflakeCount={150}

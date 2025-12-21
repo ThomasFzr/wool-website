@@ -24,6 +24,7 @@ interface CreationListItemProps {
   isDragEnabled: boolean;
   onEdit: (creation: Creation) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (creation: Creation) => void;
   onViewDetails: (creation: Creation) => void;
   onToggleSold: (id: string, currentSoldStatus: boolean) => void;
   onToggleHidden: (id: string, hidden: boolean) => void;
@@ -42,6 +43,7 @@ export function CreationListItem({
   isDragEnabled,
   onEdit,
   onDelete,
+  onDuplicate,
   onViewDetails,
   onToggleSold,
   onToggleHidden,
@@ -261,6 +263,15 @@ export function CreationListItem({
         >
           <span className="hidden sm:inline">✏️ Modifier</span>
           <span className="sm:hidden">✏️</span>
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => onDuplicate(creation)}
+          className="cursor-pointer p-2"
+          title="Dupliquer"
+        >
+          📋
         </Button>
         <Button
           variant="danger"

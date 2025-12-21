@@ -35,6 +35,7 @@ interface CreationsListProps {
   onSortByDateChange: (sort: "custom" | "asc" | "desc") => void;
   onEdit: (creation: Creation) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (creation: Creation) => void;
   onViewDetails: (creation: Creation) => void;
   onToggleSold: (id: string, currentSoldStatus: boolean) => void;
   onToggleHidden: (id: string, hidden: boolean) => void;
@@ -59,6 +60,7 @@ export function CreationsList({
   onSortByDateChange,
   onEdit,
   onDelete,
+  onDuplicate,
   onViewDetails,
   onToggleSold,
   onToggleHidden,
@@ -213,6 +215,7 @@ export function CreationsList({
               isDragEnabled={isDragEnabled}
               onEdit={onEdit}
               onDelete={onDelete}
+              onDuplicate={onDuplicate}
               onViewDetails={onViewDetails}
               onToggleSold={onToggleSold}
               onToggleHidden={onToggleHidden}

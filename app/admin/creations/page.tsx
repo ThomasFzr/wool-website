@@ -482,6 +482,38 @@ function AdminCreationsContent() {
     }
   }
 
+  function handleDuplicate(c: Creation) {
+    // Extraire les IDs des articles liés (peuvent être des objets ou des strings)
+    const relatedIds = Array.isArray(c.relatedCreations)
+      ? c.relatedCreations.map((item: any) => 
+          typeof item === 'string' ? item : item._id || item.toString()
+        )
+      : [];
+    
+    // Pré-remplir le formulaire avec les données de l'article à dupliquer
+    setForm({
+      title: `${c.title} (copie)`,
+      description: c.description ?? "",
+      seoDescription: c.seoDescription ?? "",
+      imageUrl: "",
+      images: c.images ?? (c.imageUrl ? [c.imageUrl] : []),
+      imagePublicIds: c.imagePublicIds ?? [],
+      price: c.price != null ? String(c.price) : "",
+      color: c.color ?? "",
+      type: c.type ?? "",
+      showAsNew: true, // Toujours afficher comme nouveau pour une copie
+      yarnBrand: c.yarnBrand ?? "",
+      weight: c.weight != null ? String(c.weight) : "",
+      yarnPrice: c.yarnPrice != null ? String(c.yarnPrice) : "",
+      relatedCreations: relatedIds,
+    });
+    
+    // Ouvrir la modale de création (pas d'édition)
+    setEditingId(null);
+    setMessage(null);
+    setShowCreateModal(true);
+  }
+
   if (status === "loading") {
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -627,6 +659,7 @@ function AdminCreationsContent() {
             onSortByDateChange={setSortByDate}
             onEdit={handleEditClick}
             onDelete={handleDelete}
+            onDuplicate={handleDuplicate}
             onViewDetails={(c) => {
                         setSelectedCreation(c);
                         setShowDetailModal(true);
