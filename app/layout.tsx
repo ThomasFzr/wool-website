@@ -23,6 +23,15 @@ export const metadata: Metadata = {
   verification: {
     google: 'c7a33ae43fd6971e',
   },
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon.png',
+    other: {
+      rel: 'apple-touch-icon-precomposed',
+      url: '/icon.png',
+    },
+  },
   openGraph: {
     title: "MailleMum - Créations tricotées à la main",
     description: "Découvrez nos créations tricotées à la main : tours de cou, bandeaux et bonnets faits main avec passion.",
