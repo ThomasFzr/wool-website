@@ -56,6 +56,10 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   const [swipeDeltaX, setSwipeDeltaX] = useState(0);
   const [hasDragged, setHasDragged] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [swipeVelocity, setSwipeVelocity] = useState(0);
+  const [lastSwipeTime, setLastSwipeTime] = useState<number | null>(null);
+  const [lastSwipeX, setLastSwipeX] = useState<number | null>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   const [thumbnailScroll, setThumbnailScroll] = useState(0);
   const [showToast, setShowToast] = useState(false);
   const [justAddedToCart, setJustAddedToCart] = useState(false);
@@ -209,10 +213,14 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         setIsSwiping(false);
       } else {
         // Swipe pour changer d'image - on enregistre juste la position
-        setSwipeStartX(e.touches[0].clientX);
-        setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+        const touchX = e.touches[0].clientX;
+        setSwipeStartX(touchX);
+        setDragStart({ x: touchX, y: e.touches[0].clientY });
         setSwipeDeltaX(0);
         setIsSwiping(true);
+        setSwipeVelocity(0);
+        setLastSwipeTime(Date.now());
+        setLastSwipeX(touchX);
       }
     }
   }
@@ -245,14 +253,48 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
       } else if (swipeStartX !== null && !zoomed && isSwiping) {
         // Swipe pour navigation - seulement si mouvement horizontal
-        const deltaX = e.touches[0].clientX - swipeStartX;
-        const deltaY = e.touches[0].clientY - (dragStart?.y || e.touches[0].clientY);
+        const touchX = e.touches[0].clientX;
+        const touchY = e.touches[0].clientY;
+        const deltaX = touchX - swipeStartX;
+        const deltaY = touchY - (dragStart?.y || touchY);
         
         // Détecter si c'est un swipe horizontal ou vertical
         if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
           // Swipe horizontal - changer d'image
           e.preventDefault();
-          setSwipeDeltaX(deltaX);
+          
+          // Limiter le swipe avec effet de rebond aux extrémités
+          let limitedDeltaX = deltaX;
+          if (imageContainerRef.current && imageContainerRef.current.parentElement) {
+            const visibleWidth = imageContainerRef.current.parentElement.offsetWidth;
+            const maxDelta = visibleWidth * 0.3; // Permet un swipe jusqu'à 30% de la largeur visible
+            
+            // Si on est à la première image et on swipe vers la droite
+            if (currentIndex === 0 && deltaX > 0) {
+              limitedDeltaX = deltaX * 0.3; // Réduire la résistance avec effet de rebond
+            }
+            // Si on est à la dernière image et on swipe vers la gauche
+            else if (currentIndex === images.length - 1 && deltaX < 0) {
+              limitedDeltaX = deltaX * 0.3; // Réduire la résistance avec effet de rebond
+            }
+            // Limiter le delta pour éviter un swipe trop important
+            else {
+              limitedDeltaX = Math.max(-maxDelta, Math.min(maxDelta, deltaX));
+            }
+          }
+          
+          setSwipeDeltaX(limitedDeltaX);
+          
+          // Calculer la vélocité pour le momentum
+          if (lastSwipeTime !== null && lastSwipeX !== null) {
+            const timeDelta = Date.now() - lastSwipeTime;
+            const xDelta = touchX - lastSwipeX;
+            if (timeDelta > 0) {
+              setSwipeVelocity(xDelta / timeDelta);
+            }
+          }
+          setLastSwipeTime(Date.now());
+          setLastSwipeX(touchX);
         }
         // Si c'est vertical, on laisse le scroll de la page se faire naturellement
       }
@@ -274,16 +316,34 @@ export function CreationDetail({ creation }: CreationDetailProps) {
       }
       
       if (swipeStartX !== null && !zoomed && isSwiping) {
-        if (Math.abs(swipeDeltaX) > 50) {
-          if (swipeDeltaX > 0) {
-            prevImage();
+        const threshold = 50;
+        const velocityThreshold = 0.3;
+        const shouldSwipe = Math.abs(swipeDeltaX) > threshold || Math.abs(swipeVelocity) > velocityThreshold;
+        
+        if (shouldSwipe) {
+          // Utiliser la vélocité pour déterminer la direction si le delta est proche du seuil
+          if (Math.abs(swipeDeltaX) < threshold && Math.abs(swipeVelocity) > velocityThreshold) {
+            if (swipeVelocity > 0 && currentIndex > 0) {
+              prevImage();
+            } else if (swipeVelocity < 0 && currentIndex < images.length - 1) {
+              nextImage();
+            }
           } else {
-            nextImage();
+            // Utiliser le delta pour déterminer la direction
+            if (swipeDeltaX > 0 && currentIndex > 0) {
+              prevImage();
+            } else if (swipeDeltaX < 0 && currentIndex < images.length - 1) {
+              nextImage();
+            }
           }
         }
+        
         setSwipeStartX(null);
         setSwipeDeltaX(0);
         setIsSwiping(false);
+        setSwipeVelocity(0);
+        setLastSwipeTime(null);
+        setLastSwipeX(null);
       }
     }
   }
@@ -461,24 +521,58 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 onClick={handleImageClick}
                 style={{ touchAction: zoomed ? 'none' : 'pan-y' }}
               >
-                <div
-                  className="h-full w-full transition-transform"
-                  style={{
-                    transform: !zoomed && isSwiping ? `translateX(${swipeDeltaX}px)` : 'none',
-                    transition: !zoomed && isSwiping ? 'none' : 'transform 0.3s ease-out',
-                  }}
-                >
-                  <img
-                    src={currentImageUrl}
-                    alt={`${creation.title} - Image ${currentIndex + 1}`}
-                    title={`${creation.title} - Image ${currentIndex + 1}`}
-                    className="h-full w-full object-contain transition-transform duration-150 ease-out will-change-transform"
+                {/* Conteneur mobile avec toutes les images pour swipe fluide */}
+                <div className="md:hidden h-full w-full relative overflow-hidden">
+                  <div
+                    ref={imageContainerRef}
+                    className="h-full flex"
                     style={{
-                      transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                      cursor: zoomed ? (isDragging ? "grabbing" : "zoom-out") : "zoom-in",
+                      transform: `translateX(calc(-${currentIndex * 100}% + ${isSwiping ? swipeDeltaX : 0}px))`,
+                      transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                      willChange: isSwiping ? 'transform' : 'auto',
                     }}
-                    draggable={false}
-                  />
+                  >
+                    {images.map((img, idx) => {
+                      const imgUrl = optimizeCloudinaryUrl(img, { width: 800, quality: 80, format: 'auto' });
+                      return (
+                        <div
+                          key={idx}
+                          className="h-full flex-shrink-0 relative"
+                          style={{ width: '100%', minWidth: '100%' }}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`${creation.title} - Image ${idx + 1}`}
+                            title={`${creation.title} - Image ${idx + 1}`}
+                            className="h-full w-full object-contain"
+                            draggable={false}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* Version desktop avec zoom */}
+                <div className="hidden md:block h-full w-full">
+                  <div
+                    className="h-full w-full transition-transform"
+                    style={{
+                      transition: !zoomed && isSwiping ? 'none' : 'transform 0.3s ease-out',
+                    }}
+                  >
+                    <img
+                      src={currentImageUrl}
+                      alt={`${creation.title} - Image ${currentIndex + 1}`}
+                      title={`${creation.title} - Image ${currentIndex + 1}`}
+                      className="h-full w-full object-contain transition-transform duration-150 ease-out will-change-transform"
+                      style={{
+                        transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                        cursor: zoomed ? (isDragging ? "grabbing" : "zoom-out") : "zoom-in",
+                      }}
+                      draggable={false}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
