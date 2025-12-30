@@ -59,6 +59,9 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   const [swipeVelocity, setSwipeVelocity] = useState(0);
   const [lastSwipeTime, setLastSwipeTime] = useState<number | null>(null);
   const [lastSwipeX, setLastSwipeX] = useState<number | null>(null);
+  const [isHorizontalSwipe, setIsHorizontalSwipe] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [swipeStartIndex, setSwipeStartIndex] = useState(0);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const [thumbnailScroll, setThumbnailScroll] = useState(0);
   const [showToast, setShowToast] = useState(false);
@@ -88,6 +91,34 @@ export function CreationDetail({ creation }: CreationDetailProps) {
       });
     }
   }, [images]);
+
+  // Mettre à jour la largeur du conteneur
+  useEffect(() => {
+    const updateWidth = () => {
+      if (imageContainerRef.current?.parentElement) {
+        setContainerWidth(imageContainerRef.current.parentElement.offsetWidth);
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  // Nettoyer les états de swipe si le swipe ne se déclenche pas après un certain temps
+  useEffect(() => {
+    if (isSwiping && !isHorizontalSwipe && swipeStartX !== null) {
+      const timeout = setTimeout(() => {
+        // Si après 500ms le swipe n'est toujours pas détecté comme horizontal, on le réinitialise
+        if (isSwiping && !isHorizontalSwipe) {
+          setIsSwiping(false);
+          setSwipeStartX(null);
+          setSwipeDeltaX(0);
+          setIsHorizontalSwipe(false);
+        }
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [isSwiping, isHorizontalSwipe, swipeStartX]);
 
   // Gestion clavier
   useEffect(() => {
@@ -217,7 +248,9 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         setSwipeStartX(touchX);
         setDragStart({ x: touchX, y: e.touches[0].clientY });
         setSwipeDeltaX(0);
+        setSwipeStartIndex(currentIndex);
         setIsSwiping(true);
+        setIsHorizontalSwipe(false);
         setSwipeVelocity(0);
         setLastSwipeTime(Date.now());
         setLastSwipeX(touchX);
@@ -252,37 +285,58 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         setOffset((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
         setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
       } else if (swipeStartX !== null && !zoomed && isSwiping) {
-        // Swipe pour navigation - seulement si mouvement horizontal
+        // Swipe pour navigation
         const touchX = e.touches[0].clientX;
         const touchY = e.touches[0].clientY;
         const deltaX = touchX - swipeStartX;
         const deltaY = touchY - (dragStart?.y || touchY);
+        const absDeltaX = Math.abs(deltaX);
+        const absDeltaY = Math.abs(deltaY);
         
-        // Détecter si c'est un swipe horizontal ou vertical
-        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
-          // Swipe horizontal - changer d'image
+        // Détecter si c'est un swipe horizontal (seulement au début)
+        // Une fois détecté comme horizontal, on continue à suivre même si le mouvement devient légèrement vertical
+        if (!isHorizontalSwipe) {
+          // Si le mouvement horizontal est plus important que le vertical OU si le mouvement horizontal est significatif
+          if ((absDeltaX > absDeltaY && absDeltaX > 3) || absDeltaX > 10) {
+            setIsHorizontalSwipe(true);
+            e.preventDefault(); // Empêcher le scroll dès la détection
+          } else if (absDeltaY > absDeltaX && absDeltaY > 20) {
+            // Si c'est clairement vertical (seuil plus élevé pour éviter les faux positifs), on arrête le swipe
+            setIsSwiping(false);
+            setSwipeStartX(null);
+            setIsHorizontalSwipe(false);
+            setSwipeDeltaX(0);
+            return;
+          }
+          // Si le mouvement est encore trop petit, on continue à attendre sans empêcher le scroll
+        }
+        
+        // Si c'est un swipe horizontal (détecté ou déjà confirmé), on continue
+        if (isHorizontalSwipe) {
+          // Toujours empêcher le scroll de la page une fois qu'on a détecté un swipe horizontal
           e.preventDefault();
           
-          // Limiter le swipe avec effet de rebond aux extrémités
-          let limitedDeltaX = deltaX;
-          if (imageContainerRef.current && imageContainerRef.current.parentElement) {
-            const visibleWidth = imageContainerRef.current.parentElement.offsetWidth;
-            const maxDelta = visibleWidth * 0.3; // Permet un swipe jusqu'à 30% de la largeur visible
-            
-            // Si on est à la première image et on swipe vers la droite
-            if (currentIndex === 0 && deltaX > 0) {
-              limitedDeltaX = deltaX * 0.3; // Réduire la résistance avec effet de rebond
-            }
-            // Si on est à la dernière image et on swipe vers la gauche
-            else if (currentIndex === images.length - 1 && deltaX < 0) {
-              limitedDeltaX = deltaX * 0.3; // Réduire la résistance avec effet de rebond
-            }
-            // Limiter le delta pour éviter un swipe trop important
-            else {
-              limitedDeltaX = Math.max(-maxDelta, Math.min(maxDelta, deltaX));
-            }
+          // Calculer la position réelle en pixels à partir de l'index de départ
+          const width = containerWidth || (imageContainerRef.current?.parentElement?.offsetWidth || window.innerWidth);
+          const baseOffset = -swipeStartIndex * width;
+          let totalOffset = baseOffset + deltaX;
+          
+          // Effet de rebond progressif aux extrémités
+          const minOffset = -(images.length - 1) * width;
+          const maxOffset = 0;
+          
+          if (totalOffset > maxOffset) {
+            // On est au-delà de la première image (swipe vers la droite)
+            const excess = totalOffset - maxOffset;
+            totalOffset = maxOffset + excess * 0.25; // Réduction progressive
+          } else if (totalOffset < minOffset) {
+            // On est au-delà de la dernière image (swipe vers la gauche)
+            const excess = minOffset - totalOffset;
+            totalOffset = minOffset - excess * 0.25; // Réduction progressive
           }
           
+          // Le deltaX est la différence entre la position totale et la position de base
+          const limitedDeltaX = totalOffset - baseOffset;
           setSwipeDeltaX(limitedDeltaX);
           
           // Calculer la vélocité pour le momentum
@@ -296,7 +350,6 @@ export function CreationDetail({ creation }: CreationDetailProps) {
           setLastSwipeTime(Date.now());
           setLastSwipeX(touchX);
         }
-        // Si c'est vertical, on laisse le scroll de la page se faire naturellement
       }
     }
   }
@@ -315,35 +368,39 @@ export function CreationDetail({ creation }: CreationDetailProps) {
         toggleZoom();
       }
       
-      if (swipeStartX !== null && !zoomed && isSwiping) {
+      if (swipeStartX !== null && !zoomed) {
+        // Utiliser swipeStartIndex au lieu de currentIndex pour le calcul
         const threshold = 50;
         const velocityThreshold = 0.3;
         const shouldSwipe = Math.abs(swipeDeltaX) > threshold || Math.abs(swipeVelocity) > velocityThreshold;
         
-        if (shouldSwipe) {
+        if (shouldSwipe && isHorizontalSwipe) {
           // Utiliser la vélocité pour déterminer la direction si le delta est proche du seuil
           if (Math.abs(swipeDeltaX) < threshold && Math.abs(swipeVelocity) > velocityThreshold) {
-            if (swipeVelocity > 0 && currentIndex > 0) {
+            if (swipeVelocity > 0 && swipeStartIndex > 0) {
               prevImage();
-            } else if (swipeVelocity < 0 && currentIndex < images.length - 1) {
+            } else if (swipeVelocity < 0 && swipeStartIndex < images.length - 1) {
               nextImage();
             }
           } else {
             // Utiliser le delta pour déterminer la direction
-            if (swipeDeltaX > 0 && currentIndex > 0) {
+            if (swipeDeltaX > 0 && swipeStartIndex > 0) {
               prevImage();
-            } else if (swipeDeltaX < 0 && currentIndex < images.length - 1) {
+            } else if (swipeDeltaX < 0 && swipeStartIndex < images.length - 1) {
               nextImage();
             }
           }
         }
         
+        // Toujours réinitialiser tous les états, même si le swipe n'a pas changé d'image
         setSwipeStartX(null);
         setSwipeDeltaX(0);
         setIsSwiping(false);
+        setIsHorizontalSwipe(false);
         setSwipeVelocity(0);
         setLastSwipeTime(null);
         setLastSwipeX(null);
+        setSwipeStartIndex(0);
       }
     }
   }
@@ -519,7 +576,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onClick={handleImageClick}
-                style={{ touchAction: zoomed ? 'none' : 'pan-y' }}
+                style={{ touchAction: zoomed ? 'none' : 'pan-y pinch-zoom' }}
               >
                 {/* Conteneur mobile avec toutes les images pour swipe fluide */}
                 <div className="md:hidden h-full w-full relative overflow-hidden">
@@ -527,7 +584,9 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                     ref={imageContainerRef}
                     className="h-full flex"
                     style={{
-                      transform: `translateX(calc(-${currentIndex * 100}% + ${isSwiping ? swipeDeltaX : 0}px))`,
+                      transform: isSwiping 
+                        ? `translateX(${-swipeStartIndex * (containerWidth || imageContainerRef.current?.parentElement?.offsetWidth || window.innerWidth) + swipeDeltaX}px)`
+                        : `translateX(${-currentIndex * (containerWidth || imageContainerRef.current?.parentElement?.offsetWidth || window.innerWidth)}px)`,
                       transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                       willChange: isSwiping ? 'transform' : 'auto',
                     }}
@@ -537,7 +596,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                       return (
                         <div
                           key={idx}
-                          className="h-full flex-shrink-0 relative"
+                          className="h-full shrink-0 relative"
                           style={{ width: '100%', minWidth: '100%' }}
                         >
                           <img
