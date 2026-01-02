@@ -181,7 +181,6 @@ export function CreationFormModal({
   };
 
   const handleRemoveImage = (index: number) => {
-    if (!confirm('Supprimer cette image ?')) return;
     onFormChange({
       ...form,
       images: form.images.filter((_, i) => i !== index),
@@ -692,12 +691,12 @@ export function CreationFormModal({
                       <button
                         onClick={() => handleRemoveImage(i)}
                         type="button"
-                        className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600 cursor-pointer"
+                        className="absolute -right-1 -top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-xs hover:bg-red-600 cursor-pointer"
                       >
                         ✕
                       </button>
                       {i === 0 && (
-                        <div className="absolute left-1 top-1 z-10 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                        <div className="absolute left-1 top-1 z-10 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-semibold text-white pointer-events-none">
                           Couverture
                         </div>
                       )}
