@@ -77,27 +77,28 @@ async function getCreation(slug: string) {
         }))
     : [];
   
-  // Si pas d'articles liés, récupérer d'autres créations similaires (même type ou couleur, non vendues)
+  // Si pas d'articles liés, récupérer d'autres créations similaires (même couleur et marque de fil, puis même couleur)
   if (relatedCreations.length === 0) {
     const targetLimit = 5;
     const currentId = creationData._id;
     const excludeIds: mongoose.Types.ObjectId[] = [];
     
-    // Essayer d'abord par type si disponible
-    if (creationData.type) {
-      const byType = await CreationModel.find({
+    // 1. Essayer d'abord par couleur ET marque de fil si disponibles
+    if (creationData.color && creationData.yarnBrand) {
+      const byColorAndBrand = await CreationModel.find({
         _id: { $ne: currentId },
         sold: { $ne: true },
         hidden: { $ne: true },
-        type: creationData.type,
+        color: creationData.color,
+        yarnBrand: creationData.yarnBrand,
       })
-        .select('title imageUrl images price color type slug sold hidden')
+        .select('title imageUrl images price color type slug sold hidden yarnBrand')
         .sort({ displayOrder: -1, createdAt: -1 })
         .limit(targetLimit)
         .lean();
       
-      if (byType.length > 0) {
-        relatedCreations = byType.map((item: any) => ({
+      if (byColorAndBrand.length > 0) {
+        relatedCreations = byColorAndBrand.map((item: any) => ({
           _id: item._id.toString(),
           title: item.title,
           imageUrl: item.imageUrl,
@@ -107,11 +108,11 @@ async function getCreation(slug: string) {
           type: item.type,
           slug: item.slug,
         }));
-        excludeIds.push(...byType.map((item: any) => item._id));
+        excludeIds.push(...byColorAndBrand.map((item: any) => item._id));
       }
     }
     
-    // Si pas assez de résultats, compléter par couleur
+    // 2. Si pas assez de résultats, compléter par couleur uniquement
     if (relatedCreations.length < targetLimit && creationData.color) {
       const query: any = {
         sold: { $ne: true },
@@ -126,7 +127,7 @@ async function getCreation(slug: string) {
       }
       
       const byColor = await CreationModel.find(query)
-        .select('title imageUrl images price color type slug sold hidden')
+        .select('title imageUrl images price color type slug sold hidden yarnBrand')
         .sort({ displayOrder: -1, createdAt: -1 })
         .limit(targetLimit - relatedCreations.length)
         .lean();
@@ -149,7 +150,7 @@ async function getCreation(slug: string) {
       }
     }
     
-    // Si toujours pas assez (ou si ni type ni couleur ne sont définis), prendre n'importe quelles autres créations non vendues
+    // 3. Si toujours pas assez, prendre n'importe quelles autres créations non vendues
     if (relatedCreations.length < targetLimit) {
       const query: any = {
         sold: { $ne: true },
@@ -163,7 +164,7 @@ async function getCreation(slug: string) {
       }
       
       const others = await CreationModel.find(query)
-        .select('title imageUrl images price color type slug sold hidden')
+        .select('title imageUrl images price color type slug sold hidden yarnBrand')
         .sort({ displayOrder: -1, createdAt: -1 })
         .limit(targetLimit - relatedCreations.length)
         .lean();

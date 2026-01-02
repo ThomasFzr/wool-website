@@ -73,6 +73,7 @@ function AdminCreationsContent() {
   const searchParams = useSearchParams();
 
   const [form, setForm] = useState<CreationFormData>(initialFormState);
+  const [initialFormData, setInitialFormData] = useState<CreationFormData | undefined>(undefined);
   const [message, setMessage] = useState<string | null>(null);
   const [creations, setCreations] = useState<Creation[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -328,6 +329,7 @@ function AdminCreationsContent() {
     setTimeout(() => setMessage(null), 3000);
     
     setForm(initialFormState);
+    setInitialFormData(undefined);
     setEditingId(null);
     setShowEditModal(false);
     setShowCreateModal(false);
@@ -342,7 +344,7 @@ function AdminCreationsContent() {
           typeof item === 'string' ? item : item._id || item.toString()
         )
       : [];
-    setForm({
+    const formData = {
       title: c.title ?? "",
       description: c.description ?? "",
       seoDescription: c.seoDescription ?? "",
@@ -357,7 +359,10 @@ function AdminCreationsContent() {
       weight: c.weight != null ? String(c.weight) : "",
       yarnPrice: c.yarnPrice != null ? String(c.yarnPrice) : "",
       relatedCreations: relatedIds,
-    });
+    };
+    setForm(formData);
+    // Sauvegarder les données initiales pour la comparaison
+    setInitialFormData({ ...formData });
     setMessage(null);
     setShowEditModal(true);
   }
@@ -384,6 +389,7 @@ function AdminCreationsContent() {
   function handleCancelEdit() {
     setEditingId(null);
     setForm(initialFormState);
+    setInitialFormData(undefined);
     setMessage(null);
     setShowEditModal(false);
     setShowCreateModal(false);
@@ -687,6 +693,7 @@ function AdminCreationsContent() {
         availableTypes={availableTypes}
         availableCreations={creations}
         currentCreationId={editingId}
+        initialFormData={initialFormData}
       />
 
       {/* Modale de création */}

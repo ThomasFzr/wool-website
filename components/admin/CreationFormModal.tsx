@@ -30,6 +30,7 @@ type Creation = {
   sold?: boolean;
   color?: string;
   type?: string;
+  yarnBrand?: string;
 };
 
 interface CreationFormModalProps {
@@ -44,6 +45,7 @@ interface CreationFormModalProps {
   availableTypes: string[];
   availableCreations?: Creation[];
   currentCreationId?: string | null;
+  initialFormData?: CreationFormData;
 }
 
 export function CreationFormModal({
@@ -58,6 +60,7 @@ export function CreationFormModal({
   availableTypes,
   availableCreations = [],
   currentCreationId = null,
+  initialFormData,
 }: CreationFormModalProps) {
   const {
     uploading: isUploading,
@@ -78,6 +81,8 @@ export function CreationFormModal({
   const [showRelatedCreations, setShowRelatedCreations] = useState(false);
   const yarnBrandInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const relatedCreationsScrollRef = useRef<HTMLDivElement>(null);
+  const savedScrollPositionRef = useRef<number>(0);
 
   const images = form.images;
   const publicIds = form.imagePublicIds;
@@ -148,6 +153,18 @@ export function CreationFormModal({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Restaurer la position du scroll après un changement dans les recommandations
+  useEffect(() => {
+    if (relatedCreationsScrollRef.current && savedScrollPositionRef.current > 0) {
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est mis à jour
+      requestAnimationFrame(() => {
+        if (relatedCreationsScrollRef.current) {
+          relatedCreationsScrollRef.current.scrollTop = savedScrollPositionRef.current;
+        }
+      });
+    }
+  }, [form.relatedCreations]);
 
   const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
     try {
@@ -248,42 +265,78 @@ export function CreationFormModal({
     return commonWords.length / Math.max(words1.length, words2.length);
   };
 
+  // Vérifier s'il y a des modifications par rapport à l'état initial
+  const hasChanges = (): boolean => {
+    if (!isEdit || !initialFormData) {
+      return true; // En mode création, toujours permettre la soumission
+    }
+
+    // Comparer tous les champs
+    const compareArrays = (a: string[], b: string[]): boolean => {
+      if (a.length !== b.length) return false;
+      const sortedA = [...a].sort();
+      const sortedB = [...b].sort();
+      return sortedA.every((val, index) => val === sortedB[index]);
+    };
+
+    return (
+      form.title.trim() !== initialFormData.title.trim() ||
+      (form.description || "") !== (initialFormData.description || "") ||
+      (form.seoDescription || "") !== (initialFormData.seoDescription || "") ||
+      form.price !== initialFormData.price ||
+      form.color !== initialFormData.color ||
+      form.type !== initialFormData.type ||
+      (form.yarnBrand || "") !== (initialFormData.yarnBrand || "") ||
+      (form.weight || "") !== (initialFormData.weight || "") ||
+      (form.yarnPrice || "") !== (initialFormData.yarnPrice || "") ||
+      form.showAsNew !== initialFormData.showAsNew ||
+      !compareArrays(form.images, initialFormData.images) ||
+      !compareArrays(form.imagePublicIds, initialFormData.imagePublicIds) ||
+      !compareArrays(form.relatedCreations, initialFormData.relatedCreations)
+    );
+  };
+
   // Trier les articles liés par pertinence
   const getSortedRelatedCreations = () => {
-    const currentTitle = form.title.toLowerCase();
-    const currentColor = form.color?.toLowerCase() || "";
-    const currentType = form.type?.toLowerCase() || "";
+    const currentColor = form.color?.toLowerCase().trim() || "";
+    const currentYarnBrand = form.yarnBrand?.toLowerCase().trim() || "";
 
-    return [...availableCreations]
-      .filter((c) => c._id !== currentCreationId && !c.sold)
-      .sort((a, b) => {
-        // 1. Priorité : Nom similaire
-        const similarityA = calculateSimilarity(currentTitle, a.title?.toLowerCase() || "");
-        const similarityB = calculateSimilarity(currentTitle, b.title?.toLowerCase() || "");
-        
-        if (Math.abs(similarityA - similarityB) > 0.1) {
-          return similarityB - similarityA; // Plus similaire en premier
+    // Filtrer les articles disponibles (non vendus, pas l'article actuel)
+    const available = availableCreations.filter(
+      (c) => c._id !== currentCreationId && !c.sold
+    );
+
+    // Séparer les articles déjà sélectionnés des autres
+    const selected: Creation[] = [];
+    const matching: Creation[] = [];
+
+    available.forEach((c) => {
+      if (form.relatedCreations.includes(c._id)) {
+        // Garder tous les articles déjà sélectionnés
+        selected.push(c);
+      } else {
+        // Pour les articles non sélectionnés, ne garder que ceux qui matchent les critères
+        const cColor = c.color?.toLowerCase().trim() || "";
+        const cYarnBrand = c.yarnBrand?.toLowerCase().trim() || "";
+
+        // Si on a une couleur ET une marque de fil définies : seulement ceux avec même couleur ET même marque
+        if (currentColor && currentYarnBrand) {
+          if (cColor === currentColor && cYarnBrand === currentYarnBrand) {
+            matching.push(c);
+          }
         }
-        
-        // 2. Priorité : Même couleur
-        const colorMatchA = a.color?.toLowerCase() === currentColor ? 1 : 0;
-        const colorMatchB = b.color?.toLowerCase() === currentColor ? 1 : 0;
-        
-        if (colorMatchA !== colorMatchB) {
-          return colorMatchB - colorMatchA; // Même couleur en premier
+        // Si on a seulement une couleur : seulement ceux avec même couleur
+        else if (currentColor) {
+          if (cColor === currentColor) {
+            matching.push(c);
+          }
         }
-        
-        // 3. Priorité : Même type
-        const typeMatchA = a.type?.toLowerCase() === currentType ? 1 : 0;
-        const typeMatchB = b.type?.toLowerCase() === currentType ? 1 : 0;
-        
-        if (typeMatchA !== typeMatchB) {
-          return typeMatchB - typeMatchA; // Même type en premier
-        }
-        
-        // 4. Sinon, ordre alphabétique par titre
-        return (a.title || "").localeCompare(b.title || "", 'fr');
-      });
+        // Si ni couleur ni marque : ne rien afficher (pas de critères de matching)
+      }
+    });
+
+    // Retourner d'abord les articles sélectionnés, puis ceux qui matchent les critères
+    return [...selected, ...matching];
   };
 
   if (!isOpen) return null;
@@ -514,7 +567,10 @@ export function CreationFormModal({
                 <p className="text-xs text-slate-500 mb-2">
                   Sélectionnez les articles à proposer comme recommandations sur la page de cet article
                 </p>
-                <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2">
+                <div 
+                  ref={relatedCreationsScrollRef}
+                  className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2"
+                >
                   {getSortedRelatedCreations().map((creation) => {
                     const isSelected = form.relatedCreations.includes(creation._id);
                     const imageUrl = creation.images?.[0] || creation.imageUrl;
@@ -531,6 +587,11 @@ export function CreationFormModal({
                           type="checkbox"
                           checked={isSelected}
                           onChange={(e) => {
+                            // Sauvegarder la position du scroll avant le changement
+                            if (relatedCreationsScrollRef.current) {
+                              savedScrollPositionRef.current = relatedCreationsScrollRef.current.scrollTop;
+                            }
+                            
                             const newRelated = e.target.checked
                               ? [...form.relatedCreations, creation._id]
                               : form.relatedCreations.filter((id) => id !== creation._id);
@@ -668,7 +729,8 @@ export function CreationFormModal({
                 !form.type || 
                 !form.price || 
                 parseFloat(form.price) <= 0 || 
-                !form.color
+                !form.color ||
+                (isEdit && !hasChanges())
               } 
               className="flex-1 cursor-pointer"
             >
