@@ -81,12 +81,12 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
     <>
       {/* Header sticky avec logo et bouton alignés */}
       <header
-        className="fixed left-0 right-0 z-30 h-24 sm:h-32"
+        className="fixed left-0 right-0 z-30 h-24 sm:h-32 pointer-events-none"
         style={{ top: isLocalhost ? "28px" : "0" }}
       >
-        <div className="h-full flex items-center justify-between px-4">
+        <div className="h-full flex items-center px-4">
           {/* Logo */}
-          <Link href="/">
+          <Link href="/" className="pointer-events-auto">
             <Image
               src="/images/logo.png"
               alt={title || "MailleMum"}
@@ -104,8 +104,8 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
             {title || "MailleMum - Créations tricotées à la main"}
           </div>
 
-          {/* Panier et compte */}
-          <div className="flex items-center gap-3">
+          {/* Panier et compte - positionnés à droite */}
+          <div className="flex items-center gap-3 ml-auto pointer-events-auto">
             <CartIcon />
 
             {/* Bouton Mon compte */}
