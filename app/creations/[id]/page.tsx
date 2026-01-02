@@ -77,28 +77,26 @@ async function getCreation(slug: string) {
         }))
     : [];
   
-  // Si pas d'articles liés, récupérer d'autres créations similaires (même couleur et marque de fil, puis même couleur)
+  // Si pas d'articles liés, récupérer d'autres créations avec la même couleur uniquement
   if (relatedCreations.length === 0) {
     const targetLimit = 5;
     const currentId = creationData._id;
-    const excludeIds: mongoose.Types.ObjectId[] = [];
     
-    // 1. Essayer d'abord par couleur ET marque de fil si disponibles
-    if (creationData.color && creationData.yarnBrand) {
-      const byColorAndBrand = await CreationModel.find({
+    // Proposer uniquement les articles avec la même couleur
+    if (creationData.color) {
+      const byColor = await CreationModel.find({
         _id: { $ne: currentId },
         sold: { $ne: true },
         hidden: { $ne: true },
         color: creationData.color,
-        yarnBrand: creationData.yarnBrand,
       })
         .select('title imageUrl images price color type slug sold hidden yarnBrand')
         .sort({ displayOrder: -1, createdAt: -1 })
         .limit(targetLimit)
         .lean();
       
-      if (byColorAndBrand.length > 0) {
-        relatedCreations = byColorAndBrand.map((item: any) => ({
+      if (byColor.length > 0) {
+        relatedCreations = byColor.map((item: any) => ({
           _id: item._id.toString(),
           title: item.title,
           imageUrl: item.imageUrl,
@@ -108,81 +106,6 @@ async function getCreation(slug: string) {
           type: item.type,
           slug: item.slug,
         }));
-        excludeIds.push(...byColorAndBrand.map((item: any) => item._id));
-      }
-    }
-    
-    // 2. Si pas assez de résultats, compléter par couleur uniquement
-    if (relatedCreations.length < targetLimit && creationData.color) {
-      const query: any = {
-        sold: { $ne: true },
-        hidden: { $ne: true },
-        color: creationData.color,
-      };
-      
-      if (excludeIds.length > 0) {
-        query._id = { $ne: currentId, $nin: excludeIds };
-      } else {
-        query._id = { $ne: currentId };
-      }
-      
-      const byColor = await CreationModel.find(query)
-        .select('title imageUrl images price color type slug sold hidden yarnBrand')
-        .sort({ displayOrder: -1, createdAt: -1 })
-        .limit(targetLimit - relatedCreations.length)
-        .lean();
-      
-      if (byColor.length > 0) {
-        relatedCreations = [
-          ...relatedCreations,
-          ...byColor.map((item: any) => ({
-            _id: item._id.toString(),
-            title: item.title,
-            imageUrl: item.imageUrl,
-            images: item.images,
-            price: item.price,
-            color: item.color,
-            type: item.type,
-            slug: item.slug,
-          }))
-        ];
-        excludeIds.push(...byColor.map((item: any) => item._id));
-      }
-    }
-    
-    // 3. Si toujours pas assez, prendre n'importe quelles autres créations non vendues
-    if (relatedCreations.length < targetLimit) {
-      const query: any = {
-        sold: { $ne: true },
-        hidden: { $ne: true },
-      };
-      
-      if (excludeIds.length > 0) {
-        query._id = { $ne: currentId, $nin: excludeIds };
-      } else {
-        query._id = { $ne: currentId };
-      }
-      
-      const others = await CreationModel.find(query)
-        .select('title imageUrl images price color type slug sold hidden yarnBrand')
-        .sort({ displayOrder: -1, createdAt: -1 })
-        .limit(targetLimit - relatedCreations.length)
-        .lean();
-      
-      if (others.length > 0) {
-        relatedCreations = [
-          ...relatedCreations,
-          ...others.map((item: any) => ({
-            _id: item._id.toString(),
-            title: item.title,
-            imageUrl: item.imageUrl,
-            images: item.images,
-            price: item.price,
-            color: item.color,
-            type: item.type,
-            slug: item.slug,
-          }))
-        ];
       }
     }
   }

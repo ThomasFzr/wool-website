@@ -375,17 +375,17 @@ export function CreationFormModal({
           />
 
           <Textarea
-            label="Description"
-            placeholder="Détails, matière, pour qui..."
+            label="Composition"
+            placeholder="Matière..."
             value={form.description}
             onChange={(e) => onFormChange({ ...form, description: e.target.value })}
-            rows={4}
+            rows={2}
           />
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-slate-700">
-                Description complète (SEO)
+                Description
               </label>
               <Button
                 type="button"
@@ -399,7 +399,7 @@ export function CreationFormModal({
               </Button>
             </div>
             <Textarea
-              placeholder="Description détaillée pour le référencement, visible sous le bouton d'ajout au panier..."
+              placeholder="Description détaillée..."
               value={form.seoDescription}
               onChange={(e) => onFormChange({ ...form, seoDescription: e.target.value })}
               rows={6}
