@@ -270,8 +270,14 @@ export function CreationFormModal({
       return true; // En mode création, toujours permettre la soumission
     }
 
-    // Comparer tous les champs
-    const compareArrays = (a: string[], b: string[]): boolean => {
+    // Comparer les tableaux en tenant compte de l'ordre (pour les images)
+    const compareArraysOrdered = (a: string[], b: string[]): boolean => {
+      if (a.length !== b.length) return false;
+      return a.every((val, index) => val === b[index]);
+    };
+
+    // Comparer les tableaux sans tenir compte de l'ordre (pour les articles liés)
+    const compareArraysUnordered = (a: string[], b: string[]): boolean => {
       if (a.length !== b.length) return false;
       const sortedA = [...a].sort();
       const sortedB = [...b].sort();
@@ -289,9 +295,9 @@ export function CreationFormModal({
       (form.weight || "") !== (initialFormData.weight || "") ||
       (form.yarnPrice || "") !== (initialFormData.yarnPrice || "") ||
       form.showAsNew !== initialFormData.showAsNew ||
-      !compareArrays(form.images, initialFormData.images) ||
-      !compareArrays(form.imagePublicIds, initialFormData.imagePublicIds) ||
-      !compareArrays(form.relatedCreations, initialFormData.relatedCreations)
+      !compareArraysOrdered(form.images, initialFormData.images) ||
+      !compareArraysOrdered(form.imagePublicIds, initialFormData.imagePublicIds) ||
+      !compareArraysUnordered(form.relatedCreations, initialFormData.relatedCreations)
     );
   };
 
