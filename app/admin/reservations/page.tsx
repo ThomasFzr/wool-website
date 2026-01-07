@@ -223,6 +223,15 @@ function AdminReservationsContent() {
         return "🤝 Remise en main propre";
     };
 
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        const day = date.getDate();
+        const month = date.toLocaleDateString("fr-FR", { month: "short" });
+        const hours = date.getHours().toString().padStart(2, "0");
+        const minutes = date.getMinutes().toString().padStart(2, "0");
+        return `${day} ${month} ${hours}h${minutes}`;
+    };
+
     // Regrouper les réservations par commande (stripeCheckoutSessionId)
     const groupedOrders = useMemo(() => {
         const grouped = new Map<string, Reservation[]>();
@@ -418,11 +427,6 @@ function AdminReservationsContent() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-semibold text-slate-900 truncate">{order.customerName}</p>
-                                                        {order.paymentStatus === "paid" && (
-                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-500 text-white">
-                                                                Paiement validé
-                                                            </span>
-                                                        )}
                                                     </div>
                                                     <p className="text-xs text-slate-500 truncate">{order.customerEmail}</p>
                                                 </div>
@@ -433,12 +437,7 @@ function AdminReservationsContent() {
 
                                             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mt-2">
                                                 <span className="flex items-center gap-1">
-                                                    🕒 {new Date(order.createdAt).toLocaleDateString("fr-FR", {
-                                                        day: "numeric",
-                                                        month: "short",
-                                                        hour: "2-digit",
-                                                        minute: "2-digit"
-                                                    })}
+                                                    🕒 {formatDate(order.createdAt)}
                                                 </span>
                                                 <span>•</span>
                                                 <span className="font-medium">{order.items.length} article{order.items.length > 1 ? "s" : ""}</span>
@@ -530,7 +529,7 @@ function AdminReservationsContent() {
                             </div>
                             <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <span>🕒</span>
-                                <span>{new Date(selected.createdAt).toLocaleString("fr-FR")}</span>
+                                <span>{formatDate(selected.createdAt)}</span>
                             </div>
                         </Card>
                         {/* Message du client */}
