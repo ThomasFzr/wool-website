@@ -85,6 +85,8 @@ function AdminCreationsContent() {
   const [availableTypes, setAvailableTypes] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("tous");
   const [yarnBrandFilter, setYarnBrandFilter] = useState<string>("toutes");
+  const [typeFilter, setTypeFilter] = useState<string>("tous");
+  const [colorFilter, setColorFilter] = useState<string>("toutes");
   const [sortByDate, setSortByDate] = useState<"custom" | "asc" | "desc">("custom");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
@@ -110,6 +112,14 @@ function AdminCreationsContent() {
     new Set(
       creations
         .map((c) => c.yarnBrand?.trim())
+        .filter((c): c is string => Boolean(c))
+    )
+  ).sort((a, b) => a.localeCompare(b, 'fr'));
+
+  const typeOptions = Array.from(
+    new Set(
+      creations
+        .map((c) => c.type?.trim())
         .filter((c): c is string => Boolean(c))
     )
   ).sort((a, b) => a.localeCompare(b, 'fr'));
@@ -172,6 +182,14 @@ function AdminCreationsContent() {
       if (yarnBrandFilter === "sans marque") {
         if (c.yarnBrand && c.yarnBrand.trim() !== "") return false;
       } else if (yarnBrandFilter !== "toutes" && c.yarnBrand !== yarnBrandFilter) {
+        return false;
+      }
+      
+      if (typeFilter !== "tous" && c.type !== typeFilter) {
+        return false;
+      }
+      
+      if (colorFilter !== "toutes" && c.color !== colorFilter) {
         return false;
       }
       
@@ -661,6 +679,12 @@ function AdminCreationsContent() {
             yarnBrandFilter={yarnBrandFilter}
             onYarnBrandFilterChange={setYarnBrandFilter}
             yarnBrandOptions={yarnBrandOptions}
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
+            typeOptions={typeOptions}
+            colorFilter={colorFilter}
+            onColorFilterChange={setColorFilter}
+            colorOptions={colorOptions}
             sortByDate={sortByDate}
             onSortByDateChange={setSortByDate}
             onEdit={handleEditClick}

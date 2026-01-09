@@ -31,6 +31,12 @@ interface CreationsListProps {
   yarnBrandFilter: string;
   onYarnBrandFilterChange: (filter: string) => void;
   yarnBrandOptions: string[];
+  typeFilter: string;
+  onTypeFilterChange: (filter: string) => void;
+  typeOptions: string[];
+  colorFilter: string;
+  onColorFilterChange: (filter: string) => void;
+  colorOptions: string[];
   sortByDate: "custom" | "asc" | "desc";
   onSortByDateChange: (sort: "custom" | "asc" | "desc") => void;
   onEdit: (creation: Creation) => void;
@@ -56,6 +62,12 @@ export function CreationsList({
   yarnBrandFilter,
   onYarnBrandFilterChange,
   yarnBrandOptions,
+  typeFilter,
+  onTypeFilterChange,
+  typeOptions,
+  colorFilter,
+  onColorFilterChange,
+  colorOptions,
   sortByDate,
   onSortByDateChange,
   onEdit,
@@ -190,6 +202,12 @@ export function CreationsList({
             soldCount={creations.filter(c => c.sold).length}
             yarnBrandOptions={yarnBrandOptions}
             creations={creations}
+            typeFilter={typeFilter}
+            onTypeFilterChange={onTypeFilterChange}
+            typeOptions={typeOptions}
+            colorFilter={colorFilter}
+            onColorFilterChange={onColorFilterChange}
+            colorOptions={colorOptions}
             sortByDate={sortByDate}
             onSortByDateChange={onSortByDateChange}
           />
