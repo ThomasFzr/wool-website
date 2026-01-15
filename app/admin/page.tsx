@@ -32,6 +32,11 @@ function AdminContent() {
   const [newColor, setNewColor] = useState("");
   const [newType, setNewType] = useState("");
   const [newPostalCode, setNewPostalCode] = useState("");
+  const [yarnBrands, setYarnBrands] = useState<Array<{ _id?: string; brand: string; pricePerHundredGrams: number; fromCreations?: boolean }>>([]);
+  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [newBrand, setNewBrand] = useState("");
+  const [newBrandPrice, setNewBrandPrice] = useState("");
+  const [savingBrand, setSavingBrand] = useState(false);
 
   useEffect(() => {
     async function loadSettings() {
@@ -87,6 +92,7 @@ function AdminContent() {
     if (session?.user?.role === "admin") {
       loadPendingReservations();
       loadNewMessages();
+      loadYarnBrands();
     }
   }, [session]);
 
@@ -110,6 +116,71 @@ function AdminContent() {
       setNewMessages(data.new || 0);
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  async function loadYarnBrands() {
+    try {
+      setLoadingBrands(true);
+      const res = await fetch("/api/admin/yarn-brands/manage");
+      if (!res.ok) return;
+      const data = await res.json();
+      setYarnBrands(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingBrands(false);
+    }
+  }
+
+  async function handleAddBrand() {
+    const brand = newBrand.trim();
+    const price = parseFloat(newBrandPrice);
+
+    if (!brand || !price || price <= 0) {
+      alert("Veuillez entrer une marque et un prix valide");
+      return;
+    }
+
+    try {
+      setSavingBrand(true);
+      const res = await fetch("/api/admin/yarn-brands/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand, pricePerHundredGrams: price }),
+      });
+
+      if (res.ok) {
+        setNewBrand("");
+        setNewBrandPrice("");
+        await loadYarnBrands();
+      } else {
+        alert("Erreur lors de l'ajout de la marque");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur serveur");
+    } finally {
+      setSavingBrand(false);
+    }
+  }
+
+  async function handleDeleteBrand(id: string, brand: string) {
+    if (!confirm(`Supprimer la marque "${brand}" ?`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/yarn-brands/manage?id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        await loadYarnBrands();
+      } else {
+        alert("Erreur lors de la suppression");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur serveur");
     }
   }
 
@@ -648,6 +719,108 @@ function AdminContent() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-6">
+              <h3 className="text-base font-semibold text-slate-900 mb-4">🧵 Marques de laine et prix</h3>
+              <div className="mb-4 flex gap-2">
+                <Input
+                  placeholder="Nom de la marque"
+                  value={newBrand}
+                  onChange={(e) => setNewBrand(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddBrand();
+                    }
+                  }}
+                />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Prix (€/100g)"
+                  value={newBrandPrice}
+                  onChange={(e) => setNewBrandPrice(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddBrand();
+                    }
+                  }}
+                  className="w-40"
+                />
+                <Button 
+                  type="button"
+                  variant="secondary"
+                  onClick={handleAddBrand}
+                  disabled={savingBrand}
+                  className="cursor-pointer whitespace-nowrap"
+                >
+                  {savingBrand ? "⏳" : "+ Ajouter"}
+                </Button>
+              </div>
+              
+              {loadingBrands ? (
+                <div className="text-center py-4 text-slate-500 text-sm">
+                  Chargement...
+                </div>
+              ) : yarnBrands.length === 0 ? (
+                <div className="text-center py-4 text-slate-500 text-sm">
+                  Aucune marque enregistrée
+                </div>
+              ) : (
+                <div className="space-y-2 mb-6">
+                  {yarnBrands.map((brand) => (
+                    <div
+                      key={brand._id || brand.brand}
+                      className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm border ${
+                        brand.fromCreations 
+                          ? "bg-blue-50 border-blue-200" 
+                          : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-900">{brand.brand}</span>
+                            {brand.fromCreations && (
+                              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                Depuis créations
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-slate-600">{brand.pricePerHundredGrams.toFixed(2)} €/100g</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {brand.fromCreations && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={async () => {
+                              setNewBrand(brand.brand);
+                              setNewBrandPrice(brand.pricePerHundredGrams.toString());
+                            }}
+                            className="cursor-pointer text-xs px-2 py-1"
+                          >
+                            📝 Enregistrer
+                          </Button>
+                        )}
+                        {brand._id && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBrand(brand._id!, brand.brand)}
+                            className="text-red-500 hover:text-red-700 cursor-pointer font-semibold text-lg"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="border-t border-slate-200 pt-6">
