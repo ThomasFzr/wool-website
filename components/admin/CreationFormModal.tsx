@@ -75,9 +75,9 @@ export function CreationFormModal({
   } = useImageUpload();
 
   const [generatingDescription, setGeneratingDescription] = useState(false);
-  const [yarnBrands, setYarnBrands] = useState<string[]>([]);
+  const [yarnBrands, setYarnBrands] = useState<Array<{ brand: string; price?: number }>>([]);
   const [showBrandSuggestions, setShowBrandSuggestions] = useState(false);
-  const [filteredBrands, setFilteredBrands] = useState<string[]>([]);
+  const [filteredBrands, setFilteredBrands] = useState<Array<{ brand: string; price?: number }>>([]);
   const [showRelatedCreations, setShowRelatedCreations] = useState(false);
   const yarnBrandInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -115,7 +115,7 @@ export function CreationFormModal({
 
     // Vérifier si la valeur actuelle correspond exactement à une marque existante
     const exactMatch = yarnBrands.some(
-      (brand) => brand.toLowerCase() === trimmedValue.toLowerCase()
+      (item) => item.brand.toLowerCase() === trimmedValue.toLowerCase()
     );
 
     // Si c'est une correspondance exacte, ne pas afficher de suggestions
@@ -127,9 +127,9 @@ export function CreationFormModal({
 
     // Filtrer les marques qui contiennent la saisie, en excluant la valeur exacte
     const filtered = yarnBrands.filter(
-      (brand) =>
-        brand.toLowerCase().includes(trimmedValue.toLowerCase()) &&
-        brand.toLowerCase() !== trimmedValue.toLowerCase()
+      (item) =>
+        item.brand.toLowerCase().includes(trimmedValue.toLowerCase()) &&
+        item.brand.toLowerCase() !== trimmedValue.toLowerCase()
     );
     setFilteredBrands(filtered);
     setShowBrandSuggestions(filtered.length > 0);
@@ -484,18 +484,30 @@ export function CreationFormModal({
                       ref={suggestionsRef}
                       className="absolute z-50 mt-1 w-full max-h-48 overflow-auto bg-white border border-slate-200 rounded-lg shadow-lg"
                     >
-                      {filteredBrands.map((brand, index) => (
+                      {filteredBrands.map((item, index) => (
                         <button
                           key={index}
                           type="button"
                           className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 first:rounded-t-lg last:rounded-b-lg transition-colors"
                           onClick={() => {
-                            onFormChange({ ...form, yarnBrand: brand });
+                            const updates: any = { yarnBrand: item.brand };
+                            // Auto-remplir le prix si disponible et que le champ est vide
+                            if (item.price && !form.yarnPrice) {
+                              updates.yarnPrice = item.price.toString();
+                            }
+                            onFormChange({ ...form, ...updates });
                             setShowBrandSuggestions(false);
                             yarnBrandInputRef.current?.blur();
                           }}
                         >
-                          {brand}
+                          <div className="flex justify-between items-center">
+                            <span>{item.brand}</span>
+                            {item.price && (
+                              <span className="text-xs text-slate-500 ml-2">
+                                {item.price.toFixed(2)} €/100g
+                              </span>
+                            )}
+                          </div>
                         </button>
                       ))}
                     </div>

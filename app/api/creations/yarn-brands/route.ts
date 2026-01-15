@@ -18,12 +18,21 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
     
-    // Récupérer les marques enregistrées dans YarnBrand
+    // Récupérer les marques enregistrées dans YarnBrand avec leurs prix
     const savedBrands = await YarnBrand.find({})
-      .select('brand')
+      .select('brand pricePerHundredGrams')
       .lean();
     
-    const savedBrandNames = savedBrands.map((b: any) => b.brand.trim());
+    // Créer une map des marques avec leurs prix
+    const brandsMap = new Map<string, { brand: string; price?: number }>();
+    
+    savedBrands.forEach((b: any) => {
+      const brandName = b.brand.trim();
+      brandsMap.set(brandName.toLowerCase(), {
+        brand: brandName,
+        price: b.pricePerHundredGrams,
+      });
+    });
     
     // Récupérer toutes les marques de fil uniques et non vides des créations
     const creations = await Creation.find({
@@ -32,15 +41,21 @@ export async function GET(req: NextRequest) {
       .select('yarnBrand')
       .lean();
 
-    // Extraire les marques uniques des créations
-    const creationBrands = creations
-      .map((c: any) => c.yarnBrand?.trim())
-      .filter((brand: string | undefined) => brand && brand.length > 0);
+    // Ajouter les marques des créations qui ne sont pas déjà dans la map
+    creations.forEach((c: any) => {
+      const brandName = c.yarnBrand?.trim();
+      if (brandName && brandName.length > 0) {
+        const key = brandName.toLowerCase();
+        if (!brandsMap.has(key)) {
+          brandsMap.set(key, { brand: brandName });
+        }
+      }
+    });
 
-    // Fusionner les deux listes et éliminer les doublons
-    const allBrands = Array.from(
-      new Set([...savedBrandNames, ...creationBrands])
-    ).sort() as string[];
+    // Convertir en tableau et trier
+    const allBrands = Array.from(brandsMap.values()).sort((a, b) =>
+      a.brand.localeCompare(b.brand, 'fr')
+    );
 
     return NextResponse.json(allBrands);
   } catch (err) {
