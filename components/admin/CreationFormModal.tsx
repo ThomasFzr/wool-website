@@ -491,8 +491,8 @@ export function CreationFormModal({
                           className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 first:rounded-t-lg last:rounded-b-lg transition-colors"
                           onClick={() => {
                             const updates: any = { yarnBrand: item.brand };
-                            // Auto-remplir le prix si disponible et que le champ est vide
-                            if (item.price && !form.yarnPrice) {
+                            // Toujours mettre à jour le prix du fil quand la marque a un prix
+                            if (item.price != null) {
                               updates.yarnPrice = item.price.toString();
                             }
                             onFormChange({ ...form, ...updates });
