@@ -4,7 +4,14 @@ import { CartProvider } from "@/contexts/CartContext";
 import { CartModal } from "@/components/CartModal";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import { Analytics } from "@vercel/analytics/react";
-import { Metadata } from "next";
+import { Metadata, Viewport } from "next";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.maillemum.fr'),
