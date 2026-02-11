@@ -146,6 +146,15 @@ function AdminCreationsContent() {
     if (!creation.imageUrl && (!creation.images || creation.images.length === 0)) {
       missing.push("Image");
     }
+    if (creation.weight == null || creation.weight === 0) {
+      missing.push("Poids");
+    }
+    if (!creation.yarnBrand || creation.yarnBrand.trim() === "") {
+      missing.push("Marque de fil");
+    }
+    if (creation.yarnPrice == null || creation.yarnPrice <= 0) {
+      missing.push("Prix du fil");
+    }
     
     return missing;
   }
