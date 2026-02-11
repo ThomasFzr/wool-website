@@ -315,7 +315,7 @@ function AdminCreationsContent() {
       title: form.title.trim(),
       description: form.description || undefined,
       seoDescription: form.seoDescription || undefined,
-      imageUrl: form.images[0] || undefined,
+      imageUrl: form.images.length > 0 ? form.images[0] : "",
       images: form.images,
       imagePublicIds: form.imagePublicIds,
       price: Number(form.price),
@@ -323,7 +323,7 @@ function AdminCreationsContent() {
       type: form.type.trim(),
       showAsNew: form.showAsNew,
       yarnBrand: form.yarnBrand || undefined,
-      weight: form.weight ? Number(form.weight) : undefined,
+      weight: form.weight && form.weight.trim() !== "" && form.weight !== "0" ? Number(form.weight) : null,
       yarnPrice: form.yarnPrice ? Number(form.yarnPrice) : undefined,
       relatedCreations: form.relatedCreations || [],
     };
@@ -374,7 +374,7 @@ function AdminCreationsContent() {
       type: c.type ?? "",
       showAsNew: c.showAsNew !== undefined ? c.showAsNew : true,
       yarnBrand: c.yarnBrand ?? "",
-      weight: c.weight != null ? String(c.weight) : "",
+      weight: (c.weight != null && c.weight !== 0) ? String(c.weight) : "",
       yarnPrice: c.yarnPrice != null ? String(c.yarnPrice) : "",
       relatedCreations: relatedIds,
     };
@@ -527,7 +527,7 @@ function AdminCreationsContent() {
       type: c.type ?? "",
       showAsNew: true, // Toujours afficher comme nouveau pour une copie
       yarnBrand: c.yarnBrand ?? "",
-      weight: c.weight != null ? String(c.weight) : "",
+      weight: (c.weight != null && c.weight !== 0) ? String(c.weight) : "",
       yarnPrice: c.yarnPrice != null ? String(c.yarnPrice) : "",
       relatedCreations: relatedIds,
     });

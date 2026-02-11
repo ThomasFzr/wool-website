@@ -176,7 +176,13 @@ export async function PATCH(
     if (body.description !== undefined) setData.description = body.description;
     if (body.seoDescription !== undefined) setData.seoDescription = body.seoDescription;
     if (body.imageUrl !== undefined) setData.imageUrl = body.imageUrl;
-    if (body.images !== undefined) setData.images = body.images;
+    if (body.images !== undefined) {
+      setData.images = body.images;
+      // Quand on supprime toutes les images, vider aussi imageUrl pour éviter une miniature "fantôme"
+      if (body.images.length === 0) {
+        setData.imageUrl = "";
+      }
+    }
     if (body.imagePublicIds !== undefined) {
       setData.imagePublicIds = body.imagePublicIds;
     }

@@ -723,7 +723,7 @@ function AdminContent() {
 
             <div className="border-t border-slate-200 pt-6">
               <h3 className="text-base font-semibold text-slate-900 mb-4">🧵 Marques de laine et prix</h3>
-              <div className="mb-4 flex gap-2">
+              <div className="mb-4 flex flex-wrap gap-2">
                 <Input
                   placeholder="Nom de la marque"
                   value={newBrand}
@@ -734,6 +734,7 @@ function AdminContent() {
                       handleAddBrand();
                     }
                   }}
+                  className="min-w-0 flex-1 sm:flex-initial"
                 />
                 <Input
                   type="number"
@@ -748,14 +749,14 @@ function AdminContent() {
                       handleAddBrand();
                     }
                   }}
-                  className="w-40"
+                  className="w-full sm:w-40 min-w-0"
                 />
                 <Button 
                   type="button"
                   variant="secondary"
                   onClick={handleAddBrand}
                   disabled={savingBrand}
-                  className="cursor-pointer whitespace-nowrap"
+                  className="cursor-pointer whitespace-nowrap shrink-0"
                 >
                   {savingBrand ? "⏳" : "+ Ajouter"}
                 </Button>
