@@ -124,6 +124,7 @@ async function getCreation(slug: string) {
     sold: creationData.sold,
     showAsNew: creationData.showAsNew,
     createdAt: creationData.createdAt ? creationData.createdAt.toString() : undefined,
+    visibleAt: creationData.visibleAt ? creationData.visibleAt.toString() : undefined,
     relatedCreations,
   };
 }

@@ -15,6 +15,7 @@ export type Creation = {
   sold?: boolean;
   showAsNew?: boolean;
   createdAt?: string;
+  visibleAt?: string; // Date de première mise en ligne (décompte "nouveau" à partir de là)
 };
 
 interface CreationCardProps {
@@ -36,9 +37,10 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
     format: 'auto'
   }) : undefined;
 
-  // Vérifier si l'article est nouveau (moins de 7 jours)
-  const isNewArticle = creation.showAsNew && creation.createdAt 
-    ? (new Date().getTime() - new Date(creation.createdAt).getTime()) / (1000 * 60 * 60 * 24) < 7
+  // Vérifier si l'article est nouveau (moins de 7 jours depuis visibleAt ou createdAt)
+  const refDate = creation.visibleAt || creation.createdAt;
+  const isNewArticle = creation.showAsNew && refDate
+    ? (new Date().getTime() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24) < 7
     : creation.showAsNew;
 
   // Précharger toutes les images au survol avec les mêmes optimisations que la modale

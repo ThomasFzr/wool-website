@@ -59,6 +59,7 @@ async function getCreations(): Promise<CreationType[]> {
     sold: c.sold,
     showAsNew: c.showAsNew,
     createdAt: c.createdAt?.toISOString(),
+    visibleAt: c.visibleAt?.toISOString(),
   }));
 }
 

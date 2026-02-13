@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
       type: body.type.trim(),
       displayOrder: nextDisplayOrder,
       showAsNew: body.showAsNew !== undefined ? body.showAsNew : true,
+      hidden: body.hidden !== undefined ? body.hidden : true, // Nouveaux articles cachés par défaut
       yarnBrand: body.yarnBrand,
       weight: body.weight,
       yarnPrice: body.yarnPrice,

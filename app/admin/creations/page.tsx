@@ -523,20 +523,20 @@ function AdminCreationsContent() {
         )
       : [];
     
-    // Pré-remplir le formulaire avec les données de l'article à dupliquer
+    // Pré-remplir le formulaire avec les données de l'article à dupliquer (sans photos ni poids)
     setForm({
       title: `${c.title} (copie)`,
       description: c.description ?? "",
       seoDescription: c.seoDescription ?? "",
       imageUrl: "",
-      images: c.images ?? (c.imageUrl ? [c.imageUrl] : []),
-      imagePublicIds: c.imagePublicIds ?? [],
+      images: [],
+      imagePublicIds: [],
       price: c.price != null ? String(c.price) : "",
       color: c.color ?? "",
       type: c.type ?? "",
       showAsNew: true, // Toujours afficher comme nouveau pour une copie
       yarnBrand: c.yarnBrand ?? "",
-      weight: (c.weight != null && c.weight !== 0) ? String(c.weight) : "",
+      weight: "",
       yarnPrice: c.yarnPrice != null ? String(c.yarnPrice) : "",
       relatedCreations: relatedIds,
     });

@@ -223,7 +223,13 @@ export async function PATCH(
     }
     
     if (body.showAsNew !== undefined) setData.showAsNew = body.showAsNew;
-    if (body.hidden !== undefined) setData.hidden = body.hidden;
+    if (body.hidden !== undefined) {
+      setData.hidden = body.hidden;
+      // Quand on dé-cache l'article, enregistrer la date pour que le décompte "nouveau" (7 jours) démarre
+      if (body.hidden === false && existingCreation.hidden === true) {
+        setData.visibleAt = new Date();
+      }
+    }
     if (body.displayOrder !== undefined) setData.displayOrder = body.displayOrder;
     if (body.relatedCreations !== undefined) setData.relatedCreations = body.relatedCreations;
 

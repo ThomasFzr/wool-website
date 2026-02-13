@@ -30,6 +30,7 @@ const schema = new Schema(
     showAsNew: { type: Boolean, default: true },
     salesCount: { type: Number, default: 0 }, // Nombre de fois que l'article a été vendu
     hidden: { type: Boolean, default: false }, // Cacher l'article du public
+    visibleAt: { type: Date }, // Date de première mise en ligne (décompte "nouveau" à partir de là)
 
     displayOrder: { type: Number, default: 0 },
 

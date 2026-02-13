@@ -22,6 +22,7 @@ export type Creation = {
   sold?: boolean;
   showAsNew?: boolean;
   createdAt?: string;
+  visibleAt?: string; // Date de première mise en ligne (décompte "nouveau" à partir de là)
   relatedCreations?: Array<{
     _id: string;
     slug?: string;
@@ -98,8 +99,10 @@ export function CreationDetail({ creation }: CreationDetailProps) {
       ? [creation.imageUrl] 
       : [];
 
-  const isNewArticle = creation.showAsNew && creation.createdAt 
-    ? (new Date().getTime() - new Date(creation.createdAt).getTime()) / (1000 * 60 * 60 * 24) < 7
+  // Décompte "nouveau" : 7 jours depuis visibleAt (si défini) ou createdAt
+  const refDate = creation.visibleAt || creation.createdAt;
+  const isNewArticle = creation.showAsNew && refDate
+    ? (new Date().getTime() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24) < 7
     : creation.showAsNew;
 
   // Préchargement des images principales (800px)
