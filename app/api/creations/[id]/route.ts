@@ -223,6 +223,10 @@ export async function PATCH(
     }
     
     if (body.showAsNew !== undefined) setData.showAsNew = body.showAsNew;
+    if (body.resetNewTimer === true) {
+      setData.visibleAt = new Date();
+      setData.showAsNew = true;
+    }
     if (body.hidden !== undefined) {
       setData.hidden = body.hidden;
       // Quand on dé-cache l'article, enregistrer la date pour que le décompte "nouveau" (7 jours) démarre

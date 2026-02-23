@@ -31,7 +31,79 @@ type Creation = {
   color?: string;
   type?: string;
   yarnBrand?: string;
+  createdAt?: string;
+  visibleAt?: string;
 };
+
+const NEW_BADGE_DAYS = 7;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function getNewBadgeCountdownText(refDate: Date, nowMs: number): string {
+  const endDate = new Date(refDate.getTime() + NEW_BADGE_DAYS * MS_PER_DAY);
+  const remainingMs = endDate.getTime() - nowMs;
+  if (remainingMs <= 0) {
+    return "Le badge « New » ne s'affiche plus (7 jours écoulés).";
+  }
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const days = Math.floor(totalSeconds / (24 * 3600));
+  const hours = Math.floor((totalSeconds % (24 * 3600)) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (days > 0) {
+    return `${days} j ${hours} h restantes`;
+  }
+  if (hours > 0) {
+    return `${hours} h ${minutes} min restantes`;
+  }
+  if (minutes > 0) {
+    return `${minutes} min restantes`;
+  }
+  return "Moins d'une minute";
+}
+
+function NewBadgeCountdown({
+  isEdit,
+  currentCreationId,
+  availableCreations,
+}: {
+  isEdit: boolean;
+  currentCreationId: string | null | undefined;
+  availableCreations: Creation[];
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  const creation = currentCreationId && isEdit
+    ? availableCreations.find((c) => c._id === currentCreationId)
+    : null;
+  const refDateStr = creation?.visibleAt ?? creation?.createdAt;
+  const refDate = refDateStr ? new Date(refDateStr) : null;
+
+  useEffect(() => {
+    if (!refDate) return;
+    const interval = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => clearInterval(interval);
+  }, [refDate]);
+
+  if (!refDate) {
+    return (
+      <p className="text-xs text-slate-500 pl-4">
+        Le badge sera affiché 7 jours après la première mise en ligne.
+      </p>
+    );
+  }
+
+  const endDate = new Date(refDate.getTime() + NEW_BADGE_DAYS * MS_PER_DAY);
+  const remainingMs = endDate.getTime() - now;
+  const text = getNewBadgeCountdownText(refDate, now);
+
+  return (
+    <p className="text-xs text-slate-500 pl-4">
+      {remainingMs <= 0 ? (
+        <span>{text}</span>
+      ) : (
+        <span>Encore affiché comme nouveau : <strong className="text-slate-700">{text}</strong></span>
+      )}
+    </p>
+  );
+}
 
 interface CreationFormModalProps {
   isOpen: boolean;
@@ -46,6 +118,7 @@ interface CreationFormModalProps {
   availableCreations?: Creation[];
   currentCreationId?: string | null;
   initialFormData?: CreationFormData;
+  onNewTimerReset?: () => void;
 }
 
 export function CreationFormModal({
@@ -61,6 +134,7 @@ export function CreationFormModal({
   availableCreations = [],
   currentCreationId = null,
   initialFormData,
+  onNewTimerReset,
 }: CreationFormModalProps) {
   const {
     uploading: isUploading,
@@ -79,6 +153,7 @@ export function CreationFormModal({
   const [showBrandSuggestions, setShowBrandSuggestions] = useState(false);
   const [filteredBrands, setFilteredBrands] = useState<Array<{ brand: string; price?: number }>>([]);
   const [showRelatedCreations, setShowRelatedCreations] = useState(false);
+  const [resettingNewTimer, setResettingNewTimer] = useState(false);
   const yarnBrandInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const relatedCreationsScrollRef = useRef<HTMLDivElement>(null);
@@ -547,19 +622,47 @@ export function CreationFormModal({
             </div>
           </div>
 
-          {/* Flag New */}
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm hover:bg-slate-100">
-            <input
-              type="checkbox"
-              checked={form.showAsNew !== undefined ? form.showAsNew : true}
-              onChange={(e) => onFormChange({ ...form, showAsNew: e.target.checked })}
-              className="h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500"
+          {/* Timer badge New */}
+          <div className="space-y-2">
+            {isEdit && currentCreationId ? (
+              <>
+                <div className="flex justify-center">
+                  <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={resettingNewTimer}
+                  onClick={async () => {
+                    setResettingNewTimer(true);
+                    try {
+                      const res = await fetch(`/api/creations/${currentCreationId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ resetNewTimer: true }),
+                      });
+                      if (res.ok) {
+                        onFormChange({ ...form, showAsNew: true });
+                        onNewTimerReset?.();
+                      }
+                    } finally {
+                      setResettingNewTimer(false);
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
+                  {resettingNewTimer ? "Réinitialisation…" : "Réinitialiser le timer « New »"}
+                </Button>
+                </div>
+                <p className="text-xs text-slate-500 pl-1">
+                  Le badge « New » s'affiche 7 jours. Cliquez pour repartir de zéro.
+                </p>
+              </>
+            ) : null}
+            <NewBadgeCountdown
+              isEdit={isEdit}
+              currentCreationId={currentCreationId}
+              availableCreations={availableCreations}
             />
-            <span className="text-slate-700">
-              <span className="font-semibold">Afficher le badge "New"</span>
-              <span className="ml-2 text-xs text-slate-500">(automatiquement masqué après 7 jours)</span>
-            </span>
-          </label>
+          </div>
 
           {/* Articles liés */}
           <div className="space-y-2">

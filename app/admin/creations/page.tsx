@@ -27,6 +27,7 @@ type Creation = {
   hidden?: boolean;
   slug?: string;
   createdAt?: string;
+  visibleAt?: string;
   yarnBrand?: string;
   weight?: number;
   yarnPrice?: number;
@@ -727,6 +728,7 @@ function AdminCreationsContent() {
         availableCreations={creations}
         currentCreationId={editingId}
         initialFormData={initialFormData}
+        onNewTimerReset={loadCreations}
       />
 
       {/* Modale de création */}
