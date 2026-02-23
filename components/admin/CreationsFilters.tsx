@@ -248,6 +248,7 @@ export function CreationsFilters({
           placeholder="🔍 Rechercher par titre, couleur, type, prix ou marque de fil..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
+          onBlur={(e) => onSearchChange(e.target.value.trim())}
           className="w-full"
         />
       </div>

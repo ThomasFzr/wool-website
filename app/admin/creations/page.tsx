@@ -202,8 +202,8 @@ function AdminCreationsContent() {
         return false;
       }
       
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
+      const query = searchQuery.trim().toLowerCase();
+      if (query) {
         const matchTitle = c.title?.toLowerCase().includes(query);
         const matchDescription = c.description?.toLowerCase().includes(query);
         const matchColor = c.color?.toLowerCase().includes(query);
