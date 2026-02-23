@@ -516,6 +516,30 @@ function AdminCreationsContent() {
     }
   }
 
+  async function handleToggleNew(id: string, showAsNew: boolean) {
+    try {
+      const body: { showAsNew: boolean; resetNewTimer?: boolean } = { showAsNew };
+      if (showAsNew) body.resetNewTimer = true;
+
+      const res = await fetch(`/api/creations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur lors de la mise à jour");
+      }
+
+      setMessage(showAsNew ? "Badge Nouveau activé ✔️" : "Badge Nouveau retiré ✔️");
+      setTimeout(() => setMessage(null), 3000);
+      loadCreations();
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la mise à jour");
+    }
+  }
+
   function handleDuplicate(c: Creation) {
     // Extraire les IDs des articles liés (peuvent être des objets ou des strings)
     const relatedIds = Array.isArray(c.relatedCreations)
@@ -706,6 +730,7 @@ function AdminCreationsContent() {
                       }}
             onToggleSold={handleToggleSold}
             onToggleHidden={handleToggleHidden}
+            onToggleNew={handleToggleNew}
             onReorder={handleReorder}
             onSaveOrder={saveCreationOrder}
             savingOrder={savingOrder}

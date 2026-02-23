@@ -15,6 +15,9 @@ type Creation = {
   type?: "bonnet" | "tour de cou" | "bandeau";
   sold?: boolean;
   hidden?: boolean;
+  showAsNew?: boolean;
+  visibleAt?: string;
+  createdAt?: string;
   yarnBrand?: string;
   weight?: number;
   yarnPrice?: number;
@@ -45,6 +48,7 @@ interface CreationsListProps {
   onViewDetails: (creation: Creation) => void;
   onToggleSold: (id: string, currentSoldStatus: boolean) => void;
   onToggleHidden: (id: string, hidden: boolean) => void;
+  onToggleNew: (id: string, showAsNew: boolean) => void;
   onReorder: (newCreations: Creation[]) => void;
   onSaveOrder: () => void;
   savingOrder: boolean;
@@ -76,6 +80,7 @@ export function CreationsList({
   onViewDetails,
   onToggleSold,
   onToggleHidden,
+  onToggleNew,
   onReorder,
   onSaveOrder,
   savingOrder,
@@ -237,6 +242,7 @@ export function CreationsList({
               onViewDetails={onViewDetails}
               onToggleSold={onToggleSold}
               onToggleHidden={onToggleHidden}
+              onToggleNew={onToggleNew}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}

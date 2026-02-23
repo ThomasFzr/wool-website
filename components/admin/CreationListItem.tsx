@@ -12,6 +12,9 @@ type Creation = {
   type?: "bonnet" | "tour de cou" | "bandeau";
   sold?: boolean;
   hidden?: boolean;
+  showAsNew?: boolean;
+  visibleAt?: string;
+  createdAt?: string;
   yarnBrand?: string;
   weight?: number;
   yarnPrice?: number;
@@ -28,6 +31,7 @@ interface CreationListItemProps {
   onViewDetails: (creation: Creation) => void;
   onToggleSold: (id: string, currentSoldStatus: boolean) => void;
   onToggleHidden: (id: string, hidden: boolean) => void;
+  onToggleNew: (id: string, showAsNew: boolean) => void;
   onDragStart: (index: number) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
   onDragEnd: () => void;
@@ -47,6 +51,7 @@ export function CreationListItem({
   onViewDetails,
   onToggleSold,
   onToggleHidden,
+  onToggleNew,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -54,6 +59,12 @@ export function CreationListItem({
   onTouchMove,
   onTouchEnd,
 }: CreationListItemProps) {
+  // Badge "Nouveau" uniquement si showAsNew ET dans la fenêtre des 7 jours (visibleAt ou createdAt)
+  const refDate = creation.visibleAt || creation.createdAt;
+  const isWithinNewPeriod = creation.showAsNew && refDate
+    ? (new Date().getTime() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24) < 7
+    : false;
+
   return (
     <div
       key={creation._id}
@@ -137,6 +148,11 @@ export function CreationListItem({
                 Caché
               </span>
             )}
+            {creation.showAsNew && !creation.hidden && !creation.sold && isWithinNewPeriod && (
+              <span className="absolute right-1 top-1 z-10 rounded-full bg-red-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                Nouveau
+              </span>
+            )}
             <img
               src={creation.imageUrl}
               alt={creation.title}
@@ -208,6 +224,24 @@ export function CreationListItem({
           </span>
           <span className="sm:hidden">
             {creation.hidden ? "👁️" : "🙈"}
+          </span>
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => onToggleNew(creation._id, !creation.showAsNew)}
+          title={creation.showAsNew ? "Retirer le badge Nouveau" : "Marquer comme nouveau"}
+          className={`cursor-pointer text-xs sm:text-sm ${
+            creation.showAsNew
+              ? "bg-red-100 hover:bg-red-200 text-red-900"
+              : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+          }`}
+        >
+          <span className="hidden sm:inline">
+            {creation.showAsNew ? "✨ Retirer nouveau" : "✨ Nouveau"}
+          </span>
+          <span className="sm:hidden">
+            {creation.showAsNew ? "✨" : "✨"}
           </span>
         </Button>
         <Button
