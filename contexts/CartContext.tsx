@@ -50,6 +50,12 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const STORAGE_KEY = "wool-starter-cart";
 const DELIVERY_MODE_KEY = "wool-starter-delivery-mode";
 
+// Les événements focus/visibilitychange se déclenchent à chaque alt-tab : on
+// étrangle les vérifications automatiques de disponibilité à une par 30 s.
+// Les vérifications explicites (ouverture du panier, refus au paiement) ne sont
+// jamais étranglées.
+const AUTO_CHECK_MIN_INTERVAL_MS = 30_000;
+
 type CartProviderProps = {
   children: ReactNode;
   shippingCost?: number;
@@ -90,6 +96,9 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
     itemsRef.current = items;
   }, [items]);
 
+  // Horodatage de la dernière vérification de disponibilité (pour l'étranglement)
+  const lastAutoCheckRef = useRef(0);
+
   /**
    * Purge les articles devenus indisponibles (vendus par quelqu'un d'autre,
    * cachés ou supprimés du catalogue) et prévient l'utilisateur.
@@ -99,6 +108,10 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
   const refreshAvailability = useCallback(async () => {
     const current = itemsRef.current;
     if (current.length === 0) return;
+
+    // Toute vérification (explicite ou automatique) réarme la fenêtre
+    // d'étranglement : pas de double requête si un focus suit de peu.
+    lastAutoCheckRef.current = Date.now();
 
     try {
       const ids = current.map((item) => item.creationId).join(",");
@@ -130,6 +143,28 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
   // Vérification au chargement de l'application
   useEffect(() => {
     if (mounted) refreshAvailability();
+  }, [mounted, refreshAvailability]);
+
+  // Revérifier quand l'utilisateur revient sur l'onglet : un panier laissé
+  // ouvert longtemps peut contenir un article acheté entre-temps.
+  useEffect(() => {
+    if (!mounted) return;
+
+    const maybeRefresh = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastAutoCheckRef.current < AUTO_CHECK_MIN_INTERVAL_MS) return;
+      lastAutoCheckRef.current = now;
+      refreshAvailability();
+    };
+
+    document.addEventListener("visibilitychange", maybeRefresh);
+    window.addEventListener("focus", maybeRefresh);
+
+    return () => {
+      document.removeEventListener("visibilitychange", maybeRefresh);
+      window.removeEventListener("focus", maybeRefresh);
+    };
   }, [mounted, refreshAvailability]);
 
   // Fonction pour charger le code postal
