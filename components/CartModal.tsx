@@ -8,6 +8,7 @@ import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
+import { CartUnavailableNotice } from "@/components/CartUnavailableNotice";
 
 export function CartModal() {
   const {
@@ -124,6 +125,8 @@ export function CartModal() {
               </svg>
             </button>
           </div>
+
+          <CartUnavailableNotice className="mx-6 mt-4" />
 
           {/* Contenu */}
           <div className="flex-1 overflow-y-auto px-6 py-4">

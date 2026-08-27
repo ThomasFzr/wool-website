@@ -4,6 +4,7 @@ import { useCart } from "@/contexts/CartContext";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui";
 import { RelatedCreationCard } from "@/components/RelatedCreationCard";
+import { CartUnavailableNotice } from "@/components/CartUnavailableNotice";
 import { useRelatedCreations } from "@/hooks/useRelatedCreations";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Link from "next/link";
@@ -23,6 +24,7 @@ export default function CartPage() {
     pickupUnavailableReason,
     pickupConditions,
     reloadPostalCode,
+    refreshAvailability,
   } = useCart();
   const { data: session } = useSession();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -76,6 +78,8 @@ export default function CartPage() {
         }
         
         alert(errorMessage);
+        // L'article refusé est peut-être vendu : on resynchronise le panier
+        refreshAvailability();
         setIsProcessing(false);
         return;
       }
@@ -139,6 +143,8 @@ export default function CartPage() {
       <main className="min-h-screen bg-linear-to-br from-slate-50 via-pink-50/30 to-slate-50">
         <div className="mx-auto max-w-4xl px-4 py-8 pb-8 md:pb-8">
           <h1 className="mb-8 text-3xl font-bold text-slate-900">Panier</h1>
+
+          <CartUnavailableNotice className="mb-6" />
 
           <div className="space-y-4">
             {items.map((item) => {

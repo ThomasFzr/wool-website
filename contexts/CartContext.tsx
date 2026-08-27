@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from "react";
 import { useSession } from "next-auth/react";
 
 export type CartItem = {
@@ -28,6 +28,11 @@ type CartContextType = {
   pickupConditions: PickupConditions | null;
   isPickupAvailable: boolean;
   pickupUnavailableReason: string | null;
+  /** Message à afficher quand des articles ont été retirés du panier car plus disponibles */
+  unavailableNotice: string | null;
+  dismissUnavailableNotice: () => void;
+  /** Revérifie la disponibilité des articles du panier et retire ceux qui ne le sont plus */
+  refreshAvailability: () => void;
   openCart: () => void;
   closeCart: () => void;
   addItem: (item: CartItem) => void;
@@ -59,6 +64,7 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
   const [mounted, setMounted] = useState(false);
   const [deliveryMode, setDeliveryModeState] = useState<DeliveryMode>("pickup");
   const [userPostalCode, setUserPostalCode] = useState<string | null>(null);
+  const [unavailableNotice, setUnavailableNotice] = useState<string | null>(null);
 
   // Charger le panier et le mode de livraison depuis localStorage au montage
   useEffect(() => {
@@ -77,37 +83,54 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
     }
   }, []);
 
-  // Purger les articles vendus/supprimés : le panier vit dans le localStorage,
-  // il peut contenir un article acheté depuis (paiement finalisé par le webhook,
-  // onglet fermé avant la page de confirmation…) ou retiré du catalogue.
+  // Référence toujours à jour sur les articles, pour que refreshAvailability
+  // n'ait pas besoin d'être recréé à chaque changement de panier.
+  const itemsRef = useRef(items);
   useEffect(() => {
-    if (!mounted || items.length === 0) return;
+    itemsRef.current = items;
+  }, [items]);
 
-    const ids = items.map((item) => item.creationId).join(",");
-    let cancelled = false;
+  /**
+   * Purge les articles devenus indisponibles (vendus par quelqu'un d'autre,
+   * cachés ou supprimés du catalogue) et prévient l'utilisateur.
+   * Le panier vit dans le localStorage : il peut contenir un article acheté
+   * entre-temps par un autre client.
+   */
+  const refreshAvailability = useCallback(async () => {
+    const current = itemsRef.current;
+    if (current.length === 0) return;
 
-    fetch(`/api/creations/availability?ids=${ids}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled || !Array.isArray(data?.available)) return;
-        const available = new Set<string>(data.available);
-        setItems((prev) =>
-          prev.some((item) => !available.has(item.creationId))
-            ? prev.filter((item) => available.has(item.creationId))
-            : prev
-        );
-      })
-      .catch((error) => {
-        console.error("Erreur lors de la vérification du panier:", error);
-      });
+    try {
+      const ids = current.map((item) => item.creationId).join(",");
+      const res = await fetch(`/api/creations/availability?ids=${ids}`);
+      const data = await res.json();
 
-    return () => {
-      cancelled = true;
-    };
-    // Volontairement limité au montage (et à la première hydratation) : inutile
-    // de revérifier à chaque ajout/retrait d'article.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted]);
+      // available === null : vérification impossible, on ne purge rien
+      if (!Array.isArray(data?.available)) return;
+
+      const available = new Set<string>(data.available);
+      const removed = current.filter((item) => !available.has(item.creationId));
+      if (removed.length === 0) return;
+
+      setItems((prev) => prev.filter((item) => available.has(item.creationId)));
+      setUnavailableNotice(
+        removed.length === 1
+          ? `« ${removed[0].title} » n'est plus disponible et a été retiré de votre panier.`
+          : `${removed.length} articles ne sont plus disponibles et ont été retirés de votre panier : ${removed
+              .map((item) => `« ${item.title} »`)
+              .join(", ")}.`
+      );
+    } catch (error) {
+      console.error("Erreur lors de la vérification du panier:", error);
+    }
+  }, []);
+
+  const dismissUnavailableNotice = useCallback(() => setUnavailableNotice(null), []);
+
+  // Vérification au chargement de l'application
+  useEffect(() => {
+    if (mounted) refreshAvailability();
+  }, [mounted, refreshAvailability]);
 
   // Fonction pour charger le code postal
   const loadUserPostalCode = useCallback(async () => {
@@ -188,7 +211,13 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
     setDeliveryModeState(mode);
   }, []);
 
-  const openCart = useCallback(() => setIsOpen(true), []);
+  // Ouvrir le panier revérifie la disponibilité : un article vendu entre-temps
+  // par un autre client disparaît avant que l'utilisateur ne tente de payer.
+  const openCart = useCallback(() => {
+    setIsOpen(true);
+    refreshAvailability();
+  }, [refreshAvailability]);
+
   const closeCart = useCallback(() => setIsOpen(false), []);
 
   const addItem = useCallback((newItem: CartItem) => {
@@ -311,6 +340,9 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
       pickupConditions,
       isPickupAvailable,
       pickupUnavailableReason,
+      unavailableNotice,
+      dismissUnavailableNotice,
+      refreshAvailability,
       openCart,
       closeCart,
       addItem,
@@ -330,6 +362,9 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
       pickupConditions,
       isPickupAvailable,
       pickupUnavailableReason,
+      unavailableNotice,
+      dismissUnavailableNotice,
+      refreshAvailability,
       openCart,
       closeCart,
       addItem,
