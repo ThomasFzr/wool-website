@@ -1,6 +1,6 @@
 # Wool Creations E-commerce Platform
 
-A modern, full-stack e-commerce platform built with Next.js 15 for showcasing and selling handmade wool creations. Features include user authentication, admin dashboard, reservation system, and Cloudinary image management.
+A modern, full-stack e-commerce platform built with Next.js 16 for showcasing and selling handmade wool creations. Features include user authentication, admin dashboard, reservation system, and Cloudinary image management.
 
 ## 🚀 Features
 
@@ -27,7 +27,7 @@ A modern, full-stack e-commerce platform built with Next.js 15 for showcasing an
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **Next.js 15** - React framework with App Router
+- **Next.js 16** - React framework with App Router
 - **TypeScript** - Type-safe development
 - **Tailwind CSS 4** - Utility-first styling
 - **Next-Auth** - Authentication with JWT sessions
@@ -90,7 +90,7 @@ wool-starter/
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+ and npm
+- Node.js 20.9+ and npm
 - MongoDB database
 - Cloudinary account
 - Google OAuth credentials (optional)

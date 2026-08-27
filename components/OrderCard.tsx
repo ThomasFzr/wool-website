@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Badge } from "./ui";
-import { Reservation } from "./ReservationCard";
+import { Reservation } from "@/types/reservation";
 
 export type Order = {
   id: string;

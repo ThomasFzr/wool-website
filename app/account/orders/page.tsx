@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Reservation } from "@/components/ReservationCard";
+import { Reservation } from "@/types/reservation";
 import { OrderCard, Order } from "@/components/OrderCard";
 
 export default function OrdersPage() {

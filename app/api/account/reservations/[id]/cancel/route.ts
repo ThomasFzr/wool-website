@@ -7,6 +7,7 @@ import CreationModel from "@/models/Creation";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
+import { escapeHtml } from "@/lib/escape";
 
 export async function PATCH(
   req: NextRequest,
@@ -64,15 +65,19 @@ export async function PATCH(
     // 5️⃣ On libère la création si elle n'est pas vendue
     const creation: any = reservation.creationId;
     if (creation && !creation.sold) {
-      await CreationModel.findByIdAndUpdate(creation._id, {
-        $set: { reserved: false },
-        $unset: {
-          reservedName: "",
-          reservedContact: "",
-          reservedMessage: "",
-          reservedAt: "",
-        },
-      });
+      // Condition sold côté requête : ne libère jamais un article vendu entre-temps
+      await CreationModel.findOneAndUpdate(
+        { _id: creation._id, sold: { $ne: true } },
+        {
+          $set: { reserved: false },
+          $unset: {
+            reservedName: "",
+            reservedContact: "",
+            reservedMessage: "",
+            reservedAt: "",
+          },
+        }
+      );
     }
 
     // 6️⃣ Emails (inchangé, j'utilise ta logique)
@@ -89,22 +94,28 @@ export async function PATCH(
       const priceLabel =
         creation.price != null ? `${creation.price} €` : "Prix sur demande";
 
-      const displayedReason =
+      const displayedReason = escapeHtml(
         (reason && reason.trim().length > 0) ||
           ((reservation as any).cancelReason &&
             (reservation as any).cancelReason.trim().length > 0)
           ? (reason || (reservation as any).cancelReason)
-          : "Aucune raison précisée.";
+          : "Aucune raison précisée."
+      );
+      const safeName = escapeHtml(reservation.name);
+      const safeContact = escapeHtml(reservation.contact);
+
+      // Les emails partent ensemble et ne font pas échouer la requête (sendEmail throw en cas d'erreur)
+      const emails: Promise<unknown>[] = [];
 
       // 📧 Email à l'acheteur (c'est lui qui a annulé)
       if (shouldSendEmail) {
-        await sendEmail({
+        emails.push(sendEmail({
         to: reservation.contact,
         subject: "❌ Vous avez annulé votre réservation",
         html: emailTemplate(`
             <h1 style="font-size:20px;margin:0 0 12px 0;">Votre réservation a été annulée</h1>
             <p style="font-size:14px;margin:0 0 16px 0;">
-              Bonjour <strong>${reservation.name}</strong>,<br/>
+              Bonjour <strong>${safeName}</strong>,<br/>
               Vous avez annulé votre réservation pour l'article suivant :
             </p>
 
@@ -133,18 +144,18 @@ export async function PATCH(
               <a href="${appUrl}/account/orders" style="color:#0f172a;font-weight:600;">Mes réservations</a>
             </p>
         `),
-        });
+        }));
       }
 
       // 📧 Email au vendeur (l'utilisateur a annulé)
       if (process.env.SELLER_EMAIL) {
-        await sendEmail({
+        emails.push(sendEmail({
           to: process.env.SELLER_EMAIL,
           subject: `❌ Réservation annulée par l'acheteur : ${creation.title}`,
           html: emailTemplate(`
               <h1 style="font-size:18px;margin:0 0 12px 0;">Réservation annulée par l'acheteur</h1>
               <p style="font-size:14px;margin:0 0 12px 0;">
-                <strong>${reservation.name}</strong> (${reservation.contact}) a annulé sa réservation.
+                <strong>${safeName}</strong> (${safeContact}) a annulé sa réservation.
               </p>
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
@@ -167,7 +178,14 @@ export async function PATCH(
                 <p style="margin:0;font-size:13px;">${displayedReason}</p>
               </div>
           `),
-        });
+        }));
+      }
+
+      const results = await Promise.allSettled(emails);
+      for (const r of results) {
+        if (r.status === "rejected") {
+          console.error("[cancel] Email non envoyé:", r.reason);
+        }
       }
     }
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { checkAdminAuth } from "@/lib/auth";
@@ -56,9 +57,14 @@ export async function PATCH(
     if (postalCode !== undefined) updateData.postalCode = postalCode;
     if (emailNotifications !== undefined) updateData.emailNotifications = emailNotifications;
 
-    // Si un nouveau mot de passe est fourni
+    // Si un nouveau mot de passe est fourni (même règle : 6 caractères minimum)
     if (password) {
-      const bcrypt = require("bcryptjs");
+      if (typeof password !== "string" || password.length < 6) {
+        return NextResponse.json(
+          { error: "Le mot de passe doit contenir au moins 6 caractères" },
+          { status: 400 }
+        );
+      }
       updateData.password = await bcrypt.hash(password, 10);
     }
 

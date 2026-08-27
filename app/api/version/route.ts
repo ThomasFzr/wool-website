@@ -21,12 +21,16 @@ function normalizeDate(dateString: string | undefined): string {
   }
 }
 
+// Les infos version/git ne changent pas pendant la vie du process :
+// calculées une seule fois (les execSync git sont bloquants) puis mises en cache
+let cachedVersionInfo: { version: string; git: any; nodeEnv: string } | null = null;
+
 export async function GET() {
   try {
     // Vérifier que l'utilisateur est admin en production
-    const isProduction = process.env.VERCEL_ENV === "production" || 
+    const isProduction = process.env.VERCEL_ENV === "production" ||
                          (process.env.NODE_ENV === "production" && !process.env.VERCEL_ENV);
-    
+
     if (isProduction) {
       const session = await checkAdminAuth();
       if (!session) {
@@ -35,6 +39,13 @@ export async function GET() {
           { status: 403 }
         );
       }
+    }
+
+    if (cachedVersionInfo) {
+      return NextResponse.json({
+        ...cachedVersionInfo,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // Récupérer la version depuis package.json
@@ -163,11 +174,15 @@ export async function GET() {
       environment = "staging";
     }
 
-    return NextResponse.json({
+    cachedVersionInfo = {
       version,
       git: gitInfo,
-      timestamp: new Date().toISOString(),
       nodeEnv: environment,
+    };
+
+    return NextResponse.json({
+      ...cachedVersionInfo,
+      timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error("Erreur lors de la récupération de la version:", error);

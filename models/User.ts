@@ -32,12 +32,13 @@ export interface IUserDocument extends IUser, Document {
 const userSchema = new Schema<IUserDocument>(
   {
     name: { type: String },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     provider: { type: String, default: "credentials" },
-    password: { type: String }, // utilisée avec Credentials
+    // select: false — champs sensibles jamais renvoyés par défaut, faire .select("+password") explicitement
+    password: { type: String, select: false }, // utilisée avec Credentials
     role: { type: String, enum: ["user", "admin"], default: "user" },
-    resetToken: { type: String },
-    resetTokenExpiry: { type: Date },
+    resetToken: { type: String, select: false },
+    resetTokenExpiry: { type: Date, select: false },
     phone: { type: String },
     address: { type: String },
     city: { type: String },

@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/lib/db";
 import Settings from "@/models/Settings";
 import { checkAdminAuth } from "@/lib/auth";
-
-const DEFAULT_SYSTEM_PROMPT = `Tu es un expert en copywriting pour "MailleMum", une boutique de créations artisanales tricotées main.
-Rédige une description produit optimisée SEO (environ 150 mots).
-Ton : Chaleureux, artisanal, authentique, mettant en avant le fait-main français.
-Formatage : Utilise du HTML simple (<p>, <strong>) pour aérer le texte.
-
-RÈGLES STRICTES : 
-- Si la matière fournie contient "acrylique", "synthétique" ou "polyester", il est INTERDIT d'utiliser le mot "laine". Utilise à la place : "maille", "fil doux", "tricot", "fibre".
-- Si la matière est "laine", "alpaga" ou "mérinos", tu peux utiliser le mot "laine".
-- INTERDICTION ABSOLUE : Ne mentionne JAMAIS la marque de laine ou de fil utilisée dans la description. Parle uniquement de la qualité du fil, de sa douceur, de sa texture, mais jamais de sa marque commerciale.`;
+import { DEFAULT_SYSTEM_PROMPT } from "@/lib/prompts";
 
 const DEFAULT_SETTINGS = {
   title: "Les créations de maman",
@@ -47,6 +39,10 @@ const DEFAULT_SETTINGS = {
 export async function GET() {
   try {
     await connectToDatabase();
+
+    // Le prompt système IA est une configuration interne : réservé aux admins
+    const isAdmin = (await checkAdminAuth()) !== null;
+
     const doc = (await Settings.findById("main").lean()) as
       | { 
           title?: string; 
@@ -65,7 +61,12 @@ export async function GET() {
       | null;
 
     if (!doc) {
-      return NextResponse.json({ _id: "main", ...DEFAULT_SETTINGS });
+      const { systemPrompt: _prompt, ...publicDefaults } = DEFAULT_SETTINGS;
+      return NextResponse.json({
+        _id: "main",
+        ...publicDefaults,
+        ...(isAdmin ? { systemPrompt: DEFAULT_SETTINGS.systemPrompt } : {}),
+      });
     }
 
     return NextResponse.json({
@@ -76,12 +77,13 @@ export async function GET() {
       types: doc.types ?? DEFAULT_SETTINGS.types,
       shippingCost: doc.shippingCost ?? DEFAULT_SETTINGS.shippingCost,
       pickupConditions: doc.pickupConditions ?? DEFAULT_SETTINGS.pickupConditions,
-      systemPrompt: doc.systemPrompt ?? DEFAULT_SETTINGS.systemPrompt,
+      ...(isAdmin ? { systemPrompt: doc.systemPrompt ?? DEFAULT_SETTINGS.systemPrompt } : {}),
     });
   } catch (err) {
     console.error(err);
-    // en cas d’erreur, on renvoie les valeurs par défaut
-    return NextResponse.json({ _id: "main", ...DEFAULT_SETTINGS });
+    // en cas d’erreur, on renvoie les valeurs par défaut (sans le prompt interne)
+    const { systemPrompt: _prompt, ...publicDefaults } = DEFAULT_SETTINGS;
+    return NextResponse.json({ _id: "main", ...publicDefaults });
   }
 }
 
@@ -122,6 +124,9 @@ export async function POST(req: NextRequest) {
       { $set: updateData },
       { new: true, upsert: true }
     );
+
+    // La home (ISR) affiche titre/sous-titre/couleurs : invalider son cache
+    revalidatePath("/");
 
     return NextResponse.json(updated);
   } catch (err) {

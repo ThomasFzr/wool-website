@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import "@/models/Creation";
+import { escapeRegex } from "@/lib/escape";
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,20 +35,22 @@ export async function GET(req: NextRequest) {
     }
 
     if (search) {
-      const regex = { $regex: search, $options: "i" };
+      const regex = { $regex: escapeRegex(search), $options: "i" };
       query.$or = [
         { name: regex },
         { message: regex },
       ];
     }
 
-    const total = await Reservation.countDocuments(query);
-
-    const reservations = await Reservation.find(query)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate("creationId", "title description images imageUrl price color");
+    const [total, reservations] = await Promise.all([
+      Reservation.countDocuments(query),
+      Reservation.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate("creationId", "title description images imageUrl price color")
+        .lean(),
+    ]);
 
     return NextResponse.json({
       reservations,

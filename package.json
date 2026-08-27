@@ -6,16 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "sync-users": "tsx scripts/sync-users.ts",
     "init-settings": "tsx scripts/init-settings.ts",
-    "generate-slugs": "tsx scripts/generate-slugs.ts",
-    "duplicate-db": "tsx scripts/duplicate-db.ts"
+    "generate-slugs": "tsx scripts/generate-slugs.ts"
+  },
+  "engines": {
+    "node": ">=20.9"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.1",
     "@google/generative-ai": "^0.24.1",
     "@vercel/analytics": "^1.6.1",
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
     "mongodb": "^6.21.0",
@@ -30,13 +33,12 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
-    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.8.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "autoprefixer": "^10.4.22",
-    "baseline-browser-mapping": "^2.10.0",
     "dotenv": "^17.2.3",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.17",
     "tsx": "^4.20.6",

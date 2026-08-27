@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Accordion } from "@/components/ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
@@ -93,11 +93,16 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   const panStartRef = useRef<{ x: number, y: number } | null>(null);
   const isPanningRef = useRef(false);
 
-  const images = creation?.images && creation.images.length > 0 
-    ? creation.images 
-    : creation?.imageUrl 
-      ? [creation.imageUrl] 
-      : [];
+  // Mémoïsé pour éviter de re-déclencher les useEffect de préchargement à chaque render
+  const images = useMemo(
+    () =>
+      creation?.images && creation.images.length > 0
+        ? creation.images
+        : creation?.imageUrl
+          ? [creation.imageUrl]
+          : [],
+    [creation]
+  );
 
   // Décompte "nouveau" : 7 jours depuis visibleAt (si défini) ou createdAt
   const refDate = creation.visibleAt || creation.createdAt;

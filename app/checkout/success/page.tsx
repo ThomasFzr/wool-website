@@ -9,6 +9,11 @@ import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Image from "next/image";
 import { useCart } from "@/contexts/CartContext";
 
+// Le serveur retente déjà quelques fois ; le client prolonge la fenêtre de
+// vérification pour couvrir les finalisations Stripe les plus lentes.
+const MAX_POLL_ATTEMPTS = 5;
+const POLL_DELAY_MS = 2000;
+
 interface SessionDetails {
   id: string;
   amountTotal: number;
@@ -42,25 +47,57 @@ function CheckoutSuccessContent() {
       return;
     }
 
-    // Vérifier que la session est valide
-    fetch(`/api/stripe/verify-session?session_id=${sessionId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setIsValid(data.valid || false);
+    // Stripe redirige parfois ici avant d'avoir finalisé la session : on repolle
+    // tant que la vérification répond "pending" plutôt que d'afficher un échec.
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let attempt = 0;
+
+    const verify = async () => {
+      attempt++;
+      try {
+        const res = await fetch(
+          `/api/stripe/verify-session?session_id=${sessionId}`
+        );
+        const data = await res.json();
+        if (cancelled) return;
+
         if (data.valid && data.session) {
           setSessionDetails(data.session);
+          setIsValid(true);
           // Vider le panier une seule fois après paiement réussi
           if (!hasCleared.current) {
             clearCart();
             hasCleared.current = true;
           }
+          setIsLoading(false);
+          return;
+        }
+
+        if (data.pending && attempt < MAX_POLL_ATTEMPTS) {
+          timer = setTimeout(verify, POLL_DELAY_MS);
+          return;
+        }
+
+        setIsValid(false);
+        setIsLoading(false);
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Erreur lors de la vérification:", error);
+        if (attempt < MAX_POLL_ATTEMPTS) {
+          timer = setTimeout(verify, POLL_DELAY_MS);
+          return;
         }
         setIsLoading(false);
-      })
-      .catch((error) => {
-        console.error("Erreur lors de la vérification:", error);
-        setIsLoading(false);
-      });
+      }
+    };
+
+    verify();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchParams, clearCart]);
 
   const formatPrice = (amount: number, currency: string) => {

@@ -1,3 +1,6 @@
+"use client";
+
+import { useRef } from "react";
 import { Badge } from "./ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Link from "next/link";
@@ -24,7 +27,8 @@ interface CreationCardProps {
 }
 
 export function CreationCard({ creation, priority = false }: CreationCardProps) {
-  const images = creation.images && creation.images.length > 0 
+  const hasPreloadedRef = useRef(false);
+  const images = creation.images && creation.images.length > 0
     ? creation.images 
     : creation.imageUrl 
       ? [creation.imageUrl] 
@@ -44,7 +48,10 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
     : creation.showAsNew;
 
   // Précharger toutes les images au survol avec les mêmes optimisations que la modale
+  // (une seule fois : le flag évite de recréer des <img> à chaque mouseenter)
   const handleMouseEnter = () => {
+    if (hasPreloadedRef.current) return;
+    hasPreloadedRef.current = true;
     images.forEach((src) => {
       const img = document.createElement('img');
       img.src = optimizeCloudinaryUrl(src, { width: 800, quality: 80, format: 'auto' });

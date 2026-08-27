@@ -2,14 +2,9 @@
 
 import Link from "next/link";
 import { FormEvent, useState, useEffect, Suspense } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Button, Input, Textarea, Card, Badge } from "@/components";
+import { Button, Input, Textarea, Card } from "@/components";
 
 function AdminContent() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-
   const [message, setMessage] = useState<string | null>(null);
   const [promptMessage, setPromptMessage] = useState<string | null>(null);
   const [settings, setSettings] = useState({ 
@@ -81,20 +76,12 @@ function AdminContent() {
     loadSettings();
   }, []);
 
+  // La garde admin est assurée côté serveur par app/admin/layout.tsx
   useEffect(() => {
-    if (status === "loading") return;
-    if (status === "unauthenticated" || session?.user?.role !== "admin") {
-      router.push("/");
-    }
-  }, [session, status, router]);
-
-  useEffect(() => {
-    if (session?.user?.role === "admin") {
-      loadPendingReservations();
-      loadNewMessages();
-      loadYarnBrands();
-    }
-  }, [session]);
+    loadPendingReservations();
+    loadNewMessages();
+    loadYarnBrands();
+  }, []);
 
   async function loadPendingReservations() {
     try {
@@ -184,49 +171,14 @@ function AdminContent() {
     }
   }
 
-  async function handleSaveSettings(e: FormEvent) {
-    e.preventDefault();
-    try {
-      setSavingSettings(true);
-      setMessage(null);
-
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-
-      if (!res.ok) {
-        setMessage("Impossible d'enregistrer le texte.");
-        return;
-      }
-
-      const savedData = await res.json();
-
-      // Recharger les settings depuis la BDD pour être sûr d'avoir les bonnes valeurs
-      setSettings({
-        title: savedData.title ?? settings.title,
-        subtitle: savedData.subtitle ?? settings.subtitle,
-        colors: savedData.colors ?? settings.colors,
-        types: savedData.types ?? settings.types,
-        shippingCost: savedData.shippingCost ?? settings.shippingCost,
-        pickupConditions: savedData.pickupConditions ?? settings.pickupConditions,
-        systemPrompt: savedData.systemPrompt ?? settings.systemPrompt,
-      });
-
-      setMessage("Paramètres enregistrés ✔️");
-      setTimeout(() => setMessage(null), 3000);
-    } catch (err) {
-      console.error(err);
-      setMessage("Erreur serveur lors de l'enregistrement.");
-    } finally {
-      setSavingSettings(false);
+  // Helper central : fusionne les modifications, poste sur /api/settings et
+  // recharge le state depuis la réponse. Renvoie true en cas de succès.
+  async function saveSettings(partial?: Partial<typeof settings>): Promise<boolean> {
+    const settingsToSave = { ...settings, ...partial };
+    if (partial) {
+      setSettings(settingsToSave);
     }
-  }
-
-  async function saveColorsAndTypes(updatedSettings?: typeof settings) {
     try {
-      const settingsToSave = updatedSettings || settings;
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -234,34 +186,80 @@ function AdminContent() {
       });
       if (!res.ok) {
         console.error("Erreur lors de la sauvegarde");
-      } else {
-        // Recharger les settings pour avoir les valeurs à jour
-        const savedData = await res.json();
-        setSettings({
-          title: savedData.title ?? settingsToSave.title,
-          subtitle: savedData.subtitle ?? settingsToSave.subtitle,
-          colors: savedData.colors ?? settingsToSave.colors,
-          types: savedData.types ?? settingsToSave.types,
-          shippingCost: savedData.shippingCost ?? settingsToSave.shippingCost,
-          pickupConditions: savedData.pickupConditions ?? settingsToSave.pickupConditions,
-          systemPrompt: savedData.systemPrompt ?? settingsToSave.systemPrompt,
-        });
+        return false;
       }
+      // Recharger les settings depuis la BDD pour être sûr d'avoir les bonnes valeurs
+      const savedData = await res.json();
+      setSettings({
+        title: savedData.title ?? settingsToSave.title,
+        subtitle: savedData.subtitle ?? settingsToSave.subtitle,
+        colors: savedData.colors ?? settingsToSave.colors,
+        types: savedData.types ?? settingsToSave.types,
+        shippingCost: savedData.shippingCost ?? settingsToSave.shippingCost,
+        pickupConditions: savedData.pickupConditions ?? settingsToSave.pickupConditions,
+        systemPrompt: savedData.systemPrompt ?? settingsToSave.systemPrompt,
+      });
+      return true;
     } catch (err) {
       console.error(err);
+      return false;
     }
   }
 
-  if (status === "loading") {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Chargement...</div>
-      </main>
-    );
+  async function handleSaveSettings(e: FormEvent) {
+    e.preventDefault();
+    setSavingSettings(true);
+    setMessage(null);
+
+    const ok = await saveSettings();
+
+    if (ok) {
+      setMessage("Paramètres enregistrés ✔️");
+      setTimeout(() => setMessage(null), 3000);
+    } else {
+      setMessage("Impossible d'enregistrer le texte.");
+    }
+    setSavingSettings(false);
   }
 
-  if (!session || session.user.role !== "admin") {
-    return null;
+  async function addPostalCode() {
+    const trimmed = newPostalCode.trim();
+    if (trimmed && !settings.pickupConditions.allowedPostalCodes.includes(trimmed)) {
+      setNewPostalCode("");
+      await saveSettings({
+        pickupConditions: {
+          ...settings.pickupConditions,
+          allowedPostalCodes: [...settings.pickupConditions.allowedPostalCodes, trimmed],
+        },
+      });
+    }
+  }
+
+  async function removePostalCode(code: string) {
+    await saveSettings({
+      pickupConditions: {
+        ...settings.pickupConditions,
+        allowedPostalCodes: settings.pickupConditions.allowedPostalCodes.filter(
+          (c) => c !== code
+        ),
+      },
+    });
+  }
+
+  async function addColor() {
+    const trimmed = newColor.trim().toLowerCase();
+    if (trimmed && !settings.colors.includes(trimmed)) {
+      setNewColor("");
+      await saveSettings({ colors: [...settings.colors, trimmed] });
+    }
+  }
+
+  async function addType() {
+    const trimmed = newType.trim().toLowerCase();
+    if (trimmed && !settings.types.includes(trimmed)) {
+      setNewType("");
+      await saveSettings({ types: [...settings.types, trimmed] });
+    }
   }
 
   return (
@@ -456,45 +454,17 @@ function AdminContent() {
                             placeholder="Ex: 75001"
                             value={newPostalCode}
                             onChange={(e) => setNewPostalCode(e.target.value)}
-                            onKeyPress={async (e) => {
+                            onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
-                                const trimmed = newPostalCode.trim();
-                                if (trimmed && !settings.pickupConditions.allowedPostalCodes.includes(trimmed)) {
-                                  const newCodes = [...settings.pickupConditions.allowedPostalCodes, trimmed];
-                                  const updatedSettings = {
-                                    ...settings,
-                                    pickupConditions: {
-                                      ...settings.pickupConditions,
-                                      allowedPostalCodes: newCodes,
-                                    },
-                                  };
-                                  setSettings(updatedSettings);
-                                  setNewPostalCode("");
-                                  await saveColorsAndTypes(updatedSettings);
-                                }
+                                addPostalCode();
                               }
                             }}
                           />
                           <Button
                             type="button"
                             variant="secondary"
-                            onClick={async () => {
-                              const trimmed = newPostalCode.trim();
-                              if (trimmed && !settings.pickupConditions.allowedPostalCodes.includes(trimmed)) {
-                                const newCodes = [...settings.pickupConditions.allowedPostalCodes, trimmed];
-                                const updatedSettings = {
-                                  ...settings,
-                                  pickupConditions: {
-                                    ...settings.pickupConditions,
-                                    allowedPostalCodes: newCodes,
-                                  },
-                                };
-                                setSettings(updatedSettings);
-                                setNewPostalCode("");
-                                await saveColorsAndTypes(updatedSettings);
-                              }
-                            }}
+                            onClick={addPostalCode}
                             className="cursor-pointer"
                           >
                             + Ajouter
@@ -509,20 +479,7 @@ function AdminContent() {
                               <span>{code}</span>
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  const newCodes = settings.pickupConditions.allowedPostalCodes.filter(
-                                    (c) => c !== code
-                                  );
-                                  const updatedSettings = {
-                                    ...settings,
-                                    pickupConditions: {
-                                      ...settings.pickupConditions,
-                                      allowedPostalCodes: newCodes,
-                                    },
-                                  };
-                                  setSettings(updatedSettings);
-                                  await saveColorsAndTypes(updatedSettings);
-                                }}
+                                onClick={() => removePostalCode(code)}
                                 className="text-red-500 hover:text-red-700 cursor-pointer"
                               >
                                 ×
@@ -574,41 +531,17 @@ function AdminContent() {
                     placeholder="Ajouter une couleur"
                     value={newColor}
                     onChange={(e) => setNewColor(e.target.value)}
-                    onKeyPress={async (e) => {
+                    onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        const trimmed = newColor.trim().toLowerCase();
-                        if (trimmed && !settings.colors.includes(trimmed)) {
-                          const newColors = [...settings.colors, trimmed];
-                          setSettings(s => ({ ...s, colors: newColors }));
-                          setNewColor("");
-                          // Sauvegarder immédiatement
-                          await fetch("/api/settings", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ ...settings, colors: newColors }),
-                          });
-                        }
+                        addColor();
                       }
                     }}
                   />
-                  <Button 
+                  <Button
                     type="button"
                     variant="secondary"
-                    onClick={async () => {
-                      const trimmed = newColor.trim().toLowerCase();
-                      if (trimmed && !settings.colors.includes(trimmed)) {
-                        const newColors = [...settings.colors, trimmed];
-                        setSettings(s => ({ ...s, colors: newColors }));
-                        setNewColor("");
-                        // Sauvegarder immédiatement
-                        await fetch("/api/settings", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ ...settings, colors: newColors }),
-                        });
-                      }
-                    }}
+                    onClick={addColor}
                     className="cursor-pointer"
                   >
                     + Ajouter
@@ -623,16 +556,9 @@ function AdminContent() {
                       <span>{color.charAt(0).toUpperCase() + color.slice(1)}</span>
                       <button
                         type="button"
-                        onClick={async () => {
+                        onClick={() => {
                           if (confirm(`Supprimer la couleur "${color}" ?`)) {
-                            const newColors = settings.colors.filter(c => c !== color);
-                            setSettings(s => ({ ...s, colors: newColors }));
-                            // Sauvegarder immédiatement
-                            await fetch("/api/settings", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ ...settings, colors: newColors }),
-                            });
+                            saveSettings({ colors: settings.colors.filter(c => c !== color) });
                           }
                         }}
                         className="text-red-500 hover:text-red-700 cursor-pointer"
@@ -651,41 +577,17 @@ function AdminContent() {
                   placeholder="Ajouter un type"
                   value={newType}
                   onChange={(e) => setNewType(e.target.value)}
-                  onKeyPress={async (e) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      const trimmed = newType.trim().toLowerCase();
-                      if (trimmed && !settings.types.includes(trimmed)) {
-                        const newTypes = [...settings.types, trimmed];
-                        setSettings(s => ({ ...s, types: newTypes }));
-                        setNewType("");
-                        // Sauvegarder immédiatement
-                        await fetch("/api/settings", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ ...settings, types: newTypes }),
-                        });
-                      }
+                      addType();
                     }
                   }}
                 />
-                <Button 
+                <Button
                   type="button"
                   variant="secondary"
-                  onClick={async () => {
-                    const trimmed = newType.trim().toLowerCase();
-                    if (trimmed && !settings.types.includes(trimmed)) {
-                      const newTypes = [...settings.types, trimmed];
-                      setSettings(s => ({ ...s, types: newTypes }));
-                      setNewType("");
-                      // Sauvegarder immédiatement
-                      await fetch("/api/settings", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ ...settings, types: newTypes }),
-                      });
-                    }
-                  }}
+                  onClick={addType}
                   className="cursor-pointer"
                 >
                   + Ajouter
@@ -700,16 +602,9 @@ function AdminContent() {
                     <span>{type.charAt(0).toUpperCase() + type.slice(1)}</span>
                     <button
                       type="button"
-                      onClick={async () => {
+                      onClick={() => {
                         if (confirm(`Supprimer le type "${type}" ?`)) {
-                          const newTypes = settings.types.filter(t => t !== type);
-                          setSettings(s => ({ ...s, types: newTypes }));
-                          // Sauvegarder immédiatement
-                          await fetch("/api/settings", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ ...settings, types: newTypes }),
-                          });
+                          saveSettings({ types: settings.types.filter(t => t !== type) });
                         }
                       }}
                       className="text-red-500 hover:text-red-700 cursor-pointer"
@@ -728,7 +623,7 @@ function AdminContent() {
                   placeholder="Nom de la marque"
                   value={newBrand}
                   onChange={(e) => setNewBrand(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       handleAddBrand();
@@ -743,7 +638,7 @@ function AdminContent() {
                   placeholder="Prix (€/100g)"
                   value={newBrandPrice}
                   onChange={(e) => setNewBrandPrice(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       handleAddBrand();
@@ -853,22 +748,13 @@ function AdminContent() {
                 <Button
                   type="button"
                   onClick={async () => {
-                    try {
-                      setPromptMessage(null);
-                      const res = await fetch("/api/settings", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(settings),
-                      });
-                      if (res.ok) {
-                        setPromptMessage("Prompt système enregistré ✔️");
-                        setTimeout(() => setPromptMessage(null), 3000);
-                      } else {
-                        setPromptMessage("Erreur lors de l'enregistrement du prompt.");
-                      }
-                    } catch (err) {
-                      console.error(err);
-                      setPromptMessage("Erreur serveur lors de l'enregistrement.");
+                    setPromptMessage(null);
+                    const ok = await saveSettings();
+                    if (ok) {
+                      setPromptMessage("Prompt système enregistré ✔️");
+                      setTimeout(() => setPromptMessage(null), 3000);
+                    } else {
+                      setPromptMessage("Erreur lors de l'enregistrement du prompt.");
                     }
                   }}
                   className="cursor-pointer"

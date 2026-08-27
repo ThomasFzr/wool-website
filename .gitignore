@@ -9,9 +9,8 @@ out/
 *.tsbuildinfo
 
 # Environment
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 
 # Logs
 npm-debug.log*
@@ -31,3 +30,6 @@ coverage/
 .cache/
 /.pnp.*
 *.tgz
+
+# Emails capturés en local (aperçu /dev/emails)
+.emails/

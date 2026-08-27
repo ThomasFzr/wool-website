@@ -6,6 +6,7 @@ import User from "@/models/User";
 import "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { escapeRegex } from "@/lib/escape";
 
 export async function GET(req: Request) {
     try {
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
         if (creationId) conditions.push({ creationId });
         
         if (search) {
-            const regex = { $regex: search, $options: "i" };
+            const regex = { $regex: escapeRegex(search), $options: "i" };
             conditions.push({
                 $or: [
                     { name: regex },
@@ -54,13 +55,15 @@ export async function GET(req: Request) {
         // Utiliser $and si plusieurs conditions, sinon utiliser directement
         const query: any = conditions.length > 1 ? { $and: conditions } : conditions[0];
 
-        const total = await Reservation.countDocuments(query);
-
-        const reservations = await Reservation.find(query)
-            .sort({ createdAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .populate("creationId");
+        const [total, reservations] = await Promise.all([
+            Reservation.countDocuments(query),
+            Reservation.find(query)
+                .sort({ createdAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .populate("creationId")
+                .lean(),
+        ]);
 
         return NextResponse.json({
             reservations,

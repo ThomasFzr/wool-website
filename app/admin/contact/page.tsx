@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useRef } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button, Card, Badge } from "@/components";
 import { CreationModal } from "@/components/CreationModal";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import type { Creation } from "@/components/CreationCard";
 
 type Contact = {
@@ -21,9 +20,6 @@ type Contact = {
 };
 
 export default function AdminContactPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<string>("all");
@@ -32,18 +28,10 @@ export default function AdminContactPage() {
   const [showCreationModal, setShowCreationModal] = useState(false);
   const [selectedCreation, setSelectedCreation] = useState<Creation | null>(null);
 
+  // La garde admin est assurée côté serveur par app/admin/layout.tsx
   useEffect(() => {
-    if (status === "loading") return;
-    if (status === "unauthenticated" || session?.user?.role !== "admin") {
-      router.push("/");
-    }
-  }, [session, status, router]);
-
-  useEffect(() => {
-    if (session?.user?.role === "admin") {
-      loadContacts();
-    }
-  }, [session, filter]);
+    loadContacts();
+  }, [filter]);
 
   // Désactiver le scroll quand la modale est ouverte
   useEffect(() => {
@@ -131,18 +119,6 @@ export default function AdminContactPage() {
       case "archived":
         return <Badge variant="default" className="bg-slate-200 text-slate-600">Archivé</Badge>;
     }
-  }
-
-  if (status === "loading") {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Chargement...</div>
-      </main>
-    );
-  }
-
-  if (!session || session.user.role !== "admin") {
-    return null;
   }
 
   const newCount = contacts.filter((c) => c.status === "new").length;
@@ -333,10 +309,11 @@ export default function AdminContactPage() {
                     {(selectedContact.creationId.images?.[0] ||
                       selectedContact.creationId.imageUrl) && (
                       <img
-                        src={
-                          selectedContact.creationId.images?.[0] ||
-                          selectedContact.creationId.imageUrl
-                        }
+                        src={optimizeCloudinaryUrl(
+                          (selectedContact.creationId.images?.[0] ||
+                            selectedContact.creationId.imageUrl)!,
+                          { width: 200 }
+                        )}
                         alt={selectedContact.creationId.title}
                         title={selectedContact.creationId.title}
                         className="h-16 w-16 rounded-lg object-cover"

@@ -6,12 +6,22 @@ import Contact from "@/models/Contact";
 import Creation from "@/models/Creation";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
+import { escapeHtml } from "@/lib/escape";
 
-// Rate limiting en mémoire (simple)
+// Rate limiting en mémoire (best-effort : en serverless chaque instance a sa
+// propre Map — suffisant pour freiner l'abus, purge paresseuse à chaque appel)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
 function checkRateLimit(identifier: string, maxRequests = 3, windowMs = 60000): boolean {
   const now = Date.now();
+
+  // Purge paresseuse des entrées expirées (pas de setInterval qui retient le process)
+  for (const [key, value] of rateLimitMap.entries()) {
+    if (now > value.resetTime) {
+      rateLimitMap.delete(key);
+    }
+  }
+
   const record = rateLimitMap.get(identifier);
 
   if (!record || now > record.resetTime) {
@@ -26,16 +36,6 @@ function checkRateLimit(identifier: string, maxRequests = 3, windowMs = 60000): 
   record.count++;
   return true;
 }
-
-// Nettoyage périodique de la map
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of rateLimitMap.entries()) {
-    if (now > value.resetTime) {
-      rateLimitMap.delete(key);
-    }
-  }
-}, 60000);
 
 // Détection de spam
 function containsSpam(text: string): boolean {
@@ -134,6 +134,14 @@ export async function POST(req: NextRequest) {
       status: "new",
     });
 
+    // Données utilisateur échappées avant interpolation dans le HTML des emails
+    const safeName = escapeHtml(name);
+    const safeEmail = escapeHtml(email);
+    const safeSubject = escapeHtml(subject);
+    const safeMessage = escapeHtml(message);
+
+    const emails: Promise<unknown>[] = [];
+
     // Envoyer un email à l'admin
     if (process.env.SELLER_EMAIL) {
       let creationInfo = '';
@@ -152,8 +160,8 @@ export async function POST(req: NextRequest) {
 
               return `
                 <div style="margin:12px 0;padding:12px;background:#fef9c3;border-radius:8px;border:1px solid #fde68a;">
-                  ${imageUrl ? `<img src="${imageUrl}" alt="${creation.title}" style="width:100%;max-width:200px;height:auto;border-radius:8px;margin-bottom:8px;"/>` : ''}
-                  <p style="margin:0 0 6px 0;font-size:14px;font-weight:600;">${creation.title}</p>
+                  ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(creation.title)}" style="width:100%;max-width:200px;height:auto;border-radius:8px;margin-bottom:8px;"/>` : ''}
+                  <p style="margin:0 0 6px 0;font-size:14px;font-weight:600;">${escapeHtml(creation.title)}</p>
                   ${creation.price ? `<p style="margin:0 0 6px 0;font-size:13px;">Prix : ${creation.price}€</p>` : ''}
                   ${creation.color ? `<p style="margin:0 0 6px 0;font-size:13px;">Couleur : ${creation.color}</p>` : ''}
                   <p style="margin:6px 0 0 0;">${statusBadge}</p>
@@ -173,21 +181,21 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      await sendEmail({
+      emails.push(sendEmail({
         to: process.env.SELLER_EMAIL,
         subject: `📧 Nouveau message : ${subject}`,
         html: emailTemplate(`
             <h1 style="font-size:18px;margin:0 0 12px 0;">📧 Nouveau message de contact</h1>
-            
+
             <div style="margin:16px 0;padding:16px;background:#f8fafc;border-radius:8px;">
-              <p style="margin:0 0 8px 0;font-size:14px;"><strong>De :</strong> ${name}</p>
-              <p style="margin:0 0 8px 0;font-size:14px;"><strong>Email :</strong> <a href="mailto:${email}" style="color:#0f172a;">${email}</a></p>
-              <p style="margin:0;font-size:14px;"><strong>Sujet :</strong> ${subject}</p>
+              <p style="margin:0 0 8px 0;font-size:14px;"><strong>De :</strong> ${safeName}</p>
+              <p style="margin:0 0 8px 0;font-size:14px;"><strong>Email :</strong> <a href="mailto:${safeEmail}" style="color:#0f172a;">${safeEmail}</a></p>
+              <p style="margin:0;font-size:14px;"><strong>Sujet :</strong> ${safeSubject}</p>
             </div>
 
             <div style="margin:16px 0;">
               <p style="margin:0 0 8px 0;font-size:13px;font-weight:600;color:#64748b;">Message :</p>
-              <p style="margin:0;font-size:14px;white-space:pre-line;">${message}</p>
+              <p style="margin:0;font-size:14px;white-space:pre-line;">${safeMessage}</p>
             </div>
 
             ${creationInfo}
@@ -196,21 +204,26 @@ export async function POST(req: NextRequest) {
               <a href="${process.env.NEXT_PUBLIC_APP_URL}/admin/contact" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Voir tous les messages</a>
             </p>
         `),
-      });
+      }));
     }
 
     // Envoyer un email de confirmation à l'utilisateur
-    await sendEmail({
+    emails.push(sendEmail({
       to: email,
       subject: "✅ Votre message a bien été reçu",
       html: emailTemplate(`
           <h1 style="font-size:18px;margin:0 0 12px 0;">Merci pour votre message !</h1>
           <p style="font-size:14px;margin:0 0 16px 0;">
-            Bonjour <strong>${name}</strong>,<br/><br/>
-            Nous avons bien reçu votre message concernant "<strong>${subject}</strong>". Nous vous répondrons dans les plus brefs délais.
+            Bonjour <strong>${safeName}</strong>,<br/><br/>
+            Nous avons bien reçu votre message concernant "<strong>${safeSubject}</strong>". Nous vous répondrons dans les plus brefs délais.
           </p>
       `),
-    });
+    }));
+
+    // Le message est déjà enregistré : un email en échec ne doit pas faire échouer la requête
+    for (const r of await Promise.allSettled(emails)) {
+      if (r.status === "rejected") console.error("[contact] Email non envoyé:", r.reason);
+    }
 
     return NextResponse.json(contact, { status: 201 });
   } catch (err) {

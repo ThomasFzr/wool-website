@@ -1,32 +1,20 @@
 "use client";
 
-import { useCart, DeliveryMode } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/CartContext";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui";
+import { RelatedCreationCard } from "@/components/RelatedCreationCard";
+import { useRelatedCreations } from "@/hooks/useRelatedCreations";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { useState, useEffect } from "react";
 
-type RelatedCreation = {
-  _id: string;
-  slug?: string;
-  title: string;
-  imageUrl?: string;
-  images?: string[];
-  price?: number;
-  color?: string;
-  type?: string;
-  sold?: boolean;
-};
-
 export default function CartPage() {
-  const { 
-    items, 
-    removeItem, 
-    clearCart, 
-    getTotalPrice, 
+  const {
+    items,
+    removeItem,
+    getTotalPrice,
     getTotalWithShipping,
     deliveryMode,
     setDeliveryMode,
@@ -35,12 +23,12 @@ export default function CartPage() {
     pickupUnavailableReason,
     pickupConditions,
     reloadPostalCode,
-    addItem
   } = useCart();
-  const router = useRouter();
   const { data: session } = useSession();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [relatedCreations, setRelatedCreations] = useState<RelatedCreation[]>([]);
+
+  // Récupérer les articles liés des articles dans le panier (un seul appel API)
+  const relatedCreations = useRelatedCreations(items);
 
   // Recharger le code postal quand on arrive sur la page panier
   useEffect(() => {
@@ -48,88 +36,6 @@ export default function CartPage() {
       reloadPostalCode();
     }
   }, [session, reloadPostalCode]);
-
-  // Récupérer les articles liés des articles dans le panier
-  useEffect(() => {
-    if (items.length === 0) {
-      setRelatedCreations([]);
-      return;
-    }
-
-    async function fetchRelatedCreations() {
-      try {
-        // Récupérer tous les articles liés des articles du panier
-        const allRelatedIds = new Set<string>();
-        const cartItemIds = items.map(item => item.creationId);
-
-        // Pour chaque article du panier, récupérer ses articles liés
-        const promises = cartItemIds.map(async (id) => {
-          try {
-            const res = await fetch(`/api/creations/${id}`);
-            if (res.ok) {
-              const creation = await res.json();
-              if (creation.relatedCreations && Array.isArray(creation.relatedCreations)) {
-                creation.relatedCreations.forEach((related: any) => {
-                  const relatedId = typeof related === 'string' ? related : related._id;
-                  // Exclure les articles déjà dans le panier
-                  if (relatedId && !cartItemIds.includes(relatedId)) {
-                    allRelatedIds.add(relatedId);
-                  }
-                });
-              }
-            }
-          } catch (err) {
-            console.error('Erreur lors de la récupération des articles liés:', err);
-          }
-        });
-
-        await Promise.all(promises);
-
-        // Récupérer les détails des articles liés
-        if (allRelatedIds.size > 0) {
-          const relatedArray = Array.from(allRelatedIds).slice(0, 4); // Limiter à 4 articles
-          const relatedPromises = relatedArray.map(async (id): Promise<RelatedCreation | null> => {
-            try {
-              const res = await fetch(`/api/creations/${id}`);
-              if (res.ok) {
-                const creation = await res.json();
-                // Vérifier que l'article n'est pas vendu
-                if (!creation.sold) {
-                  return {
-                    _id: creation._id,
-                    slug: creation.slug,
-                    title: creation.title,
-                    imageUrl: creation.imageUrl,
-                    images: creation.images,
-                    price: creation.price,
-                    color: creation.color,
-                    type: creation.type,
-                    sold: creation.sold,
-                  } as RelatedCreation;
-                }
-              }
-            } catch (err) {
-              console.error('Erreur lors de la récupération de l\'article:', err);
-            }
-            return null;
-          });
-
-          const related = await Promise.all(relatedPromises);
-          const validRelated: RelatedCreation[] = related.filter((item): item is RelatedCreation => {
-            return item !== null && item !== undefined;
-          });
-          setRelatedCreations(validRelated);
-        } else {
-          setRelatedCreations([]);
-        }
-      } catch (err) {
-        console.error('Erreur lors de la récupération des articles liés:', err);
-        setRelatedCreations([]);
-      }
-    }
-
-    fetchRelatedCreations();
-  }, [items]);
 
   const subtotal = getTotalPrice();
   const totalPrice = getTotalWithShipping();
@@ -318,80 +224,9 @@ export default function CartPage() {
                 Vous pourriez aussi aimer
               </h3>
               <div className="space-y-4">
-                {relatedCreations.map((related) => {
-                  const imageUrl = related.images?.[0] || related.imageUrl;
-                  const optimizedImage = imageUrl
-                    ? optimizeCloudinaryUrl(imageUrl, {
-                        width: 200,
-                        quality: 70,
-                        format: "auto",
-                      })
-                    : undefined;
-                  const isInCart = items.some((item) => item.creationId === related._id);
-
-                  return (
-                    <div
-                      key={related._id}
-                      className="flex gap-4 rounded-lg border border-slate-200 p-4"
-                    >
-                      <Link
-                        href={`/creations/${related.slug || related._id}`}
-                        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100"
-                      >
-                        {optimizedImage ? (
-                          <img
-                            src={optimizedImage}
-                            alt={related.title}
-                            title={related.title}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
-                            Pas d&apos;image
-                          </div>
-                        )}
-                      </Link>
-
-                      <div className="flex flex-1 flex-col gap-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <Link
-                              href={`/creations/${related.slug || related._id}`}
-                              className="text-sm font-semibold text-slate-900 hover:text-slate-700"
-                            >
-                              {related.title}
-                            </Link>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-slate-900">
-                            {related.price != null ? `${related.price.toFixed(2)} €` : "—"}
-                          </p>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              if (!isInCart) {
-                                addItem({
-                                  creationId: related._id,
-                                  slug: related.slug,
-                                  title: related.title,
-                                  imageUrl: imageUrl,
-                                  price: related.price,
-                                });
-                              }
-                            }}
-                            disabled={isInCart}
-                            className="cursor-pointer"
-                            variant={isInCart ? "secondary" : "primary"}
-                          >
-                            {isInCart ? "✓ Ajouté" : "+ Ajouter"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {relatedCreations.map((related) => (
+                  <RelatedCreationCard key={related._id} related={related} />
+                ))}
               </div>
             </div>
           )}

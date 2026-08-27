@@ -8,14 +8,14 @@ const schema = new Schema(
     seoDescription: String, // Description complète pour le référencement
     imageUrl: String,
     images: [String],
-    price: { type: Number, required: true },
+    price: { type: Number, required: true, min: 0 },
     color: { type: String, required: true },
     type: { type: String, required: true },
-    
+
     // Champs admin uniquement (non visibles pour les utilisateurs)
     yarnBrand: String, // Marque de fil
-    weight: Number, // Poids en grammes
-    yarnPrice: Number, // Prix du fil en euros
+    weight: { type: Number, min: 0 }, // Poids en grammes
+    yarnPrice: { type: Number, min: 0 }, // Prix du fil en euros
 
     imagePublicIds: [String],
     imagePublicId: String,
@@ -43,5 +43,8 @@ const schema = new Schema(
   },
   { timestamps: true }
 );
+
+// Index pour la vitrine publique (filtre hidden + tri displayOrder/createdAt)
+schema.index({ hidden: 1, displayOrder: -1, createdAt: -1 });
 
 export default mongoose.models.Creation || mongoose.model("Creation", schema);

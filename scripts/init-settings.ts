@@ -1,8 +1,11 @@
 // Script pour initialiser les paramètres de l'application
+import "./load-env";
 import mongoose from "mongoose";
 import Settings from "../models/Settings";
 
-const MONGODB_URI = process.env.MONGODB_URI || "";
+const MONGODB_URI = process.env.MONGODB_URI ?? (() => {
+  throw new Error("❌ MONGODB_URI not found in environment variables");
+})();
 
 async function initSettings() {
   try {

@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, Suspense, useRef } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
 import { StatsCard, StatsChart } from "@/components";
 import { Accordion } from "@/components/ui";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 // Composant de chargement réutilisable
 const LoadingScreen = () => (
@@ -15,25 +14,8 @@ const LoadingScreen = () => (
 );
 
 function StatsContent() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-
   const [stats, setStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(true);
-  const hasLoadedStats = useRef(false);
-
-  useEffect(() => {
-    if (status === "loading") return;
-    if (status === "unauthenticated" || session?.user?.role !== "admin") {
-      router.push("/");
-    }
-  }, [session, status, router]);
-
-  useEffect(() => {
-    if (session?.user?.role === "admin" && !hasLoadedStats.current) {
-      loadStats();
-    }
-  }, [session]);
 
   async function loadStats() {
     try {
@@ -42,13 +24,18 @@ function StatsContent() {
       if (!res.ok) return;
       const data = await res.json();
       setStats(data);
-      hasLoadedStats.current = true;
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingStats(false);
     }
   }
+
+  // La garde admin est assurée côté serveur par app/admin/layout.tsx
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadStats();
+  }, []);
 
   // Fonction helper pour calculer les pourcentages
   const calcPercent = (value: number, total: number) => 
@@ -57,9 +44,6 @@ function StatsContent() {
   // Fonction helper pour le pluriel
   const plural = (count: number, singular: string = '') => 
     count > 1 ? 's' : singular;
-
-  if (status === "loading") return <LoadingScreen />;
-  if (!session || session.user.role !== "admin") return null;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -145,7 +129,7 @@ function StatsContent() {
                               >
                                 {creation.imageUrl && (
                                   <img
-                                    src={creation.imageUrl}
+                                    src={optimizeCloudinaryUrl(creation.imageUrl, { width: 200 })}
                                     alt={creation.title}
                                     title={creation.title}
                                     className="w-16 h-16 object-cover rounded shrink-0"

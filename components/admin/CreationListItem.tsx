@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Badge } from "@/components";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 type Creation = {
   _id: string;
@@ -154,7 +155,7 @@ export function CreationListItem({
               </span>
             )}
             <img
-              src={creation.imageUrl}
+              src={optimizeCloudinaryUrl(creation.imageUrl, { width: 200 })}
               alt={creation.title}
               title={creation.title}
               className={`h-16 w-16 rounded-lg object-cover sm:h-20 sm:w-20 ${

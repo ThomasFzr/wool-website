@@ -38,18 +38,8 @@ export async function GET(req: NextRequest, context: AdminRouteContext) {
       : [reservation];
 
     // Chercher l'adresse de livraison (peut être sur n'importe quel article de la commande)
-    const addr = reservation.shippingAddress || 
+    const addr = reservation.shippingAddress ||
                  allReservations.find((r: any) => r.shippingAddress)?.shippingAddress;
-
-    // Log pour déboguer
-    console.log("=== DEBUG BORDEREAU ===");
-    console.log("Reservation ID:", reservation._id);
-    console.log("Delivery mode:", reservation.deliveryMode);
-    console.log("Shipping address trouvée:", addr ? "OUI" : "NON");
-    if (addr) {
-      console.log("Détails adresse:", JSON.stringify(addr, null, 2));
-    }
-    console.log("======================");
 
     // Récupérer l'adresse de l'expéditeur depuis les variables d'environnement ou utiliser des valeurs par défaut
     const senderName = process.env.SHIPPING_SENDER_NAME || "MailleMum";

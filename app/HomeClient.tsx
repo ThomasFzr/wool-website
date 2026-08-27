@@ -12,69 +12,65 @@ type HomeClientProps = {
 
 export function HomeClient({ initialCreations, availableColors = [], availableTypes = [] }: HomeClientProps) {
   const [creations] = useState<Creation[]>(initialCreations);
-  
-  // Récupérer les filtres du sessionStorage au montage
-  const [selectedColors, setSelectedColors] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("filters_colors");
-      return saved ? JSON.parse(saved) : [];
+
+  // Initialiser à vide pour éviter tout mismatch d'hydratation (serveur vs sessionStorage)
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Récupérer les filtres du sessionStorage au montage (côté client uniquement)
+  useEffect(() => {
+    try {
+      const savedColors = sessionStorage.getItem("filters_colors");
+      if (savedColors) setSelectedColors(JSON.parse(savedColors));
+
+      const savedTypes = sessionStorage.getItem("filters_types");
+      if (savedTypes) setSelectedTypes(JSON.parse(savedTypes));
+
+      const savedAvailable = sessionStorage.getItem("filters_available");
+      if (savedAvailable === "true") setShowOnlyAvailable(true);
+    } catch (error) {
+      console.error("Erreur lors de la lecture des filtres:", error);
     }
-    return [];
-  });
-  
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("filters_types");
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
-  
-  const [showOnlyAvailable, setShowOnlyAvailable] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("filters_available");
-      return saved === "true";
-    }
-    return false;
-  });
+    setHydrated(true);
+  }, []);
 
   // Sauvegarder les filtres dans le sessionStorage quand ils changent
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (hydrated) {
       if (selectedColors.length > 0) {
         sessionStorage.setItem("filters_colors", JSON.stringify(selectedColors));
       } else {
         sessionStorage.removeItem("filters_colors");
       }
     }
-  }, [selectedColors]);
+  }, [selectedColors, hydrated]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (hydrated) {
       if (selectedTypes.length > 0) {
         sessionStorage.setItem("filters_types", JSON.stringify(selectedTypes));
       } else {
         sessionStorage.removeItem("filters_types");
       }
     }
-  }, [selectedTypes]);
+  }, [selectedTypes, hydrated]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (hydrated) {
       if (showOnlyAvailable) {
         sessionStorage.setItem("filters_available", "true");
       } else {
         sessionStorage.removeItem("filters_available");
       }
     }
-  }, [showOnlyAvailable]);
+  }, [showOnlyAvailable, hydrated]);
 
   const handleClearAllFilters = () => {
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem("filters_colors");
-      sessionStorage.removeItem("filters_types");
-      sessionStorage.removeItem("filters_available");
-    }
+    sessionStorage.removeItem("filters_colors");
+    sessionStorage.removeItem("filters_types");
+    sessionStorage.removeItem("filters_available");
   };
 
   // Filtrage des créations

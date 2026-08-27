@@ -81,5 +81,14 @@ const schema = new Schema(
   { timestamps: true }
 );
 
+// Index sur les champs filtrés par les routes (compte client, admin, webhooks Stripe, stats)
+schema.index({ userId: 1, createdAt: -1 });
+schema.index({ contact: 1, paymentStatus: 1 });
+schema.index({ stripeCheckoutSessionId: 1 });
+schema.index({ creationId: 1 });
+schema.index({ status: 1, createdAt: -1 });
+schema.index({ seenByAdmin: 1, status: 1 });
+schema.index({ paymentStatus: 1, createdAt: -1 });
+
 export default mongoose.models.Reservation ||
   mongoose.model("Reservation", schema);

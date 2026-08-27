@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import { useSession } from "next-auth/react";
 
 export type CartItem = {
@@ -9,12 +9,11 @@ export type CartItem = {
   title: string;
   imageUrl?: string;
   price?: number;
-  quantity: number;
 };
 
 export type DeliveryMode = "pickup" | "shipping";
 
-type PickupConditions = {
+export type PickupConditions = {
   enabled: boolean;
   minimumAmount: number;
   allowedPostalCodes: string[];
@@ -31,9 +30,8 @@ type CartContextType = {
   pickupUnavailableReason: string | null;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (item: Omit<CartItem, "quantity">) => void;
+  addItem: (item: CartItem) => void;
   removeItem: (creationId: string) => void;
-  updateQuantity: (creationId: string, quantity: number) => void;
   clearCart: () => void;
   getTotalItems: () => number;
   getTotalPrice: () => number;
@@ -47,14 +45,19 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const STORAGE_KEY = "wool-starter-cart";
 const DELIVERY_MODE_KEY = "wool-starter-delivery-mode";
 
-export function CartProvider({ children }: { children: ReactNode }) {
+type CartProviderProps = {
+  children: ReactNode;
+  shippingCost?: number;
+  pickupConditions?: PickupConditions | null;
+};
+
+export function CartProvider({ children, shippingCost = 5, pickupConditions = null }: CartProviderProps) {
   const { data: session } = useSession();
+  const userEmail = session?.user?.email ?? null;
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [deliveryMode, setDeliveryModeState] = useState<DeliveryMode>("pickup");
-  const [shippingCost, setShippingCost] = useState(5);
-  const [pickupConditions, setPickupConditions] = useState<PickupConditions | null>(null);
   const [userPostalCode, setUserPostalCode] = useState<string | null>(null);
 
   // Charger le panier et le mode de livraison depuis localStorage au montage
@@ -74,29 +77,41 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Charger les frais de livraison et les conditions depuis les settings
+  // Purger les articles vendus/supprimés : le panier vit dans le localStorage,
+  // il peut contenir un article acheté depuis (paiement finalisé par le webhook,
+  // onglet fermé avant la page de confirmation…) ou retiré du catalogue.
   useEffect(() => {
-    fetch("/api/settings")
+    if (!mounted || items.length === 0) return;
+
+    const ids = items.map((item) => item.creationId).join(",");
+    let cancelled = false;
+
+    fetch(`/api/creations/availability?ids=${ids}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.shippingCost != null) {
-          setShippingCost(data.shippingCost);
-        }
-        if (data.pickupConditions) {
-          setPickupConditions({
-            enabled: data.pickupConditions.enabled ?? false,
-            minimumAmount: data.pickupConditions.minimumAmount ?? 0,
-            allowedPostalCodes: data.pickupConditions.allowedPostalCodes ?? [],
-            message: data.pickupConditions.message ?? "",
-          });
-        }
+        if (cancelled || !Array.isArray(data?.available)) return;
+        const available = new Set<string>(data.available);
+        setItems((prev) =>
+          prev.some((item) => !available.has(item.creationId))
+            ? prev.filter((item) => available.has(item.creationId))
+            : prev
+        );
       })
-      .catch((err) => console.error("Erreur chargement settings:", err));
-  }, []);
+      .catch((error) => {
+        console.error("Erreur lors de la vérification du panier:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Volontairement limité au montage (et à la première hydratation) : inutile
+    // de revérifier à chaque ajout/retrait d'article.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted]);
 
   // Fonction pour charger le code postal
   const loadUserPostalCode = useCallback(async () => {
-    if (session?.user) {
+    if (userEmail) {
       try {
         const res = await fetch("/api/account/profile");
         const data = await res.json();
@@ -112,7 +127,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } else {
       setUserPostalCode(null);
     }
-  }, [session]);
+  }, [userEmail]);
 
   // Charger le code postal de l'utilisateur connecté
   useEffect(() => {
@@ -120,8 +135,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [loadUserPostalCode]);
 
   // Recharger le code postal quand la page devient visible (après retour depuis profil)
+  // Uniquement utile si des codes postaux conditionnent la remise en main propre
+  const hasPostalCodeRestriction = (pickupConditions?.allowedPostalCodes?.length ?? 0) > 0;
+
   useEffect(() => {
-    if (!mounted || !session?.user) return;
+    if (!mounted || !userEmail || !hasPostalCodeRestriction) return;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -142,7 +160,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [mounted, session, loadUserPostalCode]);
+  }, [mounted, userEmail, hasPostalCodeRestriction, loadUserPostalCode]);
 
   // Sauvegarder le panier dans localStorage à chaque changement
   useEffect(() => {
@@ -166,14 +184,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [deliveryMode, mounted]);
 
-  const setDeliveryMode = (mode: DeliveryMode) => {
+  const setDeliveryMode = useCallback((mode: DeliveryMode) => {
     setDeliveryModeState(mode);
-  };
+  }, []);
 
-  const openCart = () => setIsOpen(true);
-  const closeCart = () => setIsOpen(false);
+  const openCart = useCallback(() => setIsOpen(true), []);
+  const closeCart = useCallback(() => setIsOpen(false), []);
 
-  const addItem = (newItem: Omit<CartItem, "quantity">) => {
+  const addItem = useCallback((newItem: CartItem) => {
     setItems((prevItems) => {
       const existingItem = prevItems.find(
         (item) => item.creationId === newItem.creationId
@@ -183,8 +201,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // Si l'article existe déjà, ne rien faire (un seul exemplaire par article)
         return prevItems;
       } else {
-        // Sinon, ajouter l'article avec quantité 1
-        return [...prevItems, { ...newItem, quantity: 1 }];
+        // Sinon, ajouter l'article
+        return [...prevItems, newItem];
       }
     });
     // Ouvrir la modale après ajout (sur desktop) sauf si on est déjà sur la page panier
@@ -194,57 +212,43 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsOpen(true);
       }
     }
-  };
+  }, []);
 
-  const removeItem = (creationId: string) => {
+  const removeItem = useCallback((creationId: string) => {
     setItems((prevItems) =>
       prevItems.filter((item) => item.creationId !== creationId)
     );
-  };
+  }, []);
 
-  const updateQuantity = (creationId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(creationId);
-      return;
-    }
-
-    setItems((prevItems) =>
-      prevItems.map((item) =>
-        item.creationId === creationId ? { ...item, quantity } : item
-      )
-    );
-  };
-
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setItems([]);
-  };
+  }, []);
 
-  const getTotalItems = () => {
-    return items.length;
-  };
+  // Valeurs dérivées mémoïsées
+  const totalPrice = useMemo(
+    () => items.reduce((total, item) => total + (item.price || 0), 0),
+    [items]
+  );
 
-  const getTotalPrice = () => {
-    return items.reduce((total, item) => {
-      const itemPrice = item.price || 0;
-      return total + itemPrice;
-    }, 0);
-  };
+  const getTotalItems = useCallback(() => items.length, [items]);
 
-  const getTotalWithShipping = () => {
-    const subtotal = getTotalPrice();
+  const getTotalPrice = useCallback(() => totalPrice, [totalPrice]);
+
+  const getTotalWithShipping = useCallback(() => {
     if (deliveryMode === "shipping") {
-      return subtotal + shippingCost;
+      return totalPrice + shippingCost;
     }
-    return subtotal;
-  };
+    return totalPrice;
+  }, [totalPrice, deliveryMode, shippingCost]);
 
   // Vérifier si la remise en main propre est disponible
-  const checkPickupAvailability = (): { available: boolean; reason: string | null } => {
+  const { available: isPickupAvailable, reason: pickupUnavailableReason } = useMemo((): {
+    available: boolean;
+    reason: string | null;
+  } => {
     if (!pickupConditions || !pickupConditions.enabled) {
       return { available: true, reason: null };
     }
-
-    const totalPrice = getTotalPrice();
 
     // Vérifier le montant minimum
     if (pickupConditions.minimumAmount > 0 && totalPrice < pickupConditions.minimumAmount) {
@@ -258,7 +262,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (pickupConditions.allowedPostalCodes && pickupConditions.allowedPostalCodes.length > 0) {
       // Si l'utilisateur n'est pas connecté ou n'a pas de code postal, on ne peut pas vérifier
       // On considère que c'est disponible mais on affichera un message
-      if (!session?.user || !userPostalCode) {
+      if (!userEmail || !userPostalCode) {
         return {
           available: false,
           reason: "Veuillez renseigner votre code postal dans votre profil pour utiliser la remise en main propre",
@@ -289,9 +293,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     return { available: true, reason: null };
-  };
-
-  const { available: isPickupAvailable, reason: pickupUnavailableReason } = checkPickupAvailability();
+  }, [pickupConditions, totalPrice, userEmail, userPostalCode]);
 
   // Si le mode pickup est sélectionné mais n'est plus disponible, basculer vers shipping
   useEffect(() => {
@@ -300,32 +302,48 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [isPickupAvailable, deliveryMode, mounted]);
 
-  return (
-    <CartContext.Provider
-      value={{
-        items,
-        isOpen,
-        deliveryMode,
-        shippingCost,
-        pickupConditions,
-        isPickupAvailable,
-        pickupUnavailableReason,
-        openCart,
-        closeCart,
-        addItem,
-        removeItem,
-        updateQuantity,
-        clearCart,
-        getTotalItems,
-        getTotalPrice,
-        getTotalWithShipping,
-        setDeliveryMode,
-        reloadPostalCode: loadUserPostalCode,
-      }}
-    >
-      {children}
-    </CartContext.Provider>
+  const value = useMemo<CartContextType>(
+    () => ({
+      items,
+      isOpen,
+      deliveryMode,
+      shippingCost,
+      pickupConditions,
+      isPickupAvailable,
+      pickupUnavailableReason,
+      openCart,
+      closeCart,
+      addItem,
+      removeItem,
+      clearCart,
+      getTotalItems,
+      getTotalPrice,
+      getTotalWithShipping,
+      setDeliveryMode,
+      reloadPostalCode: loadUserPostalCode,
+    }),
+    [
+      items,
+      isOpen,
+      deliveryMode,
+      shippingCost,
+      pickupConditions,
+      isPickupAvailable,
+      pickupUnavailableReason,
+      openCart,
+      closeCart,
+      addItem,
+      removeItem,
+      clearCart,
+      getTotalItems,
+      getTotalPrice,
+      getTotalWithShipping,
+      setDeliveryMode,
+      loadUserPostalCode,
+    ]
   );
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {

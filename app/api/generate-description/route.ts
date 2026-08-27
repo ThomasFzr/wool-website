@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateProductDescription } from "@/lib/gemini";
+import { checkAdminAuth } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    // Fonctionnalité admin uniquement : protège le quota Gemini
+    const session = await checkAdminAuth();
+    if (!session) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { type, color, material, price } = body;
 

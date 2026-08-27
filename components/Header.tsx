@@ -31,10 +31,13 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
   }, []);
 
   const totalNotifications = pendingReservations + newMessages;
+  const userRole = session?.user?.role;
 
   // Polling pour mettre à jour les notifications admin
+  // Dépend du rôle (stable) et non de l'objet session, pour ne pas
+  // détruire/recréer l'interval à chaque refresh de session
   useEffect(() => {
-    if (session?.user?.role !== "admin") return;
+    if (userRole !== "admin") return;
 
     const fetchNotifications = async () => {
       try {
@@ -65,7 +68,7 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
     const interval = setInterval(fetchNotifications, 30000);
 
     return () => clearInterval(interval);
-  }, [session]);
+  }, [userRole]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

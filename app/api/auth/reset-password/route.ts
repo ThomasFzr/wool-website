@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,9 +25,12 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
+    // La base stocke le hash du token (cf. forgot-password), on compare donc le hash
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
     // Trouver l'utilisateur avec le token valide
     const user = await User.findOne({
-      resetToken: token,
+      resetToken: hashedToken,
       resetTokenExpiry: { $gt: new Date() }, // Le token n'a pas expiré
     });
 

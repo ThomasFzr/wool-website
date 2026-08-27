@@ -16,32 +16,33 @@ export function useImageUpload() {
     if (!files || files.length === 0) return;
 
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      alert("Cloudinary n'est pas configuré.");
-      return;
+      throw new Error("Cloudinary n'est pas configuré.");
     }
 
     try {
       setUploading(true);
 
-      const uploadedUrls: string[] = [];
-      const uploadedPublicIds: string[] = [];
+      // Uploads en parallèle (l'ordre de sélection est préservé par le map)
+      const results = await Promise.all(
+        Array.from(files).map(async (file) => {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("upload_preset", UPLOAD_PRESET);
 
-      for (const file of Array.from(files)) {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", UPLOAD_PRESET);
+          const res = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+            { method: "POST", body: formData }
+          );
 
-        const res = await fetch(
-          `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-          { method: "POST", body: formData }
-        );
+          if (!res.ok) throw new Error("Erreur Cloudinary");
 
-        if (!res.ok) throw new Error("Erreur Cloudinary");
+          const data = await res.json();
+          return { url: data.secure_url as string, publicId: data.public_id as string };
+        })
+      );
 
-        const data = await res.json();
-        uploadedUrls.push(data.secure_url);
-        uploadedPublicIds.push(data.public_id);
-      }
+      const uploadedUrls = results.map((r) => r.url);
+      const uploadedPublicIds = results.map((r) => r.publicId);
 
       // Réinitialiser l'input pour permettre de sélectionner les mêmes fichiers
       e.target.value = '';

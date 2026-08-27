@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { FormEvent, useState, useEffect, useRef, Suspense } from "react";
-import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components";
 import { CreationModal } from "@/components/CreationModal";
@@ -69,7 +68,6 @@ const initialFormState: CreationFormData = {
 };
 
 function AdminCreationsContent() {
-  const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -217,19 +215,13 @@ function AdminCreationsContent() {
       return true;
     });
 
+  // La garde admin est assurée côté serveur par app/admin/layout.tsx
   useEffect(() => {
-    if (status === "loading") return;
-    if (status === "unauthenticated" || session?.user?.role !== "admin") {
-      router.push("/");
-    }
-  }, [session, status, router]);
-
-  useEffect(() => {
-    if (session?.user?.role === "admin" && !hasLoadedCreations.current) {
+    if (!hasLoadedCreations.current) {
       loadCreations();
       loadSettings();
     }
-  }, [session]);
+  }, []);
 
   async function loadSettings() {
     try {
@@ -570,18 +562,6 @@ function AdminCreationsContent() {
     setEditingId(null);
     setMessage(null);
     setShowCreateModal(true);
-  }
-
-  if (status === "loading") {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Chargement...</div>
-      </main>
-    );
-  }
-
-  if (!session || session.user.role !== "admin") {
-    return null;
   }
 
   return (

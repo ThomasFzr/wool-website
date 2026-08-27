@@ -1,10 +1,6 @@
-import dotenv from "dotenv";
-import path from "path";
+import "./load-env";
 import { connectToDatabase } from "../lib/db";
 import Creation from "../models/Creation";
-
-// Charger les variables d'environnement AVANT tout import
-dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 /**
  * Génère un slug à partir d'un titre
@@ -31,7 +27,7 @@ async function generateSlugs() {
     console.log(`✨ ${creations.length} créations sans slug trouvées`);
 
     for (const creation of creations) {
-      let baseSlug = generateSlug(creation.title);
+      const baseSlug = generateSlug(creation.title);
       let slug = baseSlug;
       let counter = 1;
 

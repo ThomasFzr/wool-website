@@ -4,50 +4,71 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
+import { getAppUrl } from "@/lib/url";
 import crypto from "crypto";
+
+// Rate limit en mémoire (best-effort en serverless : chaque instance a sa propre Map,
+// purgée paresseusement — suffisant pour freiner l'abus d'envoi d'emails).
+const lastRequestByEmail = new Map<string, number>();
+const MIN_INTERVAL_MS = 60_000;
+
+function isRateLimited(email: string): boolean {
+  const now = Date.now();
+  // Purge paresseuse des entrées expirées
+  for (const [key, ts] of lastRequestByEmail) {
+    if (now - ts > MIN_INTERVAL_MS) lastRequestByEmail.delete(key);
+  }
+  const last = lastRequestByEmail.get(email);
+  if (last && now - last < MIN_INTERVAL_MS) return true;
+  lastRequestByEmail.set(email, now);
+  return false;
+}
+
+// Réponse unique quelle que soit l'issue : ne révèle ni l'existence du compte,
+// ni son provider (anti énumération de comptes).
+const neutralResponse = () =>
+  NextResponse.json(
+    { message: "Si ce compte existe, un email a été envoyé" },
+    { status: 200 }
+  );
 
 export async function POST(req: NextRequest) {
   try {
     const { email } = await req.json();
 
-    if (!email) {
+    if (!email || typeof email !== "string") {
       return NextResponse.json(
         { error: "Email requis" },
         { status: 400 }
       );
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
+    if (isRateLimited(normalizedEmail)) {
+      return neutralResponse();
+    }
+
     await connectToDatabase();
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: normalizedEmail });
 
-    // Pour des raisons de sécurité, on ne révèle pas si le compte existe ou non
-    if (!user) {
-      return NextResponse.json(
-        { message: "Si ce compte existe, un email a été envoyé" },
-        { status: 200 }
-      );
+    if (!user || user.provider !== "credentials") {
+      return neutralResponse();
     }
 
-    // Vérifier que l'utilisateur utilise bien credentials (pas Google)
-    if (user.provider !== "credentials") {
-      return NextResponse.json(
-        { error: "Ce compte utilise une connexion externe (Google)" },
-        { status: 400 }
-      );
-    }
-
-    // Générer un token de réinitialisation
+    // Générer un token de réinitialisation ; seul son hash est stocké en base
+    // (un accès en lecture à la DB ne permet pas de prendre le contrôle des comptes)
     const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 heure
 
-    // Sauvegarder le token dans la base de données
-    user.resetToken = resetToken;
+    user.resetToken = hashedToken;
     user.resetTokenExpiry = resetTokenExpiry;
     await user.save();
 
-    // Créer le lien de réinitialisation
-    const resetUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/reset-password?token=${resetToken}`;
+    // Créer le lien de réinitialisation (le token en clair ne part que dans l'email)
+    const resetUrl = `${getAppUrl(req.headers)}/reset-password?token=${resetToken}`;
 
     // Envoyer l'email
     await sendEmail({
@@ -67,10 +88,7 @@ export async function POST(req: NextRequest) {
       `),
     });
 
-    return NextResponse.json(
-      { message: "Email de réinitialisation envoyé" },
-      { status: 200 }
-    );
+    return neutralResponse();
   } catch (error) {
     console.error("[forgot-password] Error:", error);
     return NextResponse.json(

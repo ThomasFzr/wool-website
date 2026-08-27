@@ -19,18 +19,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly' as const,
       priority: 0.8,
     },
-    {
-      url: `${baseUrl}/login`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly' as const,
-      priority: 0.5,
-    },
   ];
 
   // Pages dynamiques des créations
   try {
     await connectToDatabase();
-    const creations = await CreationModel.find()
+    const creations = await CreationModel.find({ hidden: { $ne: true } })
       .select('_id slug updatedAt')
       .lean();
 

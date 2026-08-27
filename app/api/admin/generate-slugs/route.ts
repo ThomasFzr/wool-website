@@ -2,18 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
-
-/**
- * Génère un slug à partir d'un titre
- */
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+import { generateUniqueSlug } from "@/lib/slug";
 
 export async function POST() {
   try {
@@ -28,15 +17,7 @@ export async function POST() {
     const results = [];
 
     for (const creation of creations) {
-      let baseSlug = generateSlug(creation.title);
-      let slug = baseSlug;
-      let counter = 1;
-
-      while (await Creation.findOne({ slug, _id: { $ne: creation._id } })) {
-        slug = `${baseSlug}-${counter}`;
-        counter++;
-      }
-
+      const slug = await generateUniqueSlug(creation.title, creation._id.toString());
       creation.slug = slug;
       await creation.save();
       results.push({ title: creation.title, slug });

@@ -12,38 +12,22 @@ export async function GET() {
 
     await connectToDatabase();
 
-    // Compter les nouvelles commandes payées non vues
-    // On compte les sessions Stripe uniques (commandes) plutôt que les réservations individuelles
-    const newReservations = await Reservation.find({ 
-      paymentStatus: "paid",
-      seenByAdmin: { $ne: true }
-    }).select("stripeCheckoutSessionId").lean();
+    // Compter les sessions Stripe uniques (commandes) plutôt que les réservations
+    // individuelles — distinct côté Mongo, en parallèle, sans charger les documents
+    const [newSessions, pendingSessions] = await Promise.all([
+      Reservation.distinct("stripeCheckoutSessionId", {
+        paymentStatus: "paid",
+        seenByAdmin: { $ne: true },
+      }),
+      Reservation.distinct("stripeCheckoutSessionId", {
+        paymentStatus: "paid",
+        status: { $in: ["pending", "preparing"] },
+      }),
+    ]);
 
-    // Compter les sessions uniques (commandes) au lieu des réservations
-    const uniqueSessions = new Set(
-      newReservations
-        .map(r => r.stripeCheckoutSessionId)
-        .filter(id => id != null)
-    );
-    const newCount = uniqueSessions.size;
-
-    // Compter les commandes en cours de préparation (payées mais pas encore expédiées)
-    // Même logique : compter les sessions uniques
-    const pendingReservations = await Reservation.find({ 
-      paymentStatus: "paid",
-      status: { $in: ["pending", "preparing"] }
-    }).select("stripeCheckoutSessionId").lean();
-
-    const uniquePendingSessions = new Set(
-      pendingReservations
-        .map(r => r.stripeCheckoutSessionId)
-        .filter(id => id != null)
-    );
-    const pendingCount = uniquePendingSessions.size;
-
-    return NextResponse.json({ 
-      pending: pendingCount,
-      new: newCount
+    return NextResponse.json({
+      pending: pendingSessions.filter((id) => id != null).length,
+      new: newSessions.filter((id) => id != null).length,
     });
   } catch (err) {
     console.error(err);

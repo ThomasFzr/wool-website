@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
 import { revalidatePath } from "next/cache";
-
-/**
- * Génère un slug à partir d'un titre
- */
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+import { generateUniqueSlug } from "@/lib/slug";
 
 /**
  * Récupère le public_id Cloudinary depuis une URL secure_url
@@ -62,15 +52,11 @@ export async function GET(
     const baseQuery = isAdmin ? {} : { hidden: { $ne: true } };
     
     // Récupérer la création par ID ou slug avec les articles liés
-    let creation = await Creation.findOne({ _id: id, ...baseQuery })
+    // (un id non-ObjectId ferait lever un CastError sur _id, d'où le test explicite)
+    const lookup = mongoose.isValidObjectId(id) ? { _id: id } : { slug: id };
+    const creation = await Creation.findOne({ ...lookup, ...baseQuery })
       .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
       .lean();
-    if (!creation) {
-      // Essayer par slug si ce n'est pas un ObjectId valide
-      creation = await Creation.findOne({ slug: id, ...baseQuery })
-        .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
-        .lean();
-    }
     
     if (!creation) {
       return new NextResponse("Not found", { status: 404 });
@@ -164,14 +150,7 @@ export async function PATCH(
     if (body.title !== undefined) {
       setData.title = body.title.trim();
       // Régénérer le slug si le titre change
-      let baseSlug = generateSlug(body.title);
-      let slug = baseSlug;
-      let counter = 1;
-      while (await Creation.findOne({ slug, _id: { $ne: id } })) {
-        slug = `${baseSlug}-${counter}`;
-        counter++;
-      }
-      setData.slug = slug;
+      setData.slug = await generateUniqueSlug(body.title, id);
     }
     if (body.description !== undefined) setData.description = body.description;
     if (body.seoDescription !== undefined) setData.seoDescription = body.seoDescription;
@@ -204,11 +183,11 @@ export async function PATCH(
     
     // Gérer le changement de statut "vendu"
     if (body.sold !== undefined) {
-      const currentCreation = await Creation.findById(id);
       setData.sold = body.sold;
-      
+
       // Si on marque comme vendu et que ce n'était pas déjà vendu, incrémenter salesCount
-      if (body.sold === true && currentCreation && !currentCreation.sold) {
+      // (existingCreation est déjà chargé plus haut, pas besoin de re-requêter)
+      if (body.sold === true && !existingCreation.sold) {
         incData.salesCount = 1;
       }
       
@@ -300,20 +279,19 @@ export async function DELETE(
       return new NextResponse("Not found", { status: 404 });
     }
 
-    // 🔥 1) Supprimer les images Cloudinary par leurs public_id stockés
+    // 🔥 1) Supprimer les images Cloudinary par leurs public_id stockés (en parallèle)
     if (Array.isArray(creation.imagePublicIds)) {
-      for (const publicId of creation.imagePublicIds) {
-        if (!publicId) continue;
-
-        try {
-          const result = await cloudinary.uploader.destroy(publicId, {
-            invalidate: true,
-          });
-          console.log("Cloudinary destroy", publicId, result);
-        } catch (err) {
-          console.error("Cloudinary destroy error for", publicId, err);
-        }
-      }
+      await Promise.allSettled(
+        creation.imagePublicIds
+          .filter(Boolean)
+          .map((publicId: string) =>
+            cloudinary.uploader
+              .destroy(publicId, { invalidate: true })
+              .catch((err: unknown) =>
+                console.error("Cloudinary destroy error for", publicId, err)
+              )
+          )
+      );
     }
 
     // 🔁 2) Fallback pour les anciennes créations sans imagePublicIds :
@@ -328,20 +306,19 @@ export async function DELETE(
         ...(creation.images || []),
       ].filter(Boolean) as string[];
 
-      for (const url of urls) {
-        try {
+      await Promise.allSettled(
+        urls.map((url) => {
           const match = url.match(/upload\/(?:v\d+\/)?([^\.]+)/);
           const publicIdFromUrl = match?.[1]; // => "s6qunadqjbpmj6eeif2e"
-          if (!publicIdFromUrl) continue;
+          if (!publicIdFromUrl) return Promise.resolve();
 
-          const result = await cloudinary.uploader.destroy(publicIdFromUrl, {
-            invalidate: true,
-          });
-          console.log("Cloudinary destroy (fallback)", publicIdFromUrl, result);
-        } catch (err) {
-          console.error("Cloudinary destroy fallback error for", url, err);
-        }
-      }
+          return cloudinary.uploader
+            .destroy(publicIdFromUrl, { invalidate: true })
+            .catch((err: unknown) =>
+              console.error("Cloudinary destroy fallback error for", url, err)
+            );
+        })
+      );
     }
 
     // 3) Supprimer toutes les réservations liées à cette création

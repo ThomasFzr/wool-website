@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Badge, Card, Input } from "@/components";
 import { CreationModal } from "@/components/CreationModal";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import type { Creation } from "@/components/CreationCard";
 
 type Reservation = {
@@ -52,6 +53,7 @@ function AdminReservationsContent() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [selected, setSelected] = useState<Reservation | null>(null);
     const [selectedOrderItems, setSelectedOrderItems] = useState<Reservation[]>([]);
@@ -69,7 +71,7 @@ function AdminReservationsContent() {
             limit: "10",
         });
 
-        if (search) params.set("search", search);
+        if (debouncedSearch) params.set("search", debouncedSearch);
         if (statusFilter) params.set("status", statusFilter);
 
         const res = await fetch("/api/admin/reservations?" + params.toString());
@@ -91,9 +93,17 @@ function AdminReservationsContent() {
         setCancelReason("");
     }
 
+    // Debounce de la recherche (300 ms) pour éviter une requête API par frappe
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
     useEffect(() => {
         load();
-    }, [page, search, statusFilter]);
+    }, [page, debouncedSearch, statusFilter]);
 
     // Ouvrir automatiquement la sidebar de réservation si creationId est dans l'URL
     useEffect(() => {
@@ -408,7 +418,7 @@ function AdminReservationsContent() {
                                                 return image ? (
                                                     <img
                                                         key={idx}
-                                                        src={image}
+                                                        src={optimizeCloudinaryUrl(image, { width: 200 })}
                                                         alt={creation?.title || "Article"}
                                                         title={creation?.title || "Article"}
                                                         className="h-16 w-16 rounded-lg object-cover border border-slate-200"
@@ -672,7 +682,7 @@ function AdminReservationsContent() {
                                                             >
                                                                 {(creation.images?.[0] || creation.imageUrl) && (
                                                                     <img
-                                                                        src={creation.images?.[0] ?? creation.imageUrl!}
+                                                                        src={optimizeCloudinaryUrl(creation.images?.[0] ?? creation.imageUrl!, { width: 200 })}
                                                                         alt={creation.title}
                                                                         title={creation.title}
                                                                         className="h-24 w-24 rounded-lg object-cover shrink-0 ring-1 ring-slate-200"
@@ -724,7 +734,7 @@ function AdminReservationsContent() {
                                     {/* Image */}
                                     {(selected.creationId.images?.[0] || selected.creationId.imageUrl) && (
                                         <img
-                                            src={selected.creationId.images?.[0] ?? selected.creationId.imageUrl!}
+                                            src={optimizeCloudinaryUrl(selected.creationId.images?.[0] ?? selected.creationId.imageUrl!, { width: 200 })}
                                             alt={selected.creationId.title}
                                             title={selected.creationId.title}
                                             className="h-24 w-24 rounded-lg object-cover shrink-0 ring-1 ring-slate-200"

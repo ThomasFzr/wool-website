@@ -7,8 +7,13 @@ import bcrypt from "bcryptjs";
 import User, { IUserDocument } from "@/models/User";
 import { connectToDatabase } from "@/lib/db";
 
+// Le rôle stocké dans le JWT est revérifié en DB au plus toutes les ROLE_REFRESH_INTERVAL ms
+// (sinon un admin révoqué garderait son rôle jusqu'à expiration du token).
+const ROLE_REFRESH_INTERVAL = 5 * 60 * 1000;
+
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
+  secret: process.env.AUTH_SECRET,
   session: {
     strategy: "jwt",
   },
@@ -16,7 +21,9 @@ export const authOptions: NextAuthOptions = {
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      allowDangerousEmailAccountLinking: true, // Permet de lier Google à un compte existant
+      // Liaison auto par email : acceptable car Google vérifie les adresses.
+      // À reconsidérer si un provider aux emails non vérifiés est ajouté.
+      allowDangerousEmailAccountLinking: true,
     }),
 
     Credentials({
@@ -29,12 +36,17 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials.password) return null;
 
         await connectToDatabase();
-        const user = await User.findOne({ email: credentials.email })
+        const user = await User.findOne({
+          email: credentials.email.toLowerCase().trim(),
+        })
+          .select("+password")
           .lean<IUserDocument | null>();
 
         if (!user) return null;
+        // Compte créé via Google : pas de mot de passe local
+        if (!user.password) return null;
 
-        const ok = await bcrypt.compare(credentials.password, user.password!);
+        const ok = await bcrypt.compare(credentials.password, user.password);
         if (!ok) return null;
 
         return {
@@ -50,26 +62,25 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       // Mettre à jour ou créer l'utilisateur dans notre collection User
       if (account && user?.email) {
         try {
           await connectToDatabase();
-          
+
           // Chercher l'utilisateur existant
           const existingUser = await User.findOne({ email: user.email });
-          
+
           if (existingUser) {
-            // Mettre à jour le provider s'il existe
-            await User.findOneAndUpdate(
-              { email: user.email },
-              { 
-                $set: { 
-                  provider: account.provider,
-                  name: user.name || existingUser.name
-                } 
-              }
-            );
+            // Ne pas écraser "credentials" (sinon le changement de mot de passe
+            // et forgot-password se retrouvent bloqués après un login Google)
+            const updates: Record<string, string> = {
+              name: user.name || existingUser.name || "",
+            };
+            if (existingUser.provider !== "credentials") {
+              updates.provider = account.provider;
+            }
+            await User.findOneAndUpdate({ email: user.email }, { $set: updates });
           } else if (account.provider !== "credentials") {
             // Créer un nouvel utilisateur pour les connexions SSO uniquement
             await User.create({
@@ -90,11 +101,12 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.userId = user.id;
         token.role = user.role ?? "user";
+        (token as any).roleCheckedAt = Date.now();
       }
-      
+
       if (account) {
         token.provider = account.provider;
-        
+
         // Si connexion via Google, récupérer le rôle depuis la DB
         if (account.provider === "google" && user?.email) {
           await connectToDatabase();
@@ -102,10 +114,28 @@ export const authOptions: NextAuthOptions = {
           if (dbUser) {
             token.role = dbUser.role;
             token.userId = dbUser._id.toString();
+            (token as any).roleCheckedAt = Date.now();
           }
         }
       }
-      
+
+      // Revérifier périodiquement le rôle en DB (révocation admin effective sans reconnexion)
+      const roleCheckedAt = (token as any).roleCheckedAt as number | undefined;
+      const stale = !roleCheckedAt || Date.now() - roleCheckedAt > ROLE_REFRESH_INTERVAL;
+      if ((trigger === "update" || stale) && token.email) {
+        try {
+          await connectToDatabase();
+          const dbUser = await User.findOne({ email: token.email }).lean<IUserDocument | null>();
+          if (dbUser) {
+            token.role = dbUser.role;
+            token.userId = dbUser._id.toString();
+          }
+          (token as any).roleCheckedAt = Date.now();
+        } catch (error) {
+          console.error("[JWT] Role refresh error:", error);
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -120,7 +150,7 @@ export const authOptions: NextAuthOptions = {
       } else {
         session.user.role = "user";
       }
-      
+
       return session;
     }
   },

@@ -21,40 +21,51 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { name, phone, address, city, postalCode } = body;
 
-    await connectToDatabase();
+    // Validation : uniquement des chaînes de taille raisonnable
+    const fields: Record<string, { value: unknown; max: number }> = {
+      name: { value: name, max: 100 },
+      phone: { value: phone, max: 30 },
+      address: { value: address, max: 200 },
+      city: { value: city, max: 100 },
+      postalCode: { value: postalCode, max: 10 },
+    };
 
-    const user = await User.findOne({ email: session.user.email });
-    if (!user) {
-      return NextResponse.json(
-        { error: "Utilisateur non trouvé" },
-        { status: 404 }
-      );
+    const updateData: Record<string, string> = {};
+    for (const [key, { value, max }] of Object.entries(fields)) {
+      if (value === undefined) continue;
+      if (typeof value !== "string" || value.length > max) {
+        return NextResponse.json(
+          { error: `Champ "${key}" invalide` },
+          { status: 400 }
+        );
+      }
+      updateData[key] = value;
     }
 
-    // Mettre à jour les champs (en préservant le provider)
-    const updateData: any = {};
-    if (name !== undefined) updateData.name = name;
-    if (phone !== undefined) updateData.phone = phone;
-    if (address !== undefined) updateData.address = address;
-    if (city !== undefined) updateData.city = city;
-    if (postalCode !== undefined) updateData.postalCode = postalCode;
+    await connectToDatabase();
 
-    // Utiliser findOneAndUpdate pour éviter les problèmes de validation
     const updatedUser = await User.findOneAndUpdate(
       { email: session.user.email },
       { $set: updateData },
       { new: true, runValidators: false }
     );
 
+    if (!updatedUser) {
+      return NextResponse.json(
+        { error: "Utilisateur non trouvé" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       message: "Profil mis à jour",
       user: {
-        name: updatedUser?.name,
-        email: updatedUser?.email,
-        phone: updatedUser?.phone,
-        address: updatedUser?.address,
-        city: updatedUser?.city,
-        postalCode: updatedUser?.postalCode,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        address: updatedUser.address,
+        city: updatedUser.city,
+        postalCode: updatedUser.postalCode,
       },
     });
   } catch (error) {

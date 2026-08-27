@@ -3,22 +3,11 @@ import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { generateUniqueSlug } from "@/lib/slug";
 
 // Désactiver le cache pour cette route API pour éviter les problèmes de synchronisation
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-/**
- * Génère un slug à partir d'un titre
- */
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -116,13 +105,7 @@ export async function POST(req: NextRequest) {
     const nextDisplayOrder = maxOrderCreation ? ((maxOrderCreation as any).displayOrder || 0) + 1 : 1;
 
     // Générer un slug unique
-    let baseSlug = generateSlug(body.title);
-    let slug = baseSlug;
-    let counter = 1;
-    while (await Creation.findOne({ slug })) {
-      slug = `${baseSlug}-${counter}`;
-      counter++;
-    }
+    const slug = await generateUniqueSlug(body.title);
 
     const creation = await Creation.create({
       title: body.title.trim(),

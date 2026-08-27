@@ -18,14 +18,19 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
     
-    // Récupérer les marques enregistrées dans YarnBrand avec leurs prix
-    const savedBrands = await YarnBrand.find({})
-      .select('brand pricePerHundredGrams')
-      .lean();
-    
+    // Marques enregistrées + marques distinctes des créations, en parallèle
+    const [savedBrands, creationBrands] = await Promise.all([
+      YarnBrand.find({})
+        .select('brand pricePerHundredGrams')
+        .lean(),
+      Creation.distinct('yarnBrand', {
+        yarnBrand: { $exists: true, $nin: [null, ""] }
+      }),
+    ]);
+
     // Créer une map des marques avec leurs prix
     const brandsMap = new Map<string, { brand: string; price?: number }>();
-    
+
     savedBrands.forEach((b: any) => {
       const brandName = b.brand.trim();
       brandsMap.set(brandName.toLowerCase(), {
@@ -33,18 +38,11 @@ export async function GET(req: NextRequest) {
         price: b.pricePerHundredGrams,
       });
     });
-    
-    // Récupérer toutes les marques de fil uniques et non vides des créations
-    const creations = await Creation.find({
-      yarnBrand: { $exists: true, $nin: [null, ""] }
-    })
-      .select('yarnBrand')
-      .lean();
 
     // Ajouter les marques des créations qui ne sont pas déjà dans la map
-    creations.forEach((c: any) => {
-      const brandName = c.yarnBrand?.trim();
-      if (brandName && brandName.length > 0) {
+    creationBrands.forEach((raw: any) => {
+      const brandName = typeof raw === "string" ? raw.trim() : "";
+      if (brandName.length > 0) {
         const key = brandName.toLowerCase();
         if (!brandsMap.has(key)) {
           brandsMap.set(key, { brand: brandName });

@@ -6,9 +6,6 @@ import CreationModel from "@/models/Creation";
 import Settings from "@/models/Settings";
 import { Metadata } from "next";
 
-// Désactiver le cache pour toujours avoir les données fraîches
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
   title: "MailleMum - Créations tricotées à la main",
   description: "Découvrez nos créations tricotées à la main : tours de cou, bandeaux et bonnets faits main avec passion.",
@@ -41,11 +38,20 @@ type SettingsType = {
 };
 
 async function getCreations(): Promise<CreationType[]> {
-  await connectToDatabase();
-  const creations = await CreationModel.find({ hidden: { $ne: true } })
-    .sort({ displayOrder: -1, createdAt: -1 })
-    .lean();
-  
+  // Tolérant aux pannes : si la DB est injoignable (notamment au build, où la
+  // page est prérendue en ISR), on rend une vitrine vide plutôt que d'échouer —
+  // le revalidate de 5 min la remplira dès que la DB répond.
+  let creations: any[];
+  try {
+    await connectToDatabase();
+    creations = await CreationModel.find({ hidden: { $ne: true } })
+      .sort({ displayOrder: -1, createdAt: -1 })
+      .lean();
+  } catch (err) {
+    console.error("Erreur lors du chargement des créations:", err);
+    return [];
+  }
+
   return creations.map((c: any) => ({
     _id: c._id.toString(),
     slug: c.slug,
@@ -64,8 +70,14 @@ async function getCreations(): Promise<CreationType[]> {
 }
 
 async function getSettings(): Promise<SettingsType | null> {
-  await connectToDatabase();
-  const settings = await Settings.findOne().lean();
+  let settings;
+  try {
+    await connectToDatabase();
+    settings = await Settings.findOne().lean();
+  } catch (err) {
+    console.error("Erreur lors du chargement des settings:", err);
+    return null;
+  }
   if (!settings) return null;
   
   const settingsData = settings as any;

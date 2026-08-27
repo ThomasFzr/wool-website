@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
+import { checkAdminAuth } from "@/lib/auth";
 
+// Route de debug (bandeau d'environnement en local) : expose le nom de la base.
+// En production, réservée aux admins pour ne pas divulguer l'infrastructure.
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    const session = await checkAdminAuth();
+    if (!session) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+  }
+
   const mongodbUri = process.env.MONGODB_URI || "";
 
   // Détecter si on utilise une base locale

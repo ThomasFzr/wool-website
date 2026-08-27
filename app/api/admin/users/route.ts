@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { checkAdminAuth } from "@/lib/auth";
@@ -58,10 +59,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Même règle que register/reset-password : 6 caractères minimum
+    if (password && (typeof password !== "string" || password.length < 6)) {
+      return NextResponse.json(
+        { error: "Le mot de passe doit contenir au moins 6 caractères" },
+        { status: 400 }
+      );
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+
     await connectToDatabase();
 
     // Vérifier si l'email existe déjà
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return NextResponse.json(
         { error: "Cet email est déjà utilisé" },
@@ -69,13 +80,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Créer l'utilisateur
-    const bcrypt = require("bcryptjs");
     const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
 
     const newUser = await User.create({
       name: name || null,
-      email,
+      email: normalizedEmail,
       provider: password ? "credentials" : "admin-created",
       password: hashedPassword,
       role: role || "user",

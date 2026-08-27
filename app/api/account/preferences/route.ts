@@ -21,21 +21,19 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { emailNotifications } = body;
 
-    await connectToDatabase();
-
-    const user = await User.findOne({ email: session.user.email });
-    if (!user) {
+    if (emailNotifications !== undefined && typeof emailNotifications !== "boolean") {
       return NextResponse.json(
-        { error: "Utilisateur non trouvé" },
-        { status: 404 }
+        { error: "emailNotifications doit être un booléen" },
+        { status: 400 }
       );
     }
 
-    // Mettre à jour les préférences en préservant les autres champs
-    const updateData: any = {};
+    const updateData: Record<string, boolean> = {};
     if (emailNotifications !== undefined) {
       updateData.emailNotifications = emailNotifications;
     }
+
+    await connectToDatabase();
 
     const updatedUser = await User.findOneAndUpdate(
       { email: session.user.email },
@@ -43,10 +41,17 @@ export async function PATCH(req: NextRequest) {
       { new: true, runValidators: false }
     );
 
+    if (!updatedUser) {
+      return NextResponse.json(
+        { error: "Utilisateur non trouvé" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       message: "Préférences mises à jour",
       preferences: {
-        emailNotifications: updatedUser?.emailNotifications,
+        emailNotifications: updatedUser.emailNotifications,
       },
     });
   } catch (error) {

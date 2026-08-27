@@ -1,9 +1,5 @@
+import "./load-env";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
-
-// Charger les variables d'environnement depuis .env ET .env.local
-dotenv.config({ path: ".env" });
-dotenv.config({ path: ".env.local" });
 
 async function syncUsers() {
   try {

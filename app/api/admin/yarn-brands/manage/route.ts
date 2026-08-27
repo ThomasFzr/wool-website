@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { checkAdminAuth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import YarnBrand from "@/models/YarnBrand";
@@ -14,16 +15,16 @@ export async function GET() {
 
     await connectToDatabase();
 
-    // Récupérer les marques enregistrées
-    const savedBrands = await YarnBrand.find({}).sort({ brand: 1 }).lean();
-    
-    // Récupérer les marques des créations existantes
-    const creations = await Creation.find({
-      yarnBrand: { $exists: true, $ne: null },
-      yarnPrice: { $exists: true, $ne: null },
-    })
-      .select("yarnBrand yarnPrice")
-      .lean();
+    // Marques enregistrées et marques issues des créations, en parallèle
+    const [savedBrands, creations] = await Promise.all([
+      YarnBrand.find({}).sort({ brand: 1 }).lean(),
+      Creation.find({
+        yarnBrand: { $exists: true, $ne: null },
+        yarnPrice: { $exists: true, $ne: null },
+      })
+        .select("yarnBrand yarnPrice")
+        .lean(),
+    ]);
 
     // Créer une map avec les marques enregistrées
     const brandsMap = new Map<string, { _id?: string; brand: string; pricePerHundredGrams: number; fromCreations?: boolean }>();
@@ -116,13 +117,16 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
-    if (!id) {
-      return NextResponse.json({ error: "ID requis" }, { status: 400 });
+    if (!id || !mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ error: "ID invalide" }, { status: 400 });
     }
 
     await connectToDatabase();
 
-    await YarnBrand.findByIdAndDelete(id);
+    const deleted = await YarnBrand.findByIdAndDelete(id);
+    if (!deleted) {
+      return NextResponse.json({ error: "Marque introuvable" }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Erreur lors de la suppression de la marque:", error);

@@ -30,6 +30,8 @@ const contactSchema = new Schema<IContactDocument>(
   { timestamps: true }
 );
 
+contactSchema.index({ status: 1, createdAt: -1 });
+
 const Contact: Model<IContactDocument> =
   models.Contact || model<IContactDocument>("Contact", contactSchema);
 

@@ -5,6 +5,15 @@ import { CartModal } from "@/components/CartModal";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import { Analytics } from "@vercel/analytics/react";
 import { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
+import { getSettings } from "@/lib/getSettings";
+
+const clashDisplay = localFont({
+  src: "../public/fonts/ClashDisplay-Variable.ttf",
+  variable: "--font-clash",
+  display: "swap",
+  weight: "100 900",
+});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -63,20 +72,21 @@ export const metadata: Metadata = {
 };
 
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const settings = await getSettings();
+  const shippingCost = settings?.shippingCost ?? 5;
+  const pickupConditions = settings?.pickupConditions ?? null;
+
   return (
-    <html lang="fr">
-      <head>
-        <link rel="preload" href="/fonts/ClashDisplay-Variable.ttf" as="font" type="font/ttf" crossOrigin="anonymous" />
-      </head>
+    <html lang="fr" className={clashDisplay.variable}>
       <body className="font-sans bg-slate-50 text-slate-900" suppressHydrationWarning>
         <EnvironmentBanner />
         <AuthSessionProvider>
-          <CartProvider>
+          <CartProvider shippingCost={shippingCost} pickupConditions={pickupConditions}>
             {children}
             <CartModal />
           </CartProvider>

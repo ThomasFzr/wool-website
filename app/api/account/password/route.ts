@@ -38,7 +38,8 @@ export async function PATCH(req: NextRequest) {
 
     await connectToDatabase();
 
-    const user = await User.findOne({ email: session.user.email });
+    // password est en select:false dans le schéma → il faut le demander explicitement
+    const user = await User.findOne({ email: session.user.email }).select("+password");
     if (!user) {
       return NextResponse.json(
         { error: "Utilisateur non trouvé" },

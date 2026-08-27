@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
@@ -43,7 +44,8 @@ function cleanDescriptionForSEO(text: string | undefined | null): string {
   return cleaned;
 }
 
-async function getCreation(slug: string) {
+// cache() évite le double appel DB (generateMetadata + page) pour une même requête
+const getCreation = cache(async (slug: string) => {
   await connectToDatabase();
   // Essayer d'abord par slug, sinon par ID (rétrocompatibilité)
   // Exclure les créations cachées pour les utilisateurs publics
@@ -127,7 +129,7 @@ async function getCreation(slug: string) {
     visibleAt: creationData.visibleAt ? creationData.visibleAt.toString() : undefined,
     relatedCreations,
   };
-}
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;

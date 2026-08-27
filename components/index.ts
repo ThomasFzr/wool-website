@@ -9,7 +9,6 @@ export { Textarea } from "./ui/Textarea";
 export { Header } from "./Header";
 export { CreationCard } from "./CreationCard";
 export { CreationModal } from "./CreationModal";
-export { ReservationCard } from "./ReservationCard";
 export { Filters } from "./Filters";
 export { LogoutButton } from "./LogoutButton";
 export { ProfileForm } from "./ProfileForm";
@@ -19,4 +18,4 @@ export { default as AuthSessionProvider } from "./AuthSessionProvider";
 
 // Types
 export type { Creation } from "./CreationCard";
-export type { Reservation } from "./ReservationCard";
+export type { Reservation } from "@/types/reservation";

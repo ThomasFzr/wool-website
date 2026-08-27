@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState, useEffect, useRef } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Button, Input, Card, Badge } from "@/components";
 
 type User = {
@@ -21,13 +20,11 @@ type User = {
 };
 
 export default function AdminUsersPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-
+  // useSession conservé uniquement pour l'affichage (empêcher la suppression de son propre compte)
+  const { data: session } = useSession();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const hasLoadedUsers = useRef(false);
 
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -43,18 +40,10 @@ export default function AdminUsersPage() {
     emailNotifications: true,
   });
 
+  // La garde admin est assurée côté serveur par app/admin/layout.tsx
   useEffect(() => {
-    if (status === "loading") return;
-    if (status === "unauthenticated" || session?.user?.role !== "admin") {
-      router.push("/");
-    }
-  }, [session, status, router]);
-
-  useEffect(() => {
-    if (session?.user?.role === "admin" && !hasLoadedUsers.current) {
-      loadUsers();
-    }
-  }, [session]);
+    loadUsers();
+  }, []);
 
   // Désactiver le scroll quand la modale est ouverte
   useEffect(() => {
@@ -80,7 +69,6 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error("Erreur de chargement");
       const data = await res.json();
       setUsers(data);
-      hasLoadedUsers.current = true;
     } catch (err) {
       console.error(err);
       setMessage("Erreur lors du chargement des utilisateurs.");
@@ -225,18 +213,6 @@ export default function AdminUsersPage() {
     setMessage(null);
   }
 
-  if (status === "loading") {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Chargement...</div>
-      </main>
-    );
-  }
-
-  if (!session || session.user.role !== "admin") {
-    return null;
-  }
-
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-6xl px-4 py-6">
@@ -340,7 +316,7 @@ export default function AdminUsersPage() {
                     variant="danger"
                     size="sm"
                     onClick={() => handleDelete(user)}
-                    disabled={session.user.email === user.email}
+                    disabled={session?.user?.email === user.email}
                     className="cursor-pointer"
                   >
                     🗑️

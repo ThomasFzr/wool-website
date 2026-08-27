@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Input, Textarea, Card } from "@/components";
 import type { Creation } from "@/components/CreationCard";
+import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 function ContactForm() {
   const { data: session } = useSession();
@@ -33,14 +34,27 @@ function ContactForm() {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [formStartTime] = useState(Date.now());
+  const [formStartTime] = useState(() => Date.now());
   const [creations, setCreations] = useState<Creation[]>([]);
   const [selectedCreationIds, setSelectedCreationIds] = useState<string[]>([]);
   const [loadingCreations, setLoadingCreations] = useState(false);
   const [showCreationsSelector, setShowCreationsSelector] = useState(false);
+  const [creationsLoaded, setCreationsLoaded] = useState(false);
 
-  // Charger les créations
+  // Pré-remplir nom/email quand la session arrive, sans écraser une saisie manuelle
   useEffect(() => {
+    if (!session?.user) return;
+    setForm((f) => ({
+      ...f,
+      name: f.name || session.user?.name || "",
+      email: f.email || session.user?.email || "",
+    }));
+  }, [session?.user?.name, session?.user?.email]);
+
+  // Charger les créations uniquement quand le sélecteur devient nécessaire (lazy)
+  useEffect(() => {
+    if (!showCreationsSelector || creationsLoaded) return;
+
     const loadCreations = async () => {
       setLoadingCreations(true);
       try {
@@ -48,6 +62,7 @@ function ContactForm() {
         if (res.ok) {
           const data = await res.json();
           setCreations(data);
+          setCreationsLoaded(true);
         }
       } catch (error) {
         console.error("Erreur lors du chargement des créations:", error);
@@ -56,7 +71,7 @@ function ContactForm() {
       }
     };
     loadCreations();
-  }, []);
+  }, [showCreationsSelector, creationsLoaded]);
 
   // Initialiser la sélection si creationId est présent dans l'URL
   useEffect(() => {
@@ -269,7 +284,7 @@ function ContactForm() {
                             </div>
                             {creation.imageUrl || (creation.images && creation.images[0]) ? (
                               <img
-                                src={creation.imageUrl || creation.images?.[0]}
+                                src={optimizeCloudinaryUrl((creation.imageUrl || creation.images?.[0])!, { width: 200 })}
                                 alt={creation.title}
                                 title={creation.title}
                                 className="w-full aspect-square object-cover rounded"

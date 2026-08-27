@@ -10,13 +10,14 @@ export function EnvironmentBanner() {
   } | null>(null);
 
   useEffect(() => {
-    // Détecter l'environnement
+    // Détecter l'environnement : ne rien faire (aucun fetch) hors localhost
     const isDev =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1");
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
 
-    // Récupérer les infos de la base de données via une API
+    if (!isDev) return;
+
+    // Récupérer les infos de la base de données via une API (dev uniquement)
     fetch("/api/env-info")
       .then((res) => res.json())
       .then((data) => {
