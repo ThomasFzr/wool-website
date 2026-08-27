@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, writeFile } from "fs/promises";
+import { spawn } from "child_process";
 import path from "path";
 import crypto from "crypto";
 
@@ -21,6 +22,39 @@ export type CapturedEmail = {
 export function isEmailPreviewEnabled(): boolean {
   if (process.env.NODE_ENV === "production") return false;
   return (process.env.EMAIL_TRANSPORT ?? "preview") !== "resend";
+}
+
+/**
+ * Ouvrir automatiquement l'aperçu dans le navigateur à chaque email capturé.
+ * Désactivable avec EMAIL_PREVIEW_OPEN=0 (utile si un test génère beaucoup
+ * d'emails, ou en CI).
+ */
+export function isEmailAutoOpenEnabled(): boolean {
+  return isEmailPreviewEnabled() && process.env.EMAIL_PREVIEW_OPEN !== "0";
+}
+
+/**
+ * Ouvre une URL dans le navigateur par défaut du système.
+ * Best effort et non bloquant : un échec ne doit jamais faire échouer l'envoi.
+ */
+export function openInBrowser(url: string): void {
+  const command =
+    process.platform === "darwin"
+      ? "open"
+      : process.platform === "win32"
+      ? "cmd"
+      : "xdg-open";
+  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+
+  try {
+    const child = spawn(command, args, { stdio: "ignore", detached: true });
+    child.on("error", (err) =>
+      console.error("[emailOutbox] Ouverture du navigateur impossible:", err.message)
+    );
+    child.unref();
+  } catch (err) {
+    console.error("[emailOutbox] Ouverture du navigateur impossible:", err);
+  }
 }
 
 // Les ids servent de nom de fichier : on n'accepte que des caractères sûrs
