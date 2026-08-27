@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
 
 // Désactiver le cache pour cette route API pour éviter les problèmes de synchronisation
@@ -128,8 +128,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 🔄 Invalider le cache immédiatement après création
-    revalidatePath('/');
-    revalidatePath('/api/creations');
+    revalidateCatalog();
 
     return NextResponse.json(creation, { status: 201 });
   } catch (err) {

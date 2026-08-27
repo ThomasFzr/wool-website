@@ -6,7 +6,7 @@ import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import { checkAdminAuth } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { revalidateCatalog } from "@/lib/revalidate";
 import { escapeHtml } from "@/lib/escape";
 
 // Whitelist des champs modifiables par le PATCH admin (anti mass assignment :
@@ -102,8 +102,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       );
 
       // 🔄 Invalider le cache après validation de la vente
-      revalidatePath('/');
-      revalidatePath('/api/creations');
+      revalidateCatalog();
 
       // Vérifier les préférences de notification de l'utilisateur
       const user = await User.findOne({ email: reservation.contact });
@@ -193,8 +192,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       });
 
       // 🔄 Invalider le cache après annulation (l'article redevient disponible)
-      revalidatePath('/');
-      revalidatePath('/api/creations');
+      revalidateCatalog();
 
       // ✅ Marquer que c'est l'admin qui a annulé
       (reservation as any).cancelledBy = "admin";
@@ -329,8 +327,7 @@ export async function DELETE(
     await Reservation.findByIdAndDelete(id);
 
     // 🔄 Invalider le cache après suppression (l'article redevient disponible)
-    revalidatePath('/');
-    revalidatePath('/api/creations');
+    revalidateCatalog();
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {

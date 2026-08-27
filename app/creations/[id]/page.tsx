@@ -11,6 +11,36 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
+// La fiche produit ne dépend pas de la requête (aucune session lue) : elle est
+// servie depuis le cache et régénérée en arrière-plan toutes les 5 minutes.
+// Les mutations (vente, édition, réservation) l'invalident immédiatement via
+// revalidateCatalog(), donc ce délai n'est qu'un filet de sécurité.
+export const revalidate = 300;
+
+/**
+ * Pré-génère les fiches des créations visibles au build : la première visite
+ * est servie depuis le cache au lieu d'attendre un aller-retour MongoDB.
+ * Les slugs absents d'ici restent rendus à la demande (dynamicParams par défaut).
+ * Tolérant aux pannes : si la base est injoignable au build, on n'en pré-génère
+ * aucune plutôt que de faire échouer le build.
+ */
+export async function generateStaticParams() {
+  try {
+    await connectToDatabase();
+    const creations = await CreationModel.find({ hidden: { $ne: true } })
+      .select("slug")
+      .lean();
+
+    return creations
+      .map((c: any) => c.slug)
+      .filter((slug: unknown): slug is string => typeof slug === "string" && slug.length > 0)
+      .map((slug: string) => ({ id: slug }));
+  } catch (err) {
+    console.error("Pré-génération des fiches produit impossible:", err);
+    return [];
+  }
+}
+
 /**
  * Nettoie et tronque une description pour la meta description SEO
  * - Enlève les balises HTML

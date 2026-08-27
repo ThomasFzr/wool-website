@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { after } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateCatalog, revalidateOrders } from "@/lib/revalidate";
 import { getStripeInstance } from "@/lib/stripe";
 import { getAppUrl } from "@/lib/url";
 import { escapeHtml } from "@/lib/escape";
@@ -222,13 +222,8 @@ export async function fulfillCheckoutSession(
     // Le paiement est DÉJÀ enregistré à ce stade : un échec de revalidation
     // (appel hors contexte de requête, ex. script/cron) ne doit jamais
     // transformer une commande payée en erreur pour le client.
-    try {
-      revalidatePath("/");
-      revalidatePath("/api/creations");
-      revalidatePath("/account/orders");
-    } catch (err) {
-      console.error("[FULFILL] Revalidation du cache impossible:", err);
-    }
+    revalidateCatalog();
+    revalidateOrders();
 
     // Emails en tâche de fond : jamais bloquants, jamais d'échec de la requête
     const dispatchEmails = buildEmailDispatcher({
@@ -505,8 +500,7 @@ export async function releaseExpiredCheckoutSession(
     );
 
     // Les articles redeviennent disponibles sur la vitrine
-    revalidatePath("/");
-    revalidatePath("/api/creations");
+    revalidateCatalog();
   }
 
   console.log(

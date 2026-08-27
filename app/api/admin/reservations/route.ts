@@ -5,7 +5,7 @@ import Creation from "@/models/Creation";
 import User from "@/models/User";
 import "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { revalidateCatalog } from "@/lib/revalidate";
 import { escapeRegex } from "@/lib/escape";
 
 export async function GET(req: Request) {
@@ -181,8 +181,7 @@ export async function POST(req: Request) {
         }
 
         // 🔄 Invalider le cache après création des ventes
-        revalidatePath('/');
-        revalidatePath('/api/creations');
+        revalidateCatalog();
 
         return NextResponse.json({
             message: `${reservations.length} réservation(s) créée(s) avec succès`,

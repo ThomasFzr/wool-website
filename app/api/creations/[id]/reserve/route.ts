@@ -8,7 +8,7 @@ import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import { escapeHtml } from "@/lib/escape";
-import { revalidatePath } from "next/cache";
+import { revalidateCatalog } from "@/lib/revalidate";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -192,8 +192,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     // 🔄 Invalider le cache de la page d'accueil immédiatement
-    revalidatePath('/');
-    revalidatePath('/api/creations');
+    revalidateCatalog();
 
     return NextResponse.json(reservation, { status: 201 });
   } catch (err) {

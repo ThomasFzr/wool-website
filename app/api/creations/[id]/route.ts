@@ -5,7 +5,7 @@ import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
-import { revalidatePath } from "next/cache";
+import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
 
 /**
@@ -252,8 +252,7 @@ export async function PATCH(
     }
 
     // 🔄 Invalider le cache après modification
-    revalidatePath('/');
-    revalidatePath('/api/creations');
+    revalidateCatalog();
 
     return NextResponse.json(creation);
   } catch (err) {
@@ -328,8 +327,7 @@ export async function DELETE(
     await Creation.findByIdAndDelete(id);
 
     // 🔄 Invalider le cache après suppression
-    revalidatePath('/');
-    revalidatePath('/api/creations');
+    revalidateCatalog();
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {

@@ -33,3 +33,4 @@ coverage/
 
 # Emails capturés en local (aperçu /dev/emails)
 .emails/
+.vercel
