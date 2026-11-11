@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit",
     "sync-users": "tsx scripts/sync-users.ts",
     "init-settings": "tsx scripts/init-settings.ts",
-    "generate-slugs": "tsx scripts/generate-slugs.ts"
+    "generate-slugs": "tsx scripts/generate-slugs.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
   },
   "engines": {
     "node": ">=20.9"
@@ -32,16 +36,24 @@
     "stripe": "^20.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/postcss": "^4.1.17",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^20.8.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^3.2.7",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
+    "jsdom": "^31.0.0",
+    "mongodb-memory-server": "^11.3.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.17",
     "tsx": "^4.20.6",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^3.2.7"
   }
 }

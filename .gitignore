@@ -34,3 +34,8 @@ coverage/
 # Emails capturés en local (aperçu /dev/emails)
 .emails/
 .vercel
+
+# Tests
+/test-results/
+/playwright-report/
+/playwright/.cache/
