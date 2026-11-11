@@ -1,0 +1,10 @@
+#!/bin/sh
+# Remplace la CI GitHub (Actions bloqué sur ce dépôt privé) : bloque le push si
+# le lint, le typecheck ou les tests unitaires échouent, ou si la couverture
+# descend sous 100 %. Les e2e se lancent à la main : npm run test:e2e
+# Contourner exceptionnellement : git push --no-verify
+set -e
+echo "pre-push : lint, typecheck, tests unitaires…"
+npm run --silent lint -- --quiet
+npm run --silent typecheck
+npm run --silent test:coverage

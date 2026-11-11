@@ -25,6 +25,8 @@ const schema = new Schema(
     reservedContact: String,
     reservedMessage: String,
     reservedAt: Date,
+    // Réservation qui détient le verrou : seule elle peut le libérer (lib/creation-lock.ts)
+    reservedByReservationId: { type: Schema.Types.ObjectId, ref: "Reservation" },
 
     sold: { type: Boolean, default: false },
     showAsNew: { type: Boolean, default: true },

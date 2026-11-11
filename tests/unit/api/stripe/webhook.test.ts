@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { headers } from "next/headers";
 import { POST } from "@/app/api/stripe/webhook/route";
@@ -31,8 +32,16 @@ function nextEvent(type: string, object: Record<string, unknown> = paidSession()
 }
 
 async function seedPendingOrder(creationOverrides: Record<string, unknown> = {}) {
-  const creation = await createCreation({ reserved: true, reservedContact: "client@example.com", ...creationOverrides });
+  // Pièce verrouillée au nom de la réservation pending, comme le fait le checkout
+  const reservationId = new mongoose.Types.ObjectId();
+  const creation = await createCreation({
+    reserved: true,
+    reservedContact: "client@example.com",
+    reservedByReservationId: reservationId,
+    ...creationOverrides,
+  });
   await Reservation.create({
+    _id: reservationId,
     creationId: creation._id,
     name: "Alice",
     contact: "client@example.com",
@@ -133,6 +142,25 @@ describe("POST /api/stripe/webhook", () => {
       expect(sendEmail).not.toHaveBeenCalled();
     });
 
+    it("répond 500 pour que Stripe réessaie quand le PaymentIntent n'a pas pu être vérifié", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await seedPendingOrder();
+      nextEvent("checkout.session.completed");
+      stripe.paymentIntents.retrieve.mockRejectedValue(new Error("Stripe injoignable"));
+
+      const res = await sendWebhook();
+
+      expect(res.status).toBe(500);
+      expect((await Reservation.findOne())!.paymentStatus).toBe("pending");
+    });
+
+    it("répond 500 tant que le PaymentIntent est en cours de traitement", async () => {
+      await seedPendingOrder();
+      nextEvent("checkout.session.completed");
+      stripe.paymentIntents.retrieve.mockResolvedValue({ id: "pi_test", status: "processing" });
+      expect((await sendWebhook()).status).toBe(500);
+    });
+
     it("ne traite qu'une fois un événement rejoué par Stripe", async () => {
       const creation = await seedPendingOrder();
       nextEvent("checkout.session.completed");
@@ -189,7 +217,7 @@ describe("POST /api/stripe/webhook", () => {
 
       expect(status).toBe(200);
       expect(body).toEqual({ received: true });
-      expect((await Reservation.findOne())!.status).toBe("cancelled");
+      expect((await Reservation.findOne())!).toMatchObject({ status: "cancelled", paymentStatus: "failed" });
       expect((await Creation.findById(creation._id))!.reserved).toBe(false);
       expect(stripe.checkout.sessions.retrieve).not.toHaveBeenCalled();
     });

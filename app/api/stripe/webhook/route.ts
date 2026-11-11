@@ -63,6 +63,14 @@ export async function POST(req: NextRequest) {
       console.log(
         `[WEBHOOK] Session ${fullSession.id}: paid=${result.paid}, réservations traitées=${result.processedCount}`
       );
+
+      // Paiement pas encore tranché (PaymentIntent en cours, Stripe injoignable) :
+      // la commande n'est PAS enregistrée, on répond 500 pour que Stripe réessaie.
+      if (!result.paid && result.pending) {
+        return new NextResponse("Paiement en cours de finalisation, réessayer plus tard", {
+          status: 500,
+        });
+      }
     }
 
     // Session expirée sans paiement : libérer les articles uniques réservés

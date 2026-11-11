@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import { getStripeInstance } from "@/lib/stripe";
 import { getAppUrl } from "@/lib/url";
+import { releaseCreationLocks } from "@/lib/creation-lock";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import Settings from "@/models/Settings";
@@ -17,6 +18,30 @@ type DeliveryMode = "pickup" | "shipping";
 // + 60 s de marge contre une dérive d'horloge. Le webhook `checkout.session.expired`
 // libère les articles réservés si le paiement n'aboutit pas.
 const CHECKOUT_SESSION_TTL_SECONDS = 30 * 60 + 60;
+
+/**
+ * Expire une ancienne session Checkout. Renvoie son état final : "expired" si elle
+ * ne peut plus être payée, "paid" si elle l'a été, "open" si son sort est inconnu.
+ */
+async function expireCheckoutSession(
+  stripe: Stripe,
+  sessionId: string
+): Promise<"expired" | "paid" | "open"> {
+  try {
+    await stripe.checkout.sessions.expire(sessionId);
+    return "expired";
+  } catch (expireErr) {
+    try {
+      const stale = await stripe.checkout.sessions.retrieve(sessionId);
+      if (stale.status === "expired") return "expired";
+      if (stale.status === "complete") return "paid";
+    } catch (retrieveErr) {
+      console.error(`[CHECKOUT] Session ${sessionId} introuvable :`, retrieveErr);
+    }
+    console.error(`[CHECKOUT] Expiration de la session ${sessionId} impossible :`, expireErr);
+    return "open";
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,7 +80,8 @@ export async function POST(req: NextRequest) {
 
     // Récupérer les créations et vérifier leur disponibilité
     const creationIds = items.map((item: any) => item.creationId);
-    const creations = await Creation.find({ _id: { $in: creationIds } });
+    // Une pièce cachée n'est pas en vente : traitée comme inexistante
+    const creations = await Creation.find({ _id: { $in: creationIds }, hidden: { $ne: true } });
 
     if (creations.length !== items.length) {
       return new NextResponse("Certaines créations n'existent pas", {
@@ -124,22 +150,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Identifiants des futures réservations, générés AVANT le verrouillage : chaque
+    // pièce est verrouillée au nom de SA réservation (reservedByReservationId), et
+    // seule cette réservation pourra ensuite la libérer (lib/creation-lock.ts).
+    const reservationIdByCreation = new Map<string, mongoose.Types.ObjectId>(
+      creations.map((c) => [c._id.toString(), new mongoose.Types.ObjectId()])
+    );
+
     // 🔒 Articles UNIQUES : réserver ATOMIQUEMENT chaque création avant de créer
     // la session de paiement. La condition `sold/reserved: { $ne: true }` garantit
-    // qu'un seul client à la fois peut engager le paiement d'un article donné
-    // (même sémantique que la route de réservation manuelle).
+    // qu'un seul client à la fois peut engager le paiement d'un article donné.
     const reservedCreationIds: string[] = [];
 
     // Nettoyage en cas d'échec en aval : libère les articles réservés par CETTE requête
     const releaseReservedCreations = async () => {
       if (reservedCreationIds.length === 0) return;
       try {
-        await Creation.updateMany(
-          { _id: { $in: reservedCreationIds }, sold: { $ne: true } },
-          {
-            $set: { reserved: false },
-            $unset: { reservedName: "", reservedContact: "", reservedAt: "" },
-          }
+        await releaseCreationLocks(
+          reservedCreationIds.map((creationId) => ({
+            creationId,
+            reservationId: reservationIdByCreation.get(creationId)!,
+          }))
         );
       } catch (releaseErr) {
         console.error(
@@ -150,82 +181,93 @@ export async function POST(req: NextRequest) {
     };
 
     let unavailableCreation: any = null;
-    // Sessions Checkout précédentes du même acheteur à invalider (retry après abandon)
-    const staleSessionIds = new Set<string>();
+    // Ancienne session du même acheteur impossible à expirer (payée ou encore ouverte)
+    let blocked: { creation: any; state: "paid" | "open" } | null = null;
+
+    // Verrou posé au nom de l'acheteur et de SA réservation
+    const buyerName = session.user?.name || "";
+    const buyerEmail = session.user.email;
+    const lockFields = (reservationId: mongoose.Types.ObjectId) => ({
+      reserved: true,
+      reservedAt: new Date(),
+      reservedName: buyerName,
+      reservedContact: buyerEmail,
+      reservedByReservationId: reservationId,
+    });
 
     for (const creation of creations) {
+      const reservationId = reservationIdByCreation.get(creation._id.toString())!;
       let lockedCreation = await Creation.findOneAndUpdate(
         {
           _id: creation._id,
           sold: { $ne: true },
           reserved: { $ne: true },
+          // Cachée entre-temps par l'admin : plus en vente
+          hidden: { $ne: true },
         },
-        {
-          $set: {
-            reserved: true,
-            reservedAt: new Date(),
-            reservedName: session.user?.name || "",
-            reservedContact: session.user.email,
-          },
-        }
+        { $set: lockFields(reservationId) }
       );
 
       if (!lockedCreation) {
         // Article déjà verrouillé. Cas particulier : c'est CE client qui l'a
         // verrouillé via un checkout précédent abandonné (retour navigateur) —
         // sans cela il resterait bloqué jusqu'à l'expiration Stripe (~30 min).
-        // On ne re-verrouille que si le verrou vient bien d'un checkout Stripe
-        // de ce client (jamais par-dessus une réservation manuelle).
-        const ownCheckoutLock = await Reservation.exists({
+        // On ne reprend le verrou que s'il appartient à une réservation Stripe
+        // en attente de ce client (jamais par-dessus une autre réservation).
+        const staleReservations = await Reservation.find({
           creationId: creation._id,
           contact: session.user.email,
           paymentStatus: "pending",
           status: { $ne: "cancelled" },
           stripeCheckoutSessionId: { $exists: true, $ne: null },
-        });
+        }).select("_id stripeCheckoutSessionId");
+        const staleIds = staleReservations.map((r: any) => r._id);
 
-        if (ownCheckoutLock) {
+        const ownStaleLock =
+          staleIds.length > 0 &&
+          (await Creation.exists({
+            _id: creation._id,
+            sold: { $ne: true },
+            reserved: true,
+            reservedByReservationId: { $in: staleIds },
+          }));
+
+        if (ownStaleLock) {
+          // L'ancienne session doit être expirée AVANT d'invalider ses réservations :
+          // si elle a été payée entre-temps (ou reste ouverte), on s'arrête là,
+          // sinon le client serait débité sans commande puis une seconde fois.
+          const staleSessionIds = new Set<string>(
+            staleReservations.map((r: any) => r.stripeCheckoutSessionId).filter(Boolean)
+          );
+          for (const staleId of staleSessionIds) {
+            const state = await expireCheckoutSession(stripe, staleId);
+            if (state !== "expired") {
+              blocked = { creation, state };
+              break;
+            }
+          }
+          if (blocked) break;
+
+          await Reservation.updateMany(
+            { _id: { $in: staleIds }, paymentStatus: "pending" },
+            {
+              $set: {
+                status: "cancelled",
+                paymentStatus: "failed",
+                cancelReason: "Remplacée par une nouvelle session de paiement",
+              },
+            }
+          );
+
+          // Reprise du verrou (ou nouveau verrou si l'expiration l'a déjà libéré)
           lockedCreation = await Creation.findOneAndUpdate(
             {
               _id: creation._id,
               sold: { $ne: true },
-              reserved: true,
-              reservedContact: session.user.email,
+              $or: [{ reserved: { $ne: true } }, { reservedByReservationId: { $in: staleIds } }],
             },
-            { $set: { reservedAt: new Date() } }
+            { $set: lockFields(reservationId) }
           );
-
-          if (lockedCreation) {
-            // Invalider les anciennes réservations pending de ce client sur cet article
-            const staleReservations = await Reservation.find({
-              creationId: creation._id,
-              contact: session.user.email,
-              paymentStatus: "pending",
-              status: { $ne: "cancelled" },
-              stripeCheckoutSessionId: { $exists: true, $ne: null },
-            }).select("stripeCheckoutSessionId");
-
-            staleReservations.forEach((r: any) => {
-              if (r.stripeCheckoutSessionId) staleSessionIds.add(r.stripeCheckoutSessionId);
-            });
-
-            await Reservation.updateMany(
-              {
-                creationId: creation._id,
-                contact: session.user.email,
-                paymentStatus: "pending",
-                status: { $ne: "cancelled" },
-                stripeCheckoutSessionId: { $exists: true, $ne: null },
-              },
-              {
-                $set: {
-                  status: "cancelled",
-                  paymentStatus: "failed",
-                  cancelReason: "Remplacée par une nouvelle session de paiement",
-                },
-              }
-            );
-          }
         }
       }
 
@@ -237,14 +279,15 @@ export async function POST(req: NextRequest) {
       reservedCreationIds.push(creation._id.toString());
     }
 
-    // Expirer les anciennes sessions Stripe remplacées (best effort : empêche
-    // un double paiement si l'ancienne session est encore ouverte dans un onglet)
-    for (const staleId of staleSessionIds) {
-      try {
-        await stripe.checkout.sessions.expire(staleId);
-      } catch {
-        // Session déjà expirée/complétée : rien à faire
-      }
+    if (blocked) {
+      await releaseReservedCreations();
+      const title = blocked.creation.title;
+      return new NextResponse(
+        blocked.state === "paid"
+          ? `Un paiement a déjà été effectué pour « ${title} » : il est en cours d'enregistrement. Consultez vos commandes dans quelques instants.`
+          : `Votre précédente session de paiement pour « ${title} » est encore ouverte. Réessayez dans quelques instants.`,
+        { status: 409 }
+      );
     }
 
     if (unavailableCreation) {
@@ -304,9 +347,9 @@ export async function POST(req: NextRequest) {
     // Pré-générer les IDs des réservations : la session Stripe est créée AVANT
     // les réservations (évite les réservations orphelines sans sessionId si
     // l'appel Stripe échoue), mais ses metadata référencent déjà leurs IDs.
-    const reservationDocs = items.map((item: any, index: number) => ({
-      _id: new mongoose.Types.ObjectId(),
-      creationId: item.creationId,
+    const reservationDocs = creations.map((creation, index: number) => ({
+      _id: reservationIdByCreation.get(creation._id.toString())!,
+      creationId: creation._id,
       userId: (session.user as any).id,
       name: session.user?.name || "",
       contact: session.user.email,

@@ -29,7 +29,13 @@ const emailsTo = (to: string) => vi.mocked(sendEmail).mock.calls.filter(([e]) =>
 /** Réservation liée à une création, avec acheteur enregistré. */
 async function orderFixture(reservation: Record<string, unknown> = {}, creation: Record<string, unknown> = {}) {
   const c = await createCreation({ title: "Pull <b>", color: "Rouge", images: ["https://img/1.jpg"], ...creation });
-  const r = await createReservation({ name: "Alice <script>", contact: "client@example.com", creationId: c._id, ...reservation });
+  const r = await createReservation({
+    name: "Alice <script>",
+    contact: "client@example.com",
+    creationId: c._id,
+    paymentStatus: "paid",
+    ...reservation,
+  });
   return { creation: c, reservation: r };
 }
 
@@ -226,6 +232,52 @@ describe("PATCH /api/admin/reservations/[id]", () => {
       expect(seller.html).toContain("Rupture &lt;de laine&gt;");
     });
 
+    it("libère aussi le verrou d'une commande saisie par l'admin", async () => {
+      const { reservation, creation } = await orderFixture({ status: "preparing" }, { sold: true });
+      await Creation.updateOne(
+        { _id: creation._id },
+        { $set: { reserved: true, reservedName: "Claire", reservedContact: "c@example.com", reservedByReservationId: reservation._id } }
+      );
+      asAdmin();
+      await patch(reservation.id, { status: "cancelled" });
+      const freed = await Creation.findById(creation._id).lean<any>();
+      expect(freed).toMatchObject({ sold: false, reserved: false });
+      for (const key of ["reservedName", "reservedContact", "reservedAt", "reservedByReservationId"]) {
+        expect(freed).not.toHaveProperty(key);
+      }
+    });
+
+    it("ne remet pas en vente une pièce revendue depuis à un autre acheteur", async () => {
+      const { reservation, creation } = await orderFixture({ status: "validated" }, { sold: true });
+      await createReservation({ creationId: creation._id, contact: "autre@example.com", paymentStatus: "paid", status: "preparing" });
+      asAdmin();
+      await patch(reservation.id, { status: "cancelled" });
+      expect((await Creation.findById(creation._id).lean<any>()).sold).toBe(true);
+      expect(revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it("une ancienne commande payée puis annulée ne bloque pas la remise en vente", async () => {
+      const { reservation, creation } = await orderFixture({ status: "validated" }, { sold: true });
+      await createReservation({ creationId: creation._id, paymentStatus: "paid", status: "cancelled" });
+      asAdmin();
+      await patch(reservation.id, { status: "cancelled" });
+      expect((await Creation.findById(creation._id).lean<any>()).sold).toBe(false);
+    });
+
+    it("pour une réservation non payée, ne lève que son propre verrou", async () => {
+      const mine = await orderFixture({ paymentStatus: "pending", status: "preparing" });
+      await Creation.updateOne({ _id: mine.creation._id }, { $set: { reserved: true, reservedByReservationId: mine.reservation._id } });
+      const other = await orderFixture({ paymentStatus: "pending", status: "preparing" });
+      await Creation.updateOne({ _id: other.creation._id }, { $set: { reserved: true, reservedByReservationId: new mongoose.Types.ObjectId() } });
+      asAdmin();
+
+      await patch(mine.reservation.id, { status: "cancelled" });
+      await patch(other.reservation.id, { status: "cancelled" });
+
+      expect((await Creation.findById(mine.creation._id).lean<any>()).reserved).toBe(false);
+      expect((await Creation.findById(other.creation._id).lean<any>()).reserved).toBe(true);
+    });
+
     it("utilise la raison déjà enregistrée ou un texte par défaut", async () => {
       const { reservation } = await orderFixture();
       asAdmin();
@@ -310,6 +362,23 @@ describe("DELETE /api/admin/reservations/[id]", () => {
     expect(await Reservation.countDocuments()).toBe(0);
     expect((await Creation.findById(creation._id).lean<any>()).sold).toBe(false);
     expect(revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("ne touche pas à la pièce en supprimant une commande déjà annulée", async () => {
+    // La pièce a été revendue après l'annulation : la supprimer ne doit rien rouvrir
+    const { reservation, creation } = await orderFixture({ status: "cancelled" }, { sold: true });
+    asAdmin();
+    expect((await del(reservation.id)).status).toBe(204);
+    expect((await Creation.findById(creation._id).lean<any>()).sold).toBe(true);
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("ne remet pas en vente une pièce détenue par une autre commande payée", async () => {
+    const { reservation, creation } = await orderFixture({}, { sold: true });
+    await createReservation({ creationId: creation._id, paymentStatus: "paid", status: "delivered" });
+    asAdmin();
+    expect((await del(reservation.id)).status).toBe(204);
+    expect((await Creation.findById(creation._id).lean<any>()).sold).toBe(true);
   });
 
   it("supprime une réservation sans création liée", async () => {

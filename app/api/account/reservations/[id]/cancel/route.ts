@@ -8,6 +8,8 @@ import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import { escapeHtml } from "@/lib/escape";
+import { releaseCreationLock } from "@/lib/creation-lock";
+import mongoose from "mongoose";
 
 export async function PATCH(
   req: NextRequest,
@@ -23,10 +25,18 @@ export async function PATCH(
 
     await connectToDatabase();
 
-    const { reason } = await req.json();
+    if (!mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ error: "Reservation not found" }, { status: 404 });
+    }
+
+    const { reason: rawReason } = await req.json();
+    if (rawReason !== undefined && rawReason !== null && typeof rawReason !== "string") {
+      return NextResponse.json({ error: "Raison invalide" }, { status: 400 });
+    }
+    const reason = (rawReason ?? "").trim().slice(0, 1000);
 
     // 1️⃣ On récupère la réservation par ID
-    const reservation = await Reservation.findById(id).populate("creationId");
+    const reservation = await Reservation.findById(id);
 
     if (!reservation) {
       return NextResponse.json(
@@ -48,37 +58,29 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // 3️⃣ Si déjà validée → on ne laisse plus annuler
-    if (reservation.status === "validated") {
+    // 3️⃣ Annulation atomique, seulement pour une réservation en attente et non payée :
+    // une commande payée/expédiée se rembourse via la boutique, et une réservation
+    // déjà annulée ne peut pas être ré-annulée (ni relibérer la pièce).
+    const cancelled = await Reservation.findOneAndUpdate(
+      { _id: reservation._id, status: "pending", paymentStatus: { $ne: "paid" } },
+      { $set: { status: "cancelled", cancelReason: reason, cancelledBy: "user" } },
+      { new: true }
+    );
+    if (!cancelled) {
       return NextResponse.json(
-        { error: "Cette commande est déjà validée, impossible de l'annuler." },
+        { error: "Cette réservation ne peut plus être annulée. Contactez la boutique." },
         { status: 400 }
       );
     }
 
-    // 4️⃣ On annule + raison
-    reservation.status = "cancelled";
-    (reservation as any).cancelReason = reason ?? "";
-    (reservation as any).cancelledBy = "user"; // ✅ C'est l'utilisateur qui annule
-    await reservation.save();
-
-    // 5️⃣ On libère la création si elle n'est pas vendue
-    const creation: any = reservation.creationId;
-    if (creation && !creation.sold) {
-      // Condition sold côté requête : ne libère jamais un article vendu entre-temps
-      await CreationModel.findOneAndUpdate(
-        { _id: creation._id, sold: { $ne: true } },
-        {
-          $set: { reserved: false },
-          $unset: {
-            reservedName: "",
-            reservedContact: "",
-            reservedMessage: "",
-            reservedAt: "",
-          },
-        }
-      );
+    // 4️⃣ On libère la pièce, seulement si son verrou appartient encore à cette réservation
+    if (cancelled.creationId) {
+      await releaseCreationLock(cancelled.creationId, cancelled._id);
     }
+
+    const creation: any = cancelled.creationId
+      ? await CreationModel.findById(cancelled.creationId).lean()
+      : null;
 
     // 6️⃣ Emails (inchangé, j'utilise ta logique)
     if (creation) {
@@ -94,15 +96,11 @@ export async function PATCH(
       const priceLabel =
         creation.price != null ? `${creation.price} €` : "Prix sur demande";
 
-      const displayedReason = escapeHtml(
-        (reason && reason.trim().length > 0) ||
-          ((reservation as any).cancelReason &&
-            (reservation as any).cancelReason.trim().length > 0)
-          ? (reason || (reservation as any).cancelReason)
-          : "Aucune raison précisée."
-      );
-      const safeName = escapeHtml(reservation.name);
-      const safeContact = escapeHtml(reservation.contact);
+      const displayedReason = escapeHtml(reason || "Aucune raison précisée.");
+      const safeName = escapeHtml(cancelled.name);
+      const safeContact = escapeHtml(cancelled.contact);
+      const safeTitle = escapeHtml(creation.title);
+      const safeColor = escapeHtml(creation.color);
 
       // Les emails partent ensemble et ne font pas échouer la requête (sendEmail throw en cas d'erreur)
       const emails: Promise<unknown>[] = [];
@@ -110,7 +108,7 @@ export async function PATCH(
       // 📧 Email à l'acheteur (c'est lui qui a annulé)
       if (shouldSendEmail) {
         emails.push(sendEmail({
-        to: reservation.contact,
+        to: cancelled.contact,
         subject: "❌ Vous avez annulé votre réservation",
         html: emailTemplate(`
             <h1 style="font-size:20px;margin:0 0 12px 0;">Votre réservation a été annulée</h1>
@@ -121,13 +119,13 @@ export async function PATCH(
 
             <div style="margin-top:16px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
               ${productImage
-            ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+            ? `<img src="${productImage}" alt="${safeTitle}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
             : ""
           }
               <div style="font-size:13px;flex:1;">
-                <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
+                <p style="margin:0 0 4px 0;font-weight:600;">${safeTitle}</p>
                 ${creation.color
-            ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+            ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${safeColor}</strong></p>`
             : ""
           }
                 <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>
@@ -160,13 +158,13 @@ export async function PATCH(
 
               <div style="margin-top:12px;border-radius:12px;border:1px solid #fee2e2;padding:12px;display:flex;gap:12px;background:#fef2f2;">
                 ${productImage
-              ? `<img src="${productImage}" alt="${creation.title}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
+              ? `<img src="${productImage}" alt="${safeTitle}" style="width:96px;height:96px;object-fit:cover;border-radius:8px;flex-shrink:0;" />`
               : ""
             }
                 <div style="font-size:13px;flex:1;">
-                  <p style="margin:0 0 4px 0;font-weight:600;">${creation.title}</p>
+                  <p style="margin:0 0 4px 0;font-weight:600;">${safeTitle}</p>
                   ${creation.color
-              ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${creation.color}</strong></p>`
+              ? `<p style="margin:0 0 4px 0;">Couleur : <strong>${safeColor}</strong></p>`
               : ""
             }
                   <p style="margin:0 0 4px 0;">Prix : <strong>${priceLabel}</strong></p>

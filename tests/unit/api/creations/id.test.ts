@@ -263,6 +263,7 @@ describe("PATCH /api/creations/[id]", () => {
       reservedContact: "alice@example.com",
       reservedMessage: "Merci",
       reservedAt: new Date(),
+      reservedByReservationId: new mongoose.Types.ObjectId(),
     });
     asAdmin();
     await patch(c._id.toString(), { sold: false });
@@ -273,6 +274,16 @@ describe("PATCH /api/creations/[id]", () => {
     expect(doc.reservedContact).toBeUndefined();
     expect(doc.reservedMessage).toBeUndefined();
     expect(doc.reservedAt).toBeUndefined();
+    expect(doc.reservedByReservationId).toBeUndefined();
+  });
+
+  it("oublie la réservation détentrice quand l'admin lève le verrou à la main", async () => {
+    const c = await createCreation({ reserved: true, reservedByReservationId: new mongoose.Types.ObjectId() });
+    asAdmin();
+    await patch(c._id.toString(), { reserved: false });
+    const doc = await fresh(c._id);
+    expect(doc.reserved).toBe(false);
+    expect(doc.reservedByReservationId).toBeUndefined();
   });
 
   it("relance le badge « nouveau » à la demande", async () => {

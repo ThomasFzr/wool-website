@@ -8,6 +8,8 @@ import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
+import CheckoutNotification from "@/models/CheckoutNotification";
+import { LOCK_FIELDS_UNSET, releaseCreationLocks } from "@/lib/creation-lock";
 
 export type FulfillmentResult = {
   /** true si la session Stripe est réellement payée (payment_status=paid, status=complete, PaymentIntent succeeded) */
@@ -110,6 +112,7 @@ export async function fulfillCheckoutSession(
 
   if (reservations.length === 0) {
     console.error(`[FULFILL] Aucune réservation trouvée pour la session ${session.id}`);
+    await settleOrphanPayment({ session, paymentIntentId, appUrl });
     return { paid: true, processedCount: 0, pending: false };
   }
 
@@ -146,8 +149,11 @@ export async function fulfillCheckoutSession(
   // Traiter toutes les réservations (mises à jour atomiques)
   const processedReservations: any[] = [];
   const processedCreations: any[] = [];
+  const conflicts: SoldConflict[] = [];
+  // Réservations prises en charge par CET appel (fulfillingAt posé)
+  const gatedIds: unknown[] = [];
 
-  await Promise.all(
+  const outcomes = await Promise.allSettled(
     reservations.map(async (reservation: any, index: number) => {
       // Protection contre les appels concurrents et les doubles traitements :
       // findOneAndUpdate conditionnel — seulement si encore "pending"
@@ -164,6 +170,7 @@ export async function fulfillCheckoutSession(
             paymentStatus: "paid",
             status: "validated",
             paidAt: now,
+            fulfillingAt: now,
             deliveryMode: deliveryMode,
             shippingCost:
               deliveryMode === "shipping" && totalShippingCost > 0 && index === 0
@@ -180,65 +187,380 @@ export async function fulfillCheckoutSession(
         console.log(`[FULFILL] Réservation ${reservation._id} déjà traitée, skip`);
         return;
       }
+      gatedIds.push(updatedReservation._id);
 
       // Marquer la création vendue + incrémenter salesCount ATOMIQUEMENT :
       // la condition `sold: { $ne: true }` garantit que l'incrément n'a lieu qu'une fois.
       // On libère aussi le flag `reserved` posé à la création de la session Checkout.
-      let creation = await Creation.findOneAndUpdate(
+      const creation = await Creation.findOneAndUpdate(
         { _id: updatedReservation.creationId, sold: { $ne: true } },
         {
           $set: { sold: true, reserved: false },
-          $unset: {
-            reservedName: "",
-            reservedContact: "",
-            reservedMessage: "",
-            reservedAt: "",
-          },
+          $unset: LOCK_FIELDS_UNSET,
           $inc: { salesCount: 1 },
         },
         { new: true }
       );
 
-      // Déjà vendue (cas limite) : on récupère quand même la création pour l'email,
-      // sans ré-incrémenter salesCount.
-      if (!creation) {
-        creation = await Creation.findById(updatedReservation.creationId);
-      }
-
       if (creation) {
         processedReservations.push(updatedReservation);
         processedCreations.push(creation);
+      } else {
+        // Pièce déjà vendue (ou supprimée) : ce paiement ne peut pas être honoré
+        conflicts.push({
+          reservation: updatedReservation,
+          creation: await Creation.findById(updatedReservation.creationId),
+        });
       }
     })
   );
 
-  if (processedReservations.length > 0 && processedCreations.length > 0) {
+  // Aucune réservation en attente : soit un autre appel les a déjà traitées
+  // (webhook + verify-session, idempotence), soit elles avaient été invalidées
+  // (session remplacée, expirée) et ce paiement ne correspond à aucune commande.
+  if (processedReservations.length === 0 && conflicts.length === 0) {
+    const recorded = await Reservation.exists({
+      _id: { $in: reservations.map((r: any) => r._id) },
+      paymentStatus: { $in: ["paid", "refunded"] },
+    });
+    if (!recorded) {
+      console.error(`[FULFILL] Session ${session.id} payée sans réservation en attente`);
+      await settleOrphanPayment({ session, paymentIntentId, appUrl, buyerName: reservations[0].name });
+    }
+  }
+
+  if (conflicts.length > 0) {
+    const settled = await settleSoldConflicts({
+      session,
+      paymentIntentId,
+      conflicts,
+      shippingCost: deliveryMode === "shipping" ? totalShippingCost : 0,
+    });
+    revalidateOrders();
+    await runInBackground(buildConflictEmailDispatcher({ settled, appUrl }));
+  }
+
+  // Traitement de CET appel terminé : ses réservations ne bloquent plus l'email
+  if (gatedIds.length > 0) {
+    await Reservation.updateMany({ _id: { $in: gatedIds } }, { $unset: { fulfillingAt: "" } });
+  }
+
+  if (processedReservations.length > 0) {
     // La vitrine et les commandes ont changé : invalider le cache.
     // Le paiement est DÉJÀ enregistré à ce stade : un échec de revalidation
     // (appel hors contexte de requête, ex. script/cron) ne doit jamais
     // transformer une commande payée en erreur pour le client.
     revalidateCatalog();
     revalidateOrders();
+  }
 
-    // Emails en tâche de fond : jamais bloquants, jamais d'échec de la requête
-    const dispatchEmails = buildEmailDispatcher({
-      processedReservations,
-      processedCreations,
+  // Une réservation n'a pas pu être traitée : erreur remontée (le webhook répond
+  // 500 et Stripe réessaie), l'email partira lors du nouvel essai.
+  const failure = outcomes.find((o): o is PromiseRejectedResult => o.status === "rejected");
+  if (failure) throw failure.reason;
+
+  await sendOrderConfirmationOnce({
+    session,
+    reservationIds: reservations.map((r: any) => r._id),
+    deliveryMode,
+    totalShippingCost,
+    appUrl,
+  });
+
+  return { paid: true, processedCount: processedReservations.length, pending: false };
+}
+
+// Au-delà, un traitement interrompu (crash) ne bloque plus l'email de confirmation
+const FULFILLING_TIMEOUT_MS = 2 * 60 * 1000;
+
+/**
+ * Email de confirmation de la commande, décidé au niveau de la SESSION :
+ * - attend que toutes ses réservations soient traitées (webhook et verify-session
+ *   peuvent s'en partager le traitement) : c'est le dernier appel qui envoie ;
+ * - un seul envoi grâce à l'_id unique de CheckoutNotification ;
+ * - construit à partir de TOUTES les réservations honorées de la session.
+ */
+async function sendOrderConfirmationOnce({
+  session,
+  reservationIds,
+  deliveryMode,
+  totalShippingCost,
+  appUrl,
+}: {
+  session: Stripe.Checkout.Session;
+  reservationIds: unknown[];
+  deliveryMode: string;
+  totalShippingCost: number;
+  appUrl: string;
+}) {
+  // Toutes les réservations de la session, pas seulement celles vues par cet appel
+  const all = await Reservation.find({
+    $or: [{ _id: { $in: reservationIds } }, { stripeCheckoutSessionId: session.id }],
+  }).lean<any[]>();
+  const busy = all.some(
+    (r) =>
+      r.paymentStatus === "pending" ||
+      (r.fulfillingAt && Date.now() - new Date(r.fulfillingAt).getTime() < FULFILLING_TIMEOUT_MS)
+  );
+  if (busy) return;
+
+  const honored = all.filter((r) => r.paymentStatus === "paid" && r.status !== "cancelled");
+  if (honored.length === 0) return;
+
+  try {
+    await CheckoutNotification.create({ _id: session.id });
+  } catch (err: any) {
+    if (err?.code === 11000) return; // déjà envoyé par un autre appel
+    throw err;
+  }
+
+  const creations = await Creation.find({ _id: { $in: honored.map((r) => r.creationId) } }).lean<any[]>();
+  const byId = new Map(creations.map((c) => [String(c._id), c]));
+  const items = honored.filter((r) => byId.has(String(r.creationId)));
+
+  await runInBackground(
+    buildEmailDispatcher({
+      processedReservations: items,
+      processedCreations: items.map((r) => byId.get(String(r.creationId))),
       deliveryMode,
       totalShippingCost,
+      // Montant réellement payé, sauf si une partie de la commande a été remboursée
+      amountTotal: honored.length === all.length ? session.amount_total : null,
       appUrl,
-    });
+    })
+  );
+}
 
+/**
+ * Exécute une tâche après l'envoi de la réponse HTTP (`after()`, Next 15.1+) ;
+ * hors contexte de requête, l'attend directement. La tâche ne doit jamais throw.
+ */
+async function runInBackground(task: () => Promise<void>) {
+  try {
+    after(task);
+  } catch {
+    await task();
+  }
+}
+
+/**
+ * Paiement reçu pour une session qui ne correspond plus à aucune commande en
+ * attente : remboursement intégral (clé d'idempotence par session) et alerte.
+ */
+async function settleOrphanPayment({
+  session,
+  paymentIntentId,
+  appUrl,
+  buyerName,
+}: {
+  session: Stripe.Checkout.Session;
+  paymentIntentId: string | undefined;
+  appUrl: string;
+  buyerName?: string;
+}) {
+  let refunded = false;
+  if (paymentIntentId) {
     try {
-      // `after()` exécute la tâche après l'envoi de la réponse HTTP (Next 15.1+)
-      after(dispatchEmails);
-    } catch {
-      // Hors contexte de requête : on attend, mais dispatchEmails ne throw jamais
-      await dispatchEmails();
+      await getStripeInstance().refunds.create(
+        { payment_intent: paymentIntentId },
+        { idempotencyKey: `orphan-${session.id}` }
+      );
+      refunded = true;
+    } catch (err) {
+      console.error(`[FULFILL] Remboursement impossible (orphan-${session.id}):`, err);
     }
   }
 
-  return { paid: true, processedCount: processedReservations.length, pending: false };
+  const buyerEmail = session.customer_email;
+  const amount = ((session.amount_total ?? 0) / 100).toFixed(2);
+  const safeSessionId = escapeHtml(session.id);
+
+  await runInBackground(async () => {
+    const results = await Promise.allSettled([
+      buyerEmail
+        ? sendEmail({
+            to: buyerEmail,
+            subject: "Paiement non enregistré - MailleMum",
+            html: emailTemplate(`
+              <h1 style="font-size:20px;margin:0 0 12px 0;color:#0f172a;">Paiement non enregistré</h1>
+              <p style="font-size:14px;margin:0 0 12px 0;color:#475569;line-height:1.6;">
+                Bonjour <strong>${escapeHtml(buyerName) || "👋"}</strong>,<br/>
+                Nous avons reçu un paiement de ${amount} € qui ne correspond plus à une commande en cours
+                (une nouvelle session de paiement l'avait remplacée).
+                ${refunded ? "Il vous a été intégralement remboursé." : "Nous revenons vers vous très vite pour vous rembourser."}
+              </p>
+            `),
+          })
+        : Promise.resolve(null),
+      process.env.SELLER_EMAIL
+        ? sendEmail({
+            to: process.env.SELLER_EMAIL,
+            subject: "⚠️ Paiement reçu sans commande en attente",
+            html: emailTemplate(`
+              <h1 style="font-size:18px;margin:0 0 12px 0;">Paiement sans commande</h1>
+              <p style="font-size:14px;margin:0 0 12px 0;">
+                Session Stripe <code>${safeSessionId}</code> (${escapeHtml(buyerEmail)}) : ${amount} € payés
+                alors qu'aucune réservation n'était en attente.
+                ${refunded ? "Remboursement automatique effectué." : "<strong>Remboursement automatique impossible : à rembourser depuis Stripe.</strong>"}
+              </p>
+              <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+                <a href="${appUrl}/admin/reservations">Voir les commandes</a>
+              </p>
+            `),
+          })
+        : Promise.resolve(null),
+    ]);
+    results.forEach((result, i) => {
+      if (result.status === "rejected") {
+        console.error(
+          `[FULFILL] Échec de l'email de paiement orphelin ${i === 0 ? "acheteur" : "vendeur"}:`,
+          (result.reason as any)?.message || result.reason
+        );
+      }
+    });
+  });
+}
+
+type SoldConflict = { reservation: any; creation: any | null };
+type SettledConflict = SoldConflict & { refunded: boolean };
+
+/**
+ * Paiement reçu pour une pièce déjà vendue (ou supprimée) : la réservation est
+ * annulée et la pièce remboursée automatiquement (montant connu = prix de la
+ * pièce). Les frais de port sont remboursés aussi quand AUCUN article de la
+ * commande n'a pu être honoré. Les clés d'idempotence Stripe empêchent un double
+ * remboursement si le traitement est rejoué. Sans remboursement possible, la
+ * réservation reste « paid » (visible dans l'admin) pour un remboursement manuel.
+ */
+async function settleSoldConflicts({
+  session,
+  paymentIntentId,
+  conflicts,
+  shippingCost,
+}: {
+  session: Stripe.Checkout.Session;
+  paymentIntentId: string | undefined;
+  conflicts: SoldConflict[];
+  shippingCost: number;
+}): Promise<SettledConflict[]> {
+  const stripe = getStripeInstance();
+
+  const refund = async (amount: number, idempotencyKey: string) => {
+    if (!paymentIntentId || !(amount > 0)) return false;
+    try {
+      await stripe.refunds.create(
+        { payment_intent: paymentIntentId, amount: Math.round(amount * 100) },
+        { idempotencyKey }
+      );
+      return true;
+    } catch (err) {
+      console.error(`[FULFILL] Remboursement impossible (${idempotencyKey}):`, err);
+      return false;
+    }
+  };
+
+  const settled: SettledConflict[] = [];
+  for (const { reservation, creation } of conflicts) {
+    const refunded = await refund(creation?.price, `conflict-${reservation._id}`);
+    await Reservation.updateOne(
+      { _id: reservation._id },
+      {
+        $set: {
+          status: "cancelled",
+          paymentStatus: refunded ? "refunded" : "paid",
+          cancelReason: refunded
+            ? "Pièce déjà vendue : paiement remboursé automatiquement"
+            : "Pièce déjà vendue : paiement à rembourser manuellement",
+        },
+      }
+    );
+    console.error(
+      `[FULFILL] Session ${session.id}: réservation ${reservation._id} en conflit (pièce déjà vendue), remboursée=${refunded}`
+    );
+    settled.push({ reservation, creation, refunded });
+  }
+
+  // Aucun article de la commande honoré (ni en cours de traitement par un appel
+  // concurrent) : rembourser aussi les frais de port
+  const honored = await Reservation.exists({
+    stripeCheckoutSessionId: session.id,
+    paymentStatus: { $in: ["paid", "pending"] },
+    status: { $ne: "cancelled" },
+  });
+  if (!honored && shippingCost > 0) {
+    await refund(shippingCost, `conflict-shipping-${session.id}`);
+  }
+
+  return settled;
+}
+
+/** Emails d'un conflit : l'acheteur est prévenu, la vendeuse alertée. Ne throw jamais. */
+function buildConflictEmailDispatcher({
+  settled,
+  appUrl,
+}: {
+  settled: SettledConflict[];
+  appUrl: string;
+}): () => Promise<void> {
+  const first = settled[0].reservation;
+  const buyerName = escapeHtml(first.name);
+  const buyerContact = escapeHtml(first.contact);
+  const lines = settled
+    .map(
+      ({ reservation, creation, refunded }) =>
+        `<li>${escapeHtml(creation?.title ?? `pièce supprimée (${reservation.creationId})`)} — ${
+          refunded ? "remboursée automatiquement" : "<strong>à rembourser manuellement</strong>"
+        }</li>`
+    )
+    .join("");
+  const allRefunded = settled.every((c) => c.refunded);
+
+  const sendBuyerEmail = () =>
+    sendEmail({
+      to: first.contact,
+      subject: "Article indisponible - Votre commande chez MailleMum",
+      html: emailTemplate(`
+        <h1 style="font-size:20px;margin:0 0 12px 0;color:#0f172a;">Article indisponible</h1>
+        <p style="font-size:14px;margin:0 0 12px 0;color:#475569;line-height:1.6;">
+          Bonjour <strong>${buyerName || "👋"}</strong>,<br/>
+          Désolée, ${settled.length > 1 ? "ces pièces uniques ont" : "cette pièce unique a"} été vendue${settled.length > 1 ? "s" : ""} juste avant votre paiement :
+        </p>
+        <ul style="font-size:14px;color:#0f172a;">${settled.map(({ creation }) => `<li>${escapeHtml(creation?.title ?? "Article")}</li>`).join("")}</ul>
+        <p style="font-size:14px;margin:12px 0 0 0;color:#475569;">
+          ${allRefunded ? "Le montant correspondant vous a été remboursé : il apparaîtra sur votre compte sous quelques jours." : "Nous revenons vers vous très vite pour vous rembourser."}
+        </p>
+      `),
+    });
+
+  const sendSellerEmail = () => {
+    if (!process.env.SELLER_EMAIL) return Promise.resolve(null);
+    return sendEmail({
+      to: process.env.SELLER_EMAIL,
+      subject: `⚠️ Paiement reçu pour une pièce déjà vendue`,
+      html: emailTemplate(`
+        <h1 style="font-size:18px;margin:0 0 12px 0;">Paiement en conflit</h1>
+        <p style="font-size:14px;margin:0 0 12px 0;">
+          <strong>${buyerName}</strong> (${buyerContact}) a payé des pièces déjà vendues :
+        </p>
+        <ul style="font-size:14px;">${lines}</ul>
+        <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+          <a href="${appUrl}/admin/reservations" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Voir les commandes</a>
+        </p>
+      `),
+    });
+  };
+
+  return async () => {
+    const results = await Promise.allSettled([sendBuyerEmail(), sendSellerEmail()]);
+    results.forEach((result, i) => {
+      if (result.status === "rejected") {
+        console.error(
+          `[FULFILL] Échec de l'email de conflit ${i === 0 ? "acheteur" : "vendeur"}:`,
+          (result.reason as any)?.message || result.reason
+        );
+      }
+    });
+  };
 }
 
 /**
@@ -251,12 +573,14 @@ function buildEmailDispatcher({
   processedCreations,
   deliveryMode,
   totalShippingCost,
+  amountTotal,
   appUrl,
 }: {
   processedReservations: any[];
   processedCreations: any[];
   deliveryMode: string;
   totalShippingCost: number;
+  amountTotal: number | null;
   appUrl: string;
 }): () => Promise<void> {
   const firstReservation = processedReservations[0];
@@ -272,7 +596,7 @@ function buildEmailDispatcher({
     0
   );
   const shippingCost = deliveryMode === "shipping" ? totalShippingCost : 0;
-  const total = subtotal + shippingCost;
+  const total = amountTotal != null ? amountTotal / 100 : subtotal + shippingCost;
 
   // Générer le HTML pour tous les articles du résumé
   const orderSummaryItems = processedCreations
@@ -435,11 +759,12 @@ function buildEmailDispatcher({
 
 /**
  * Libère les articles d'une session Checkout expirée (checkout.session.expired) :
- * - passe les réservations encore "pending" de cette session à "cancelled"
+ * - passe les réservations encore "pending" de cette session à "cancelled" / "failed"
  *   (cancelledBy volontairement absent : l'enum du modèle n'accepte que "admin"/"user",
  *   aucun ne correspond à une expiration automatique) ;
- * - libère le flag `reserved` des créations concernées (uniquement si non vendues).
- * Idempotent : un second passage ne trouve plus de réservation "pending".
+ * - libère les pièces dont le verrou appartient ENCORE à ces réservations (un autre
+ *   acheteur a pu verrouiller la pièce depuis).
+ * Idempotent : un événement rejoué ne trouve plus de réservation "pending".
  */
 export async function releaseExpiredCheckoutSession(
   session: Stripe.Checkout.Session
@@ -463,44 +788,35 @@ export async function releaseExpiredCheckoutSession(
     return { cancelledCount: 0 };
   }
 
-  await Reservation.updateMany(
-    {
-      _id: { $in: pendingReservations.map((r: any) => r._id) },
-      paymentStatus: "pending",
-    },
-    {
-      $set: {
-        status: "cancelled",
-        cancelReason: "Session de paiement expirée",
-      },
-    }
-  );
-
-  const creationIds = pendingReservations
-    .map((r: any) => r.creationId)
-    .filter(Boolean);
-
-  if (creationIds.length > 0) {
-    await Creation.updateMany(
-      { _id: { $in: creationIds }, sold: { $ne: true } },
+  // Passage atomique pending → failed : seules les réservations basculées par CET
+  // appel libèrent leur pièce (deux événements concurrents ne libèrent rien deux fois)
+  const expired: any[] = [];
+  for (const reservation of pendingReservations) {
+    const updated = await Reservation.findOneAndUpdate(
+      { _id: reservation._id, paymentStatus: "pending" },
       {
-        $set: { reserved: false },
-        $unset: {
-          reservedName: "",
-          reservedContact: "",
-          reservedMessage: "",
-          reservedAt: "",
+        $set: {
+          status: "cancelled",
+          paymentStatus: "failed",
+          cancelReason: "Session de paiement expirée",
         },
       }
     );
+    if (updated) expired.push(updated);
+  }
 
+  const releasedCount = await releaseCreationLocks(
+    expired.map((r) => ({ creationId: r.creationId, reservationId: r._id }))
+  );
+
+  if (releasedCount > 0) {
     // Les articles redeviennent disponibles sur la vitrine
     revalidateCatalog();
   }
 
   console.log(
-    `[FULFILL] Session expirée ${session.id}: ${pendingReservations.length} réservation(s) annulée(s), ${creationIds.length} création(s) libérée(s)`
+    `[FULFILL] Session expirée ${session.id}: ${expired.length} réservation(s) annulée(s), ${releasedCount} création(s) libérée(s)`
   );
 
-  return { cancelledCount: pendingReservations.length };
+  return { cancelledCount: expired.length };
 }

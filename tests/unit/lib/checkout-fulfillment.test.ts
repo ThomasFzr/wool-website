@@ -9,6 +9,7 @@ import {
 import { connectToDatabase } from "@/lib/db";
 import { sendEmail } from "@/lib/sendEmail";
 import Creation from "@/models/Creation";
+import CheckoutNotification from "@/models/CheckoutNotification";
 import Reservation from "@/models/Reservation";
 import { createCreation, installFakeStripe, paidSession, type FakeStripe } from "../../helpers/stripe-fake";
 
@@ -94,10 +95,63 @@ describe("fulfillCheckoutSession", () => {
   });
 
   describe("commande payée", () => {
-    it("répond payé sans rien traiter quand aucune réservation ne correspond", async () => {
+    it("rembourse et signale un paiement sans aucune réservation", async () => {
       const result = await fulfillCheckoutSession(paidSession());
+
       expect(result).toEqual({ paid: true, processedCount: 0, pending: false });
-      expect(sendEmail).not.toHaveBeenCalled();
+      expect(stripe.refunds.create).toHaveBeenCalledWith(
+        { payment_intent: "pi_test" },
+        { idempotencyKey: "orphan-cs_test_1" }
+      );
+      expect(emailTo("client@example.com")[0][0].subject).toBe("Paiement non enregistré - MailleMum");
+      expect(emailTo("client@example.com")[0][0].html).toContain("intégralement remboursé");
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("Remboursement automatique effectué");
+    });
+
+    it("rembourse une session payée dont les réservations avaient été remplacées", async () => {
+      const creation = await createCreation();
+      await pendingReservation(creation._id, { paymentStatus: "failed", status: "cancelled" });
+
+      const result = await fulfillCheckoutSession(paidSession());
+
+      expect(result.processedCount).toBe(0);
+      expect(stripe.refunds.create).toHaveBeenCalledWith(
+        { payment_intent: "pi_test" },
+        { idempotencyKey: "orphan-cs_test_1" }
+      );
+      expect((await Creation.findById(creation._id))!.sold).toBe(false);
+    });
+
+    it("signale un remboursement manuel quand Stripe refuse ou sans PaymentIntent", async () => {
+      vi.stubEnv("SELLER_EMAIL", "");
+      stripe.refunds.create.mockRejectedValueOnce(new Error("refund ko"));
+      await fulfillCheckoutSession(paidSession());
+      expect(emailTo("client@example.com")[0][0].html).toContain("Nous revenons vers vous");
+      expect(console.error).toHaveBeenCalledWith("[FULFILL] Remboursement impossible (orphan-cs_test_1):", expect.any(Error));
+
+      vi.mocked(sendEmail).mockClear();
+      vi.stubEnv("SELLER_EMAIL", "vendeuse@example.com");
+      await fulfillCheckoutSession(paidSession({ payment_intent: null, customer_email: null, amount_total: null }));
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("à rembourser depuis Stripe");
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("0.00 €");
+    });
+
+    it("journalise les emails de paiement orphelin en échec", async () => {
+      vi.mocked(sendEmail).mockRejectedValueOnce(new Error("Resend indisponible")).mockRejectedValueOnce("quota");
+      await fulfillCheckoutSession(paidSession());
+      expect(console.error).toHaveBeenCalledWith(
+        "[FULFILL] Échec de l'email de paiement orphelin acheteur:",
+        "Resend indisponible"
+      );
+      expect(console.error).toHaveBeenCalledWith("[FULFILL] Échec de l'email de paiement orphelin vendeur:", "quota");
+    });
+
+    it("ne rembourse pas un traitement déjà fait par un autre appel (idempotence)", async () => {
+      const creation = await createCreation();
+      await pendingReservation(creation._id);
+      await fulfillCheckoutSession(paidSession());
+      await fulfillCheckoutSession(paidSession());
+      expect(stripe.refunds.create).not.toHaveBeenCalled();
     });
 
     it("valide la réservation, marque la pièce unique vendue et libère le verrou", async () => {
@@ -191,7 +245,7 @@ describe("fulfillCheckoutSession", () => {
       await pendingReservation(a._id);
       await pendingReservation(b._id);
 
-      const result = await fulfillCheckoutSession(paidSession());
+      const result = await fulfillCheckoutSession(paidSession({ amount_total: 5550 }));
 
       expect(result.processedCount).toBe(2);
       expect(await Creation.countDocuments({ sold: true })).toBe(2);
@@ -261,6 +315,7 @@ describe("fulfillCheckoutSession", () => {
 
       await fulfillCheckoutSession(
         paidSession({
+          amount_total: 8650,
           metadata: {
             deliveryMode: "shipping",
             shippingCost: "6.5",
@@ -383,28 +438,206 @@ describe("fulfillCheckoutSession", () => {
       expect(emailTo("client@example.com")).toHaveLength(1);
     });
 
-    it("n'incrémente pas les ventes d'une pièce déjà vendue mais confirme quand même le paiement", async () => {
+    it("un seul email complet quand webhook et verify-session se partagent les articles", async () => {
+      const a = await createCreation({ title: "Bonnet A", price: 30 });
+      const b = await createCreation({ title: "Snood B", price: 25 });
+      const ra = await pendingReservation(a._id);
+      const rb = await pendingReservation(b._id);
+      const session = paidSession({
+        amount_total: 6100,
+        metadata: {
+          deliveryMode: "shipping",
+          shippingCost: "6",
+          reservationIds: JSON.stringify([ra._id.toString(), rb._id.toString()]),
+        },
+      });
+      // Un premier appel n'a traité que l'article A (l'autre est encore en cours ailleurs)
+      vi.spyOn(Reservation, "find").mockImplementationOnce((() =>
+        Reservation.where({ _id: ra._id })) as any);
+      await fulfillCheckoutSession(session);
+      expect(emailTo("client@example.com")).toHaveLength(0);
+
+      await fulfillCheckoutSession(session);
+
+      const mails = emailTo("client@example.com");
+      expect(mails).toHaveLength(1);
+      expect(mails[0][0].html).toContain("Bonnet A");
+      expect(mails[0][0].html).toContain("Snood B");
+      // Frais de port comptés une seule fois, total = montant payé
+      expect(mails[0][0].html.match(/Frais de livraison/g)).toHaveLength(1);
+      expect(mails[0][0].html).toContain("61.00 €");
+      expect(emailTo("vendeuse@example.com")).toHaveLength(1);
+    });
+
+    it("affiche le montant payé même si le prix a changé depuis", async () => {
+      const creation = await createCreation({ price: 40 });
+      await pendingReservation(creation._id);
+      await Creation.updateOne({ _id: creation._id }, { $set: { price: 55 } });
+
+      await fulfillCheckoutSession(paidSession({ amount_total: 4000 }));
+
+      expect(emailTo("client@example.com")[0][0].html).toMatch(/Total[\s\S]*40\.00 €/);
+    });
+
+    it("attend un traitement concurrent en cours, mais pas un traitement interrompu depuis longtemps", async () => {
+      const creation = await createCreation();
+      await pendingReservation(creation._id, {
+        paymentStatus: "paid",
+        status: "validated",
+        fulfillingAt: new Date(),
+      });
+      await fulfillCheckoutSession(paidSession());
+      expect(sendEmail).not.toHaveBeenCalled();
+
+      await Reservation.updateOne({}, { $set: { fulfillingAt: new Date(Date.now() - 10 * 60 * 1000) } });
+      await fulfillCheckoutSession(paidSession());
+      expect(emailTo("client@example.com")).toHaveLength(1);
+    });
+
+    it("envoie l'email au nouvel essai quand un traitement a échoué en cours de route", async () => {
+      const a = await createCreation({ title: "A" });
+      const b = await createCreation({ title: "B" });
+      await pendingReservation(a._id);
+      await pendingReservation(b._id);
+      const realUpdate = Creation.findOneAndUpdate.bind(Creation);
+      vi.spyOn(Creation, "findOneAndUpdate")
+        .mockImplementationOnce(realUpdate as any)
+        .mockRejectedValueOnce(new Error("db down"));
+
+      await expect(fulfillCheckoutSession(paidSession())).rejects.toThrow("db down");
+      expect(sendEmail).not.toHaveBeenCalled();
+      // fulfillingAt est levé même en cas d'échec : le nouvel essai n'attend pas
+      expect(await Reservation.countDocuments({ fulfillingAt: { $exists: true } })).toBe(0);
+
+      await fulfillCheckoutSession(paidSession());
+      expect(emailTo("client@example.com")).toHaveLength(1);
+    });
+
+    it("propage une erreur d'enregistrement de l'envoi autre qu'un doublon", async () => {
+      const creation = await createCreation();
+      await pendingReservation(creation._id);
+      vi.spyOn(CheckoutNotification, "create").mockRejectedValueOnce(new Error("db down"));
+      await expect(fulfillCheckoutSession(paidSession())).rejects.toThrow("db down");
+    });
+
+    it("ne confirme pas une pièce déjà vendue : réservation annulée et pièce remboursée", async () => {
       const creation = await createCreation({ sold: true, salesCount: 1 });
       await pendingReservation(creation._id);
 
       const result = await fulfillCheckoutSession(paidSession());
 
-      expect(result.processedCount).toBe(1);
+      expect(result).toEqual({ paid: true, processedCount: 0, pending: false });
       expect((await Creation.findById(creation._id))!.salesCount).toBe(1);
+      expect(stripe.refunds.create).toHaveBeenCalledWith(
+        { payment_intent: "pi_test", amount: 4000 },
+        { idempotencyKey: `conflict-${(await Reservation.findOne())!._id}` }
+      );
+      expect((await Reservation.findOne())!).toMatchObject({
+        status: "cancelled",
+        paymentStatus: "refunded",
+        cancelReason: "Pièce déjà vendue : paiement remboursé automatiquement",
+      });
+      // Pas de « Paiement confirmé » : l'acheteur est prévenu, la vendeuse alertée
       expect(emailTo("client@example.com")).toHaveLength(1);
+      expect(emailTo("client@example.com")[0][0].subject).toBe("Article indisponible - Votre commande chez MailleMum");
+      expect(emailTo("client@example.com")[0][0].html).toContain("vous a été remboursé");
+      expect(emailTo("vendeuse@example.com")[0][0].subject).toBe("⚠️ Paiement reçu pour une pièce déjà vendue");
+      expect(revalidatePath).toHaveBeenCalledWith("/account/orders");
     });
 
-    it("valide la réservation d'une création supprimée sans envoyer d'email", async () => {
-      await pendingReservation(new mongoose.Types.ObjectId());
+    it("rembourse aussi les frais de port quand aucun article n'est honoré", async () => {
+      const creation = await createCreation({ sold: true });
+      await pendingReservation(creation._id);
 
-      const result = await fulfillCheckoutSession(paidSession());
+      await fulfillCheckoutSession(
+        paidSession({ metadata: { deliveryMode: "shipping", shippingCost: "6" } })
+      );
 
-      // BUG: la réservation passe à "paid" mais processedCount vaut 0 et aucun email
-      // de confirmation ne part : l'acheteur a payé sans recevoir de confirmation.
+      expect(stripe.refunds.create).toHaveBeenCalledWith(
+        { payment_intent: "pi_test", amount: 600 },
+        { idempotencyKey: "conflict-shipping-cs_test_1" }
+      );
+    });
+
+    it("garde les frais de port quand un autre article de la commande est honoré", async () => {
+      const free = await createCreation({ title: "Libre" });
+      const sold = await createCreation({ title: "Vendue", sold: true });
+      await pendingReservation(free._id);
+      await pendingReservation(sold._id);
+
+      const result = await fulfillCheckoutSession(
+        paidSession({ metadata: { deliveryMode: "shipping", shippingCost: "6" } })
+      );
+
+      expect(result.processedCount).toBe(1);
+      expect(stripe.refunds.create).toHaveBeenCalledTimes(1);
+      expect(stripe.refunds.create.mock.calls[0][0].amount).toBe(4000);
+      const confirmation = emailTo("client@example.com").find(([arg]) => arg.subject.includes("Paiement confirmé"))!;
+      expect(confirmation[0].html).toContain("Libre");
+      expect(confirmation[0].html).not.toContain("Vendue");
+    });
+
+    it("laisse la réservation payée pour un remboursement manuel quand le remboursement échoue", async () => {
+      const creation = await createCreation({ sold: true });
+      await pendingReservation(creation._id);
+      stripe.refunds.create.mockRejectedValue(new Error("refund ko"));
+
+      await fulfillCheckoutSession(paidSession());
+
+      expect((await Reservation.findOne())!).toMatchObject({
+        status: "cancelled",
+        paymentStatus: "paid",
+        cancelReason: "Pièce déjà vendue : paiement à rembourser manuellement",
+      });
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("Remboursement impossible"),
+        expect.any(Error)
+      );
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("à rembourser manuellement");
+      expect(emailTo("client@example.com")[0][0].html).toContain("Nous revenons vers vous");
+    });
+
+    it("signale une création supprimée sans pouvoir la rembourser automatiquement", async () => {
+      await pendingReservation(new mongoose.Types.ObjectId(), { name: "" });
+
+      const result = await fulfillCheckoutSession(paidSession({ payment_intent: null }));
+
       expect(result).toEqual({ paid: true, processedCount: 0, pending: false });
+      expect(stripe.refunds.create).not.toHaveBeenCalled();
       expect((await Reservation.findOne())!.paymentStatus).toBe("paid");
-      expect(sendEmail).not.toHaveBeenCalled();
-      expect(revalidatePath).not.toHaveBeenCalled();
+      expect((await Reservation.findOne())!.status).toBe("cancelled");
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("pièce supprimée");
+      expect(emailTo("client@example.com")[0][0].html).toContain("Article");
+      expect(revalidatePath).not.toHaveBeenCalledWith("/");
+    });
+
+    it("accorde le pluriel quand plusieurs pièces sont en conflit et journalise les emails en échec", async () => {
+      vi.stubEnv("SELLER_EMAIL", "");
+      const a = await createCreation({ title: "A", sold: true });
+      const b = await createCreation({ title: "B", sold: true });
+      await pendingReservation(a._id);
+      await pendingReservation(b._id);
+      vi.mocked(sendEmail).mockRejectedValueOnce(new Error("Resend indisponible"));
+
+      await fulfillCheckoutSession(paidSession());
+
+      expect(vi.mocked(sendEmail).mock.calls[0][0].html).toContain("ces pièces uniques ont été vendues");
+      expect(console.error).toHaveBeenCalledWith(
+        "[FULFILL] Échec de l'email de conflit acheteur:",
+        "Resend indisponible"
+      );
+    });
+
+    it("journalise l'échec de l'email de conflit côté vendeuse", async () => {
+      const creation = await createCreation({ sold: true });
+      await pendingReservation(creation._id);
+      vi.mocked(sendEmail)
+        .mockResolvedValueOnce({ data: { id: "email" }, error: null } as any)
+        .mockRejectedValueOnce("quota dépassé");
+
+      await fulfillCheckoutSession(paidSession());
+
+      expect(console.error).toHaveBeenCalledWith("[FULFILL] Échec de l'email de conflit vendeur:", "quota dépassé");
     });
 
     it("ne fait jamais échouer le paiement quand un email échoue", async () => {
@@ -445,14 +678,22 @@ describe("releaseExpiredCheckoutSession", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
-  it("annule les réservations pending de la session et libère les pièces", async () => {
-    const creation = await createCreation({
+  /** Pièce verrouillée au nom de la réservation `reservationId`. */
+  function lockedCreation(reservationId: mongoose.Types.ObjectId, overrides: Record<string, any> = {}) {
+    return createCreation({
       reserved: true,
       reservedName: "Alice",
       reservedContact: "client@example.com",
       reservedAt: new Date(),
+      reservedByReservationId: reservationId,
+      ...overrides,
     });
-    await pendingReservation(creation._id);
+  }
+
+  it("annule les réservations pending de la session et libère leurs pièces", async () => {
+    const reservationId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(reservationId);
+    await pendingReservation(creation._id, { _id: reservationId });
 
     const result = await releaseExpiredCheckoutSession(paidSession({ status: "expired" }));
 
@@ -460,29 +701,79 @@ describe("releaseExpiredCheckoutSession", () => {
     const reservation = (await Reservation.findOne())!;
     expect(reservation.status).toBe("cancelled");
     expect(reservation.cancelReason).toBe("Session de paiement expirée");
-    // paymentStatus reste "pending" : seul le statut logistique change
-    expect(reservation.paymentStatus).toBe("pending");
+    // Le paiement est clos : un événement rejoué ne retrouve plus cette réservation
+    expect(reservation.paymentStatus).toBe("failed");
     const released = (await Creation.findById(creation._id))!;
     expect(released.reserved).toBe(false);
     expect(released.reservedContact).toBeUndefined();
+    expect(released.reservedByReservationId).toBeUndefined();
     expect(revalidatePath).toHaveBeenCalledWith("/");
   });
 
   it("retrouve les réservations via les metadata", async () => {
-    const creation = await createCreation({ reserved: true });
-    const reservation = await pendingReservation(creation._id, { stripeCheckoutSessionId: "autre" });
+    const reservationId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(reservationId);
+    await pendingReservation(creation._id, { _id: reservationId, stripeCheckoutSessionId: "autre" });
 
     const result = await releaseExpiredCheckoutSession(
-      paidSession({ metadata: { reservationIds: JSON.stringify([reservation._id.toString()]) } })
+      paidSession({ metadata: { reservationIds: JSON.stringify([reservationId.toString()]) } })
     );
 
     expect(result.cancelledCount).toBe(1);
     expect((await Creation.findById(creation._id))!.reserved).toBe(false);
   });
 
-  it("ne libère pas une pièce déjà vendue", async () => {
-    const creation = await createCreation({ sold: true, reserved: true });
+  it("ne libère pas une pièce verrouillée depuis par un autre acheteur", async () => {
+    const creation = await lockedCreation(new mongoose.Types.ObjectId(), {
+      reservedContact: "autre@example.com",
+    });
     await pendingReservation(creation._id);
+
+    const result = await releaseExpiredCheckoutSession(paidSession({ status: "expired" }));
+
+    expect(result.cancelledCount).toBe(1);
+    const stillLocked = (await Creation.findById(creation._id))!;
+    expect(stillLocked.reserved).toBe(true);
+    expect(stillLocked.reservedContact).toBe("autre@example.com");
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("un événement « expired » rejoué ne libère pas le verrou d'un nouvel acheteur", async () => {
+    const firstId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(firstId);
+    await pendingReservation(creation._id, { _id: firstId });
+    await releaseExpiredCheckoutSession(paidSession({ status: "expired" }));
+
+    // Un autre acheteur verrouille la pièce, puis Stripe rejoue l'événement
+    const secondId = new mongoose.Types.ObjectId();
+    await Creation.updateOne(
+      { _id: creation._id },
+      { $set: { reserved: true, reservedContact: "autre@example.com", reservedByReservationId: secondId } }
+    );
+    const replay = await releaseExpiredCheckoutSession(paidSession({ status: "expired" }));
+
+    expect(replay).toEqual({ cancelledCount: 0 });
+    const lockedAgain = (await Creation.findById(creation._id))!;
+    expect(lockedAgain.reserved).toBe(true);
+    expect(lockedAgain.reservedByReservationId!.toString()).toBe(secondId.toString());
+  });
+
+  it("ne traite pas une réservation basculée entre-temps par un appel concurrent", async () => {
+    const reservationId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(reservationId);
+    await pendingReservation(creation._id, { _id: reservationId });
+    vi.spyOn(Reservation, "findOneAndUpdate").mockResolvedValueOnce(null);
+
+    const result = await releaseExpiredCheckoutSession(paidSession());
+
+    expect(result.cancelledCount).toBe(0);
+    expect((await Creation.findById(creation._id))!.reserved).toBe(true);
+  });
+
+  it("ne libère pas une pièce déjà vendue", async () => {
+    const reservationId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(reservationId, { sold: true });
+    await pendingReservation(creation._id, { _id: reservationId });
     await releaseExpiredCheckoutSession(paidSession());
     expect((await Creation.findById(creation._id))!.reserved).toBe(true);
   });

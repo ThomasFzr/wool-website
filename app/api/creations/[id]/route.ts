@@ -153,6 +153,8 @@ export async function PATCH(
     }
 
     if (body.reserved !== undefined) setData.reserved = body.reserved;
+    // Verrou levé à la main : il n'appartient plus à aucune réservation
+    if (body.reserved === false) unsetData.reservedByReservationId = "";
     if (body.reservedName !== undefined) setData.reservedName = body.reservedName;
     if (body.reservedContact !== undefined) setData.reservedContact = body.reservedContact;
     if (body.reservedMessage !== undefined) setData.reservedMessage = body.reservedMessage;
@@ -175,6 +177,7 @@ export async function PATCH(
         unsetData.reservedContact = "";
         unsetData.reservedMessage = "";
         unsetData.reservedAt = "";
+        unsetData.reservedByReservationId = "";
       }
     }
     

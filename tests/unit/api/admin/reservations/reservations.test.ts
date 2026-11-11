@@ -162,6 +162,8 @@ describe("POST /api/admin/reservations", () => {
 
     const neuveApres = await Creation.findById(neuve._id).lean<any>();
     expect(neuveApres).toMatchObject({ sold: true, reserved: true, reservedName: "Claire", salesCount: 1 });
+    const neuveReservation = reservations.find((r) => String(r.creationId) === neuve.id)!;
+    expect(String(neuveApres.reservedByReservationId)).toBe(String(neuveReservation._id));
     // salesCount n'est pas réincrémenté pour une création déjà vendue
     expect((await Creation.findById(dejaVendue._id).lean<any>()).salesCount).toBe(3);
     expect(revalidatePath).toHaveBeenCalledWith("/");

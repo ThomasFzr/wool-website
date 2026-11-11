@@ -164,6 +164,8 @@ export async function POST(req: Request) {
                     reservedContact: reservationContact,
                     reservedMessage: message || "",
                     reservedAt: now,
+                    // La commande détient la pièce : son annulation pourra la remettre en vente
+                    reservedByReservationId: reservation._id,
                     sold: true,
                 },
             };
