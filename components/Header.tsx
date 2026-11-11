@@ -1,9 +1,10 @@
 "use client";
 
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Badge } from "./ui";
 import { CartIcon } from "./CartIcon";
 
@@ -15,7 +16,8 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle, pendingReservations: initialPending = 0, newMessages: initialMessages = 0 }: HeaderProps) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [pendingReservations, setPendingReservations] = useState(initialPending);
   const [newMessages, setNewMessages] = useState(initialMessages);
@@ -116,8 +118,12 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
               <button
                 type="button"
                 onClick={() => {
+                  // Session encore en chargement : ne pas envoyer un utilisateur connecté vers le login
+                  if (status === "loading") return;
                   if (!session) {
-                    signIn(undefined, { callbackUrl: "/" });
+                    // Navigation directe vers /login : signIn() sans provider passe par
+                    // /api/auth/providers et redirige vers /api/auth/error si cet appel échoue
+                    router.push("/login?callbackUrl=/");
                   } else {
                     setAccountMenuOpen((o) => !o);
                   }

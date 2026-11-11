@@ -6,7 +6,11 @@ const options = {};
 
 if (!(global as any)._mongoClientPromise) {
   const client = new MongoClient(uri, options);
-  (global as any)._mongoClientPromise = client.connect();
+  // Ne pas mettre en cache une promesse rejetée : l'instance resterait sans base jusqu'à son recyclage
+  (global as any)._mongoClientPromise = client.connect().catch((err) => {
+    (global as any)._mongoClientPromise = null;
+    throw err;
+  });
 }
 const clientPromise: Promise<MongoClient> = (global as any)._mongoClientPromise;
 

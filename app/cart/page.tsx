@@ -8,7 +8,8 @@ import { CartUnavailableNotice } from "@/components/CartUnavailableNotice";
 import { useRelatedCreations } from "@/hooks/useRelatedCreations";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Link from "next/link";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
 export default function CartPage() {
@@ -27,6 +28,7 @@ export default function CartPage() {
     refreshAvailability,
   } = useCart();
   const { data: session } = useSession();
+  const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Récupérer les articles liés des articles dans le panier (un seul appel API)
@@ -44,7 +46,7 @@ export default function CartPage() {
 
   const handleCheckout = async () => {
     if (!session?.user) {
-      signIn(undefined, { callbackUrl: "/cart" });
+      router.push("/login?callbackUrl=/cart");
       return;
     }
 

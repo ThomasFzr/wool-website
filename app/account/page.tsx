@@ -12,7 +12,7 @@ export default async function AccountPage() {
 
   // 🔐 Protection : si pas connecté → page de login
   if (!session || !session.user) {
-    redirect("/api/auth/signin?callbackUrl=/account");
+    redirect("/login?callbackUrl=/account");
   }
 
   // Récupérer le profil complet de l'utilisateur
