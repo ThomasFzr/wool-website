@@ -8,6 +8,7 @@ import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
+import CheckoutNotification from "@/models/CheckoutNotification";
 import { LOCK_FIELDS_UNSET, releaseCreationLocks } from "@/lib/creation-lock";
 
 export type FulfillmentResult = {
@@ -149,8 +150,10 @@ export async function fulfillCheckoutSession(
   const processedReservations: any[] = [];
   const processedCreations: any[] = [];
   const conflicts: SoldConflict[] = [];
+  // Réservations prises en charge par CET appel (fulfillingAt posé)
+  const gatedIds: unknown[] = [];
 
-  await Promise.all(
+  const outcomes = await Promise.allSettled(
     reservations.map(async (reservation: any, index: number) => {
       // Protection contre les appels concurrents et les doubles traitements :
       // findOneAndUpdate conditionnel — seulement si encore "pending"
@@ -167,6 +170,7 @@ export async function fulfillCheckoutSession(
             paymentStatus: "paid",
             status: "validated",
             paidAt: now,
+            fulfillingAt: now,
             deliveryMode: deliveryMode,
             shippingCost:
               deliveryMode === "shipping" && totalShippingCost > 0 && index === 0
@@ -183,6 +187,7 @@ export async function fulfillCheckoutSession(
         console.log(`[FULFILL] Réservation ${reservation._id} déjà traitée, skip`);
         return;
       }
+      gatedIds.push(updatedReservation._id);
 
       // Marquer la création vendue + incrémenter salesCount ATOMIQUEMENT :
       // la condition `sold: { $ne: true }` garantit que l'incrément n'a lieu qu'une fois.
@@ -235,27 +240,95 @@ export async function fulfillCheckoutSession(
     await runInBackground(buildConflictEmailDispatcher({ settled, appUrl }));
   }
 
-  if (processedReservations.length > 0 && processedCreations.length > 0) {
+  // Traitement de CET appel terminé : ses réservations ne bloquent plus l'email
+  if (gatedIds.length > 0) {
+    await Reservation.updateMany({ _id: { $in: gatedIds } }, { $unset: { fulfillingAt: "" } });
+  }
+
+  if (processedReservations.length > 0) {
     // La vitrine et les commandes ont changé : invalider le cache.
     // Le paiement est DÉJÀ enregistré à ce stade : un échec de revalidation
     // (appel hors contexte de requête, ex. script/cron) ne doit jamais
     // transformer une commande payée en erreur pour le client.
     revalidateCatalog();
     revalidateOrders();
-
-    // Emails en tâche de fond : jamais bloquants, jamais d'échec de la requête
-    const dispatchEmails = buildEmailDispatcher({
-      processedReservations,
-      processedCreations,
-      deliveryMode,
-      totalShippingCost,
-      appUrl,
-    });
-
-    await runInBackground(dispatchEmails);
   }
 
+  // Une réservation n'a pas pu être traitée : erreur remontée (le webhook répond
+  // 500 et Stripe réessaie), l'email partira lors du nouvel essai.
+  const failure = outcomes.find((o): o is PromiseRejectedResult => o.status === "rejected");
+  if (failure) throw failure.reason;
+
+  await sendOrderConfirmationOnce({
+    session,
+    reservationIds: reservations.map((r: any) => r._id),
+    deliveryMode,
+    totalShippingCost,
+    appUrl,
+  });
+
   return { paid: true, processedCount: processedReservations.length, pending: false };
+}
+
+// Au-delà, un traitement interrompu (crash) ne bloque plus l'email de confirmation
+const FULFILLING_TIMEOUT_MS = 2 * 60 * 1000;
+
+/**
+ * Email de confirmation de la commande, décidé au niveau de la SESSION :
+ * - attend que toutes ses réservations soient traitées (webhook et verify-session
+ *   peuvent s'en partager le traitement) : c'est le dernier appel qui envoie ;
+ * - un seul envoi grâce à l'_id unique de CheckoutNotification ;
+ * - construit à partir de TOUTES les réservations honorées de la session.
+ */
+async function sendOrderConfirmationOnce({
+  session,
+  reservationIds,
+  deliveryMode,
+  totalShippingCost,
+  appUrl,
+}: {
+  session: Stripe.Checkout.Session;
+  reservationIds: unknown[];
+  deliveryMode: string;
+  totalShippingCost: number;
+  appUrl: string;
+}) {
+  // Toutes les réservations de la session, pas seulement celles vues par cet appel
+  const all = await Reservation.find({
+    $or: [{ _id: { $in: reservationIds } }, { stripeCheckoutSessionId: session.id }],
+  }).lean<any[]>();
+  const busy = all.some(
+    (r) =>
+      r.paymentStatus === "pending" ||
+      (r.fulfillingAt && Date.now() - new Date(r.fulfillingAt).getTime() < FULFILLING_TIMEOUT_MS)
+  );
+  if (busy) return;
+
+  const honored = all.filter((r) => r.paymentStatus === "paid" && r.status !== "cancelled");
+  if (honored.length === 0) return;
+
+  try {
+    await CheckoutNotification.create({ _id: session.id });
+  } catch (err: any) {
+    if (err?.code === 11000) return; // déjà envoyé par un autre appel
+    throw err;
+  }
+
+  const creations = await Creation.find({ _id: { $in: honored.map((r) => r.creationId) } }).lean<any[]>();
+  const byId = new Map(creations.map((c) => [String(c._id), c]));
+  const items = honored.filter((r) => byId.has(String(r.creationId)));
+
+  await runInBackground(
+    buildEmailDispatcher({
+      processedReservations: items,
+      processedCreations: items.map((r) => byId.get(String(r.creationId))),
+      deliveryMode,
+      totalShippingCost,
+      // Montant réellement payé, sauf si une partie de la commande a été remboursée
+      amountTotal: honored.length === all.length ? session.amount_total : null,
+      appUrl,
+    })
+  );
 }
 
 /**
@@ -500,12 +573,14 @@ function buildEmailDispatcher({
   processedCreations,
   deliveryMode,
   totalShippingCost,
+  amountTotal,
   appUrl,
 }: {
   processedReservations: any[];
   processedCreations: any[];
   deliveryMode: string;
   totalShippingCost: number;
+  amountTotal: number | null;
   appUrl: string;
 }): () => Promise<void> {
   const firstReservation = processedReservations[0];
@@ -521,7 +596,7 @@ function buildEmailDispatcher({
     0
   );
   const shippingCost = deliveryMode === "shipping" ? totalShippingCost : 0;
-  const total = subtotal + shippingCost;
+  const total = amountTotal != null ? amountTotal / 100 : subtotal + shippingCost;
 
   // Générer le HTML pour tous les articles du résumé
   const orderSummaryItems = processedCreations

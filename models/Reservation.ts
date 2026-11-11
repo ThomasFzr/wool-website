@@ -77,6 +77,9 @@ const schema = new Schema(
       default: "pending",
     },
     paidAt: Date,
+    // Posé pendant le traitement du paiement (lib/checkout-fulfillment.ts) : tant
+    // qu'il est présent, l'email de confirmation de la commande attend.
+    fulfillingAt: Date,
   },
   { timestamps: true }
 );

@@ -9,6 +9,7 @@ import {
 import { connectToDatabase } from "@/lib/db";
 import { sendEmail } from "@/lib/sendEmail";
 import Creation from "@/models/Creation";
+import CheckoutNotification from "@/models/CheckoutNotification";
 import Reservation from "@/models/Reservation";
 import { createCreation, installFakeStripe, paidSession, type FakeStripe } from "../../helpers/stripe-fake";
 
@@ -244,7 +245,7 @@ describe("fulfillCheckoutSession", () => {
       await pendingReservation(a._id);
       await pendingReservation(b._id);
 
-      const result = await fulfillCheckoutSession(paidSession());
+      const result = await fulfillCheckoutSession(paidSession({ amount_total: 5550 }));
 
       expect(result.processedCount).toBe(2);
       expect(await Creation.countDocuments({ sold: true })).toBe(2);
@@ -314,6 +315,7 @@ describe("fulfillCheckoutSession", () => {
 
       await fulfillCheckoutSession(
         paidSession({
+          amount_total: 8650,
           metadata: {
             deliveryMode: "shipping",
             shippingCost: "6.5",
@@ -434,6 +436,88 @@ describe("fulfillCheckoutSession", () => {
       expect(results.map((r) => r.processedCount).sort()).toEqual([0, 1]);
       expect((await Creation.findById(creation._id))!.salesCount).toBe(1);
       expect(emailTo("client@example.com")).toHaveLength(1);
+    });
+
+    it("un seul email complet quand webhook et verify-session se partagent les articles", async () => {
+      const a = await createCreation({ title: "Bonnet A", price: 30 });
+      const b = await createCreation({ title: "Snood B", price: 25 });
+      const ra = await pendingReservation(a._id);
+      const rb = await pendingReservation(b._id);
+      const session = paidSession({
+        amount_total: 6100,
+        metadata: {
+          deliveryMode: "shipping",
+          shippingCost: "6",
+          reservationIds: JSON.stringify([ra._id.toString(), rb._id.toString()]),
+        },
+      });
+      // Un premier appel n'a traité que l'article A (l'autre est encore en cours ailleurs)
+      vi.spyOn(Reservation, "find").mockImplementationOnce((() =>
+        Reservation.where({ _id: ra._id })) as any);
+      await fulfillCheckoutSession(session);
+      expect(emailTo("client@example.com")).toHaveLength(0);
+
+      await fulfillCheckoutSession(session);
+
+      const mails = emailTo("client@example.com");
+      expect(mails).toHaveLength(1);
+      expect(mails[0][0].html).toContain("Bonnet A");
+      expect(mails[0][0].html).toContain("Snood B");
+      // Frais de port comptés une seule fois, total = montant payé
+      expect(mails[0][0].html.match(/Frais de livraison/g)).toHaveLength(1);
+      expect(mails[0][0].html).toContain("61.00 €");
+      expect(emailTo("vendeuse@example.com")).toHaveLength(1);
+    });
+
+    it("affiche le montant payé même si le prix a changé depuis", async () => {
+      const creation = await createCreation({ price: 40 });
+      await pendingReservation(creation._id);
+      await Creation.updateOne({ _id: creation._id }, { $set: { price: 55 } });
+
+      await fulfillCheckoutSession(paidSession({ amount_total: 4000 }));
+
+      expect(emailTo("client@example.com")[0][0].html).toMatch(/Total[\s\S]*40\.00 €/);
+    });
+
+    it("attend un traitement concurrent en cours, mais pas un traitement interrompu depuis longtemps", async () => {
+      const creation = await createCreation();
+      await pendingReservation(creation._id, {
+        paymentStatus: "paid",
+        status: "validated",
+        fulfillingAt: new Date(),
+      });
+      await fulfillCheckoutSession(paidSession());
+      expect(sendEmail).not.toHaveBeenCalled();
+
+      await Reservation.updateOne({}, { $set: { fulfillingAt: new Date(Date.now() - 10 * 60 * 1000) } });
+      await fulfillCheckoutSession(paidSession());
+      expect(emailTo("client@example.com")).toHaveLength(1);
+    });
+
+    it("envoie l'email au nouvel essai quand un traitement a échoué en cours de route", async () => {
+      const a = await createCreation({ title: "A" });
+      const b = await createCreation({ title: "B" });
+      await pendingReservation(a._id);
+      await pendingReservation(b._id);
+      const realUpdate = Creation.findOneAndUpdate.bind(Creation);
+      vi.spyOn(Creation, "findOneAndUpdate")
+        .mockImplementationOnce(realUpdate as any)
+        .mockRejectedValueOnce(new Error("db down"));
+
+      await expect(fulfillCheckoutSession(paidSession())).rejects.toThrow("db down");
+      expect(sendEmail).not.toHaveBeenCalled();
+      // fulfillingAt est levé même en cas d'échec : le nouvel essai n'attend pas
+      expect(await Reservation.countDocuments({ fulfillingAt: { $exists: true } })).toBe(0);
+
+      await fulfillCheckoutSession(paidSession());
+      expect(emailTo("client@example.com")).toHaveLength(1);
+    });
+
+    it("propage une erreur d'enregistrement de l'envoi autre qu'un doublon", async () => {
+      const creation = await createCreation();
+      await pendingReservation(creation._id);
+      vi.spyOn(CheckoutNotification, "create").mockRejectedValueOnce(new Error("db down"));
+      await expect(fulfillCheckoutSession(paidSession())).rejects.toThrow("db down");
     });
 
     it("ne confirme pas une pièce déjà vendue : réservation annulée et pièce remboursée", async () => {
