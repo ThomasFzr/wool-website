@@ -7,7 +7,7 @@ import Reservation from "@/models/Reservation";
 import User from "@/models/User";
 import { makeRequest, readJson, routeParams } from "../../../../helpers/http";
 import { asAnonymous, asUser } from "../../../../helpers/session";
-import { createCreation, createReservation, newId } from "../../../../helpers/account-fixtures";
+import { createCreation, createReservation as createAnyReservation, newId } from "../../../../helpers/account-fixtures";
 
 vi.mock("next-auth", async (orig) => ({ ...(await orig<object>()), getServerSession: vi.fn() }));
 vi.mock("@/lib/sendEmail", () => ({ sendEmail: vi.fn() }));
@@ -19,6 +19,10 @@ const cancel = async (id: unknown, body: unknown = {}) =>
       routeParams({ id: String(id) })
     )
   );
+
+// Seule une réservation en attente et non payée est annulable par le client
+const createReservation = (overrides: Record<string, unknown> = {}) =>
+  createAnyReservation({ paymentStatus: "pending", ...overrides });
 
 const mails = () => vi.mocked(sendEmail).mock.calls.map(([m]) => m);
 const buyerMail = () => mails().find((m) => m.to === "client@example.com")!;
@@ -90,28 +94,70 @@ describe("PATCH /api/account/reservations/[id]/cancel", () => {
     });
   });
 
-  it("refuse d'annuler une commande validée", async () => {
-    const r = await createReservation({ status: "validated" });
+  it.each(["validated", "preparing", "shipped", "delivered", "cancelled"])(
+    "refuse d'annuler une réservation au statut « %s »",
+    async (status) => {
+      const r = await createReservation({ status, creationId: (await createCreation())._id });
+      asUser();
+      const res = await cancel(r._id);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/ne peut plus être annulée/);
+      expect((await Reservation.findById(r._id)).status).toBe(status);
+      expect(sendEmail).not.toHaveBeenCalled();
+    }
+  );
+
+  it("refuse d'annuler une réservation payée, même encore « pending »", async () => {
+    const r = await createAnyReservation({ status: "pending", paymentStatus: "paid" });
     asUser();
-    const { status, body } = await cancel(r._id);
-    expect(status).toBe(400);
-    expect(body.error).toMatch(/déjà validée/);
-    expect((await Reservation.findById(r._id)).status).toBe("validated");
+    expect((await cancel(r._id)).status).toBe(400);
+    expect((await Reservation.findById(r._id)).status).toBe("pending");
   });
 
-  it("laisse annuler une commande déjà expédiée", async () => {
-    // BUG: seul le statut "validated" bloque l'annulation ; une commande "shipped",
-    // "delivered" ou déjà "cancelled" peut être (ré)annulée et renvoie les emails.
-    const r = await createReservation({ status: "shipped", creationId: (await createCreation())._id });
+  it("une réservation déjà annulée ne relibère pas la pièce verrouillée depuis par un autre acheteur", async () => {
+    const creation = await reservedCreation();
+    const r = await createReservation({ creationId: creation._id });
+    await Creation.updateOne({ _id: creation._id }, { $set: { reservedByReservationId: r._id } });
     asUser();
     expect((await cancel(r._id)).status).toBe(200);
-    expect((await Reservation.findById(r._id)).status).toBe("cancelled");
+
+    // Un autre acheteur verrouille la pièce, puis le client renvoie l'annulation
+    const otherOwner = newId();
+    await Creation.updateOne(
+      { _id: creation._id },
+      { $set: { reserved: true, reservedContact: "autre@example.com", reservedByReservationId: otherOwner } }
+    );
+    expect((await cancel(r._id)).status).toBe(400);
+
+    const locked = (await Creation.findById(creation._id).lean()) as any;
+    expect(locked.reserved).toBe(true);
+    expect(locked.reservedByReservationId.toString()).toBe(otherOwner.toString());
+  });
+
+  it("ne libère pas une pièce dont le verrou appartient à une autre réservation", async () => {
+    const creation = await reservedCreation({ reservedByReservationId: newId() });
+    const r = await createReservation({ creationId: creation._id });
+    asUser();
+    expect((await cancel(r._id)).status).toBe(200);
+    expect(((await Creation.findById(creation._id).lean()) as any).reserved).toBe(true);
+  });
+
+  it("deux annulations simultanées n'en appliquent qu'une", async () => {
+    const r = await createReservation({ creationId: (await createCreation())._id });
+    asUser();
+    const statuses = (await Promise.all([cancel(r._id), cancel(r._id)])).map((x) => x.status).sort();
+    expect(statuses).toEqual([200, 400]);
     expect(sendEmail).toHaveBeenCalledTimes(2);
   });
 
   it("annule, libère la création et prévient acheteur et vendeur", async () => {
-    const creation = await reservedCreation({ images: ["/a.jpg", "/b.jpg"], imageUrl: "/old.jpg" });
-    const r = await createReservation({ creationId: creation._id, name: "Client <b>" });
+    const reservationId = newId();
+    const creation = await reservedCreation({
+      images: ["/a.jpg", "/b.jpg"],
+      imageUrl: "/old.jpg",
+      reservedByReservationId: reservationId,
+    });
+    const r = await createReservation({ _id: reservationId, creationId: creation._id, name: "Client <b>" });
     asUser();
 
     const { status, body } = await cancel(r._id, { reason: "Trop cher" });
@@ -123,7 +169,7 @@ describe("PATCH /api/account/reservations/[id]/cancel", () => {
 
     const freed = (await Creation.findById(creation._id).lean()) as any;
     expect(freed.reserved).toBe(false);
-    for (const key of ["reservedName", "reservedContact", "reservedMessage", "reservedAt"]) {
+    for (const key of ["reservedName", "reservedContact", "reservedMessage", "reservedAt", "reservedByReservationId"]) {
       expect(freed).not.toHaveProperty(key);
     }
 
@@ -145,11 +191,15 @@ describe("PATCH /api/account/reservations/[id]/cancel", () => {
     expect(seller.html).toContain("Trop cher");
   });
 
-  it("échappe la raison d'annulation dans les emails", async () => {
-    const r = await createReservation({ creationId: (await createCreation())._id });
+  it("échappe la raison d'annulation et la fiche dans les emails", async () => {
+    const r = await createReservation({
+      creationId: (await createCreation({ title: "<i>Bonnet</i>", color: "<b>Rouge</b>" }))._id,
+    });
     asUser();
     await cancel(r._id, { reason: '<a href="x">clic</a>' });
     expect(buyerMail().html).toContain("&lt;a href=&quot;x&quot;&gt;clic&lt;/a&gt;");
+    expect(buyerMail().html).toContain("&lt;i&gt;Bonnet&lt;/i&gt;");
+    expect(buyerMail().html).not.toContain("<b>Rouge</b>");
     expect(sellerMail().html).not.toContain('<a href="x">');
   });
 
@@ -186,27 +236,23 @@ describe("PATCH /api/account/reservations/[id]/cancel", () => {
     expect(buyerMail().html).toContain("Aucune raison précisée.");
   });
 
-  it("affiche la raison convertie en texte par Mongoose quand le client envoie false", async () => {
-    // Cas limite : reason=false est casté en "false" par le schéma, et c'est ce texte qui part.
-    const r = await createReservation({ creationId: (await createCreation())._id });
-    asUser();
-    await cancel(r._id, { reason: false });
-    expect((await Reservation.findById(r._id)).cancelReason).toBe("false");
-    expect(buyerMail().html).toContain(">false</p>");
-  });
-
-  it("répond 500 après avoir annulé quand la raison n'est pas une chaîne", async () => {
-    // BUG: reason.trim() lève une TypeError pour une raison numérique APRÈS l'enregistrement :
-    // la réservation est annulée et la création libérée, mais le client reçoit un 500 et aucun email ne part.
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it.each([false, 42, { texte: "x" }])("refuse une raison qui n'est pas une chaîne (%s) sans rien modifier", async (reason) => {
     const creation = await reservedCreation();
     const r = await createReservation({ creationId: creation._id });
     asUser();
-    const { status } = await cancel(r._id, { reason: 42 });
-    expect(status).toBe(500);
-    expect((await Reservation.findById(r._id)).status).toBe("cancelled");
-    expect(((await Creation.findById(creation._id).lean()) as any).reserved).toBe(false);
+    const { status, body } = await cancel(r._id, { reason });
+    expect(status).toBe(400);
+    expect(body.error).toBe("Raison invalide");
+    expect((await Reservation.findById(r._id)).status).toBe("pending");
+    expect(((await Creation.findById(creation._id).lean()) as any).reserved).toBe(true);
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("accepte une raison nulle", async () => {
+    const r = await createReservation({ creationId: (await createCreation())._id });
+    asUser();
+    expect((await cancel(r._id, { reason: null })).status).toBe(200);
+    expect((await Reservation.findById(r._id)).cancelReason).toBe("");
   });
 
   it("utilise imageUrl à défaut d'images, sans couleur ni prix", async () => {
@@ -261,10 +307,18 @@ describe("PATCH /api/account/reservations/[id]/cancel", () => {
     expect(spy).toHaveBeenCalledWith("[cancel] Email non envoyé:", expect.any(Error));
   });
 
-  it("répond 500 pour un identifiant invalide", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("répond 404 pour un identifiant invalide", async () => {
     asUser();
     const { status, body } = await cancel("pas-un-id");
+    expect(status).toBe(404);
+    expect(body.error).toBe("Reservation not found");
+  });
+
+  it("répond 500 quand la base est indisponible", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(Reservation, "findById").mockRejectedValueOnce(new Error("db down"));
+    asUser();
+    const { status, body } = await cancel(newId());
     expect(status).toBe(500);
     expect(body.error).toBe("Server error");
   });
