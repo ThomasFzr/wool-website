@@ -1,0 +1,121 @@
+import crypto from "crypto";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { POST } from "@/app/api/auth/forgot-password/route";
+import { connectToDatabase } from "@/lib/db";
+import { sendEmail } from "@/lib/sendEmail";
+import User from "@/models/User";
+import { makeRequest, readJson } from "../../../helpers/http";
+
+vi.mock("@/lib/sendEmail", () => ({ sendEmail: vi.fn() }));
+
+const NEUTRAL = { message: "Si ce compte existe, un email a été envoyé" };
+const post = (body: unknown, headers?: Record<string, string>) =>
+  POST(makeRequest("/api/auth/forgot-password", { method: "POST", body, headers }));
+
+// Le rate limit est en mémoire au niveau du module : chaque test utilise une adresse distincte.
+let n = 0;
+const uniqueEmail = () => `client${++n}@example.com`;
+
+const withSecret = (email: string) =>
+  User.findOne({ email }).select("+resetToken +resetTokenExpiry");
+
+describe("POST /api/auth/forgot-password", () => {
+  beforeEach(async () => {
+    await connectToDatabase();
+  });
+
+  it("exige un email sous forme de chaîne", async () => {
+    for (const body of [{}, { email: "" }, { email: 42 }]) {
+      const { status, body: res } = await readJson(await post(body));
+      expect(status).toBe(400);
+      expect(res.error).toBe("Email requis");
+    }
+  });
+
+  it("répond neutre sans email pour un compte inconnu", async () => {
+    const { status, body } = await readJson(await post({ email: uniqueEmail() }));
+    expect(status).toBe(200);
+    expect(body).toEqual(NEUTRAL);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("répond neutre sans email pour un compte Google", async () => {
+    const email = uniqueEmail();
+    await User.create({ email, provider: "google" });
+    const { status, body } = await readJson(await post({ email }));
+    expect(status).toBe(200);
+    expect(body).toEqual(NEUTRAL);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect((await withSecret(email))!.resetToken).toBeUndefined();
+  });
+
+  it("stocke le hash du token et envoie le lien en clair par email", async () => {
+    const email = uniqueEmail();
+    await User.create({ email, provider: "credentials" });
+    const before = Date.now();
+
+    const { status, body } = await readJson(await post({ email: `  ${email.toUpperCase()} ` }));
+    expect(status).toBe(200);
+    expect(body).toEqual(NEUTRAL);
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    const mail = vi.mocked(sendEmail).mock.calls[0][0];
+    expect(mail.to).toBe(email);
+    expect(mail.subject).toBe("Réinitialisation de votre mot de passe");
+    const token = mail.html.match(/http:\/\/localhost:3000\/reset-password\?token=([a-f0-9]{64})/)![1];
+
+    const user = await withSecret(email);
+    expect(user!.resetToken).toBe(crypto.createHash("sha256").update(token).digest("hex"));
+    expect(user!.resetToken).not.toBe(token);
+    const expiry = user!.resetTokenExpiry!.getTime();
+    expect(expiry).toBeGreaterThanOrEqual(before + 3600000 - 1000);
+    expect(expiry).toBeLessThanOrEqual(Date.now() + 3600000);
+  });
+
+  it("ignore un en-tête Host non autorisé dans le lien envoyé", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://boutique.example.com");
+    const email = uniqueEmail();
+    await User.create({ email, provider: "credentials" });
+    await post({ email }, { host: "evil.example.net" });
+    expect(vi.mocked(sendEmail).mock.calls[0][0].html).toContain("https://boutique.example.com/reset-password?token=");
+  });
+
+  it("limite à une demande par minute et par adresse, puis réautorise", async () => {
+    const email = uniqueEmail();
+    await User.create({ email, provider: "credentials" });
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+
+    await post({ email });
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+
+    clock.mockReturnValue(now + 30_000);
+    const { status, body } = await readJson(await post({ email }));
+    expect(status).toBe(200);
+    expect(body).toEqual(NEUTRAL);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+
+    // Passé le délai, l'entrée est purgée et une nouvelle demande part
+    clock.mockReturnValue(now + 61_000);
+    await post({ email });
+    expect(sendEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it("répond 500 si l'envoi de l'email échoue", async () => {
+    // BUG: le 500 n'arrive que pour un compte credentials existant, ce qui révèle
+    // l'existence du compte malgré la réponse neutre voulue (anti énumération).
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(sendEmail).mockRejectedValueOnce(new Error("resend down"));
+    const email = uniqueEmail();
+    await User.create({ email, provider: "credentials" });
+    const { status, body } = await readJson(await post({ email }));
+    expect(status).toBe(500);
+    expect(body.error).toBe("Erreur lors de l'envoi de l'email");
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it("répond 500 sur un corps JSON invalide", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await post("{pas du json")).status).toBe(500);
+  });
+});
