@@ -130,6 +130,8 @@ describe("POST /api/stripe/create-checkout-session", () => {
       expect(locked.reserved).toBe(true);
       expect(locked.reservedContact).toBe("client@example.com");
       expect(locked.reservedName).toBe("Alice");
+      // Le verrou est au nom de la réservation : elle seule pourra le libérer
+      expect(locked.reservedByReservationId!.toString()).toBe(reservation._id.toString());
     });
 
     it("utilise l'image historique ou aucune image, et omet la description sans couleur", async () => {
@@ -295,8 +297,14 @@ describe("POST /api/stripe/create-checkout-session", () => {
     });
 
     it("reprend le verrou d'un checkout abandonné du même client et expire l'ancienne session", async () => {
-      const creation = await createCreation({ reserved: true, reservedContact: "client@example.com" });
+      const staleId = new mongoose.Types.ObjectId();
+      const creation = await createCreation({
+        reserved: true,
+        reservedContact: "client@example.com",
+        reservedByReservationId: staleId,
+      });
       const stale = await Reservation.create({
+        _id: staleId,
         creationId: creation._id,
         contact: "client@example.com",
         paymentStatus: "pending",
@@ -312,12 +320,22 @@ describe("POST /api/stripe/create-checkout-session", () => {
       expect(old.status).toBe("cancelled");
       expect(old.paymentStatus).toBe("failed");
       expect(old.cancelReason).toBe("Remplacée par une nouvelle session de paiement");
-      expect(await Reservation.countDocuments({ stripeCheckoutSessionId: "cs_new", paymentStatus: "pending" })).toBe(1);
+      const fresh = (await Reservation.findOne({ stripeCheckoutSessionId: "cs_new", paymentStatus: "pending" }))!;
+      // Le verrou passe à la nouvelle réservation
+      expect((await Creation.findById(creation._id))!.reservedByReservationId!.toString()).toBe(
+        fresh._id.toString()
+      );
     });
 
     it("ignore l'échec d'expiration d'une ancienne session déjà close", async () => {
-      const creation = await createCreation({ reserved: true, reservedContact: "client@example.com" });
+      const staleId = new mongoose.Types.ObjectId();
+      const creation = await createCreation({
+        reserved: true,
+        reservedContact: "client@example.com",
+        reservedByReservationId: staleId,
+      });
       await Reservation.create({
+        _id: staleId,
         creationId: creation._id,
         contact: "client@example.com",
         paymentStatus: "pending",
@@ -328,8 +346,14 @@ describe("POST /api/stripe/create-checkout-session", () => {
     });
 
     it("n'expire aucune session quand l'ancien identifiant de session est vide", async () => {
-      const creation = await createCreation({ reserved: true, reservedContact: "client@example.com" });
+      const staleId = new mongoose.Types.ObjectId();
+      const creation = await createCreation({
+        reserved: true,
+        reservedContact: "client@example.com",
+        reservedByReservationId: staleId,
+      });
       await Reservation.create({
+        _id: staleId,
         creationId: creation._id,
         contact: "client@example.com",
         paymentStatus: "pending",
@@ -340,8 +364,13 @@ describe("POST /api/stripe/create-checkout-session", () => {
     });
 
     it("refuse quand le client a un ancien checkout mais que la pièce est verrouillée par quelqu'un d'autre", async () => {
-      const creation = await createCreation({ reserved: true, reservedContact: "autre@example.com" });
-      await Reservation.create({
+      // Le verrou appartient à une autre réservation que l'ancien checkout du client
+      const creation = await createCreation({
+        reserved: true,
+        reservedContact: "autre@example.com",
+        reservedByReservationId: new mongoose.Types.ObjectId(),
+      });
+      const stale = await Reservation.create({
         creationId: creation._id,
         contact: "client@example.com",
         paymentStatus: "pending",
@@ -349,6 +378,8 @@ describe("POST /api/stripe/create-checkout-session", () => {
       });
       expect((await checkout({ items: itemsOf(creation) })).status).toBe(409);
       expect(stripe.checkout.sessions.expire).not.toHaveBeenCalled();
+      expect((await Reservation.findById(stale._id))!.paymentStatus).toBe("pending");
+      expect((await Creation.findById(creation._id))!.reservedContact).toBe("autre@example.com");
     });
   });
 
@@ -368,7 +399,7 @@ describe("POST /api/stripe/create-checkout-session", () => {
     it("répond « Server error » sur une erreur sans message, même si la libération échoue", async () => {
       const creation = await createCreation();
       stripe.checkout.sessions.create.mockRejectedValue({});
-      vi.spyOn(Creation, "updateMany").mockRejectedValueOnce(new Error("db down"));
+      vi.spyOn(Creation, "updateOne").mockRejectedValueOnce(new Error("db down"));
 
       const res = await checkout({ items: itemsOf(creation) });
 

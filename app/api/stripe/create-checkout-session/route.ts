@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import { getStripeInstance } from "@/lib/stripe";
 import { getAppUrl } from "@/lib/url";
+import { releaseCreationLocks } from "@/lib/creation-lock";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import Settings from "@/models/Settings";
@@ -124,22 +125,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Identifiants des futures réservations, générés AVANT le verrouillage : chaque
+    // pièce est verrouillée au nom de SA réservation (reservedByReservationId), et
+    // seule cette réservation pourra ensuite la libérer (lib/creation-lock.ts).
+    const reservationIdByCreation = new Map<string, mongoose.Types.ObjectId>(
+      creations.map((c) => [c._id.toString(), new mongoose.Types.ObjectId()])
+    );
+
     // 🔒 Articles UNIQUES : réserver ATOMIQUEMENT chaque création avant de créer
     // la session de paiement. La condition `sold/reserved: { $ne: true }` garantit
-    // qu'un seul client à la fois peut engager le paiement d'un article donné
-    // (même sémantique que la route de réservation manuelle).
+    // qu'un seul client à la fois peut engager le paiement d'un article donné.
     const reservedCreationIds: string[] = [];
 
     // Nettoyage en cas d'échec en aval : libère les articles réservés par CETTE requête
     const releaseReservedCreations = async () => {
       if (reservedCreationIds.length === 0) return;
       try {
-        await Creation.updateMany(
-          { _id: { $in: reservedCreationIds }, sold: { $ne: true } },
-          {
-            $set: { reserved: false },
-            $unset: { reservedName: "", reservedContact: "", reservedAt: "" },
-          }
+        await releaseCreationLocks(
+          reservedCreationIds.map((creationId) => ({
+            creationId,
+            reservationId: reservationIdByCreation.get(creationId)!,
+          }))
         );
       } catch (releaseErr) {
         console.error(
@@ -154,6 +160,7 @@ export async function POST(req: NextRequest) {
     const staleSessionIds = new Set<string>();
 
     for (const creation of creations) {
+      const reservationId = reservationIdByCreation.get(creation._id.toString())!;
       let lockedCreation = await Creation.findOneAndUpdate(
         {
           _id: creation._id,
@@ -166,6 +173,7 @@ export async function POST(req: NextRequest) {
             reservedAt: new Date(),
             reservedName: session.user?.name || "",
             reservedContact: session.user.email,
+            reservedByReservationId: reservationId,
           },
         }
       );
@@ -174,49 +182,36 @@ export async function POST(req: NextRequest) {
         // Article déjà verrouillé. Cas particulier : c'est CE client qui l'a
         // verrouillé via un checkout précédent abandonné (retour navigateur) —
         // sans cela il resterait bloqué jusqu'à l'expiration Stripe (~30 min).
-        // On ne re-verrouille que si le verrou vient bien d'un checkout Stripe
-        // de ce client (jamais par-dessus une réservation manuelle).
-        const ownCheckoutLock = await Reservation.exists({
+        // On ne reprend le verrou que s'il appartient à une réservation Stripe
+        // en attente de ce client (jamais par-dessus une autre réservation).
+        const staleReservations = await Reservation.find({
           creationId: creation._id,
           contact: session.user.email,
           paymentStatus: "pending",
           status: { $ne: "cancelled" },
           stripeCheckoutSessionId: { $exists: true, $ne: null },
-        });
+        }).select("_id stripeCheckoutSessionId");
 
-        if (ownCheckoutLock) {
+        if (staleReservations.length > 0) {
+          const staleIds = staleReservations.map((r: any) => r._id);
           lockedCreation = await Creation.findOneAndUpdate(
             {
               _id: creation._id,
               sold: { $ne: true },
               reserved: true,
-              reservedContact: session.user.email,
+              reservedByReservationId: { $in: staleIds },
             },
-            { $set: { reservedAt: new Date() } }
+            { $set: { reservedAt: new Date(), reservedByReservationId: reservationId } }
           );
 
           if (lockedCreation) {
-            // Invalider les anciennes réservations pending de ce client sur cet article
-            const staleReservations = await Reservation.find({
-              creationId: creation._id,
-              contact: session.user.email,
-              paymentStatus: "pending",
-              status: { $ne: "cancelled" },
-              stripeCheckoutSessionId: { $exists: true, $ne: null },
-            }).select("stripeCheckoutSessionId");
-
             staleReservations.forEach((r: any) => {
               if (r.stripeCheckoutSessionId) staleSessionIds.add(r.stripeCheckoutSessionId);
             });
 
+            // Invalider les anciennes réservations pending de ce client sur cet article
             await Reservation.updateMany(
-              {
-                creationId: creation._id,
-                contact: session.user.email,
-                paymentStatus: "pending",
-                status: { $ne: "cancelled" },
-                stripeCheckoutSessionId: { $exists: true, $ne: null },
-              },
+              { _id: { $in: staleIds }, paymentStatus: "pending" },
               {
                 $set: {
                   status: "cancelled",
@@ -304,9 +299,9 @@ export async function POST(req: NextRequest) {
     // Pré-générer les IDs des réservations : la session Stripe est créée AVANT
     // les réservations (évite les réservations orphelines sans sessionId si
     // l'appel Stripe échoue), mais ses metadata référencent déjà leurs IDs.
-    const reservationDocs = items.map((item: any, index: number) => ({
-      _id: new mongoose.Types.ObjectId(),
-      creationId: item.creationId,
+    const reservationDocs = creations.map((creation, index: number) => ({
+      _id: reservationIdByCreation.get(creation._id.toString())!,
+      creationId: creation._id,
       userId: (session.user as any).id,
       name: session.user?.name || "",
       contact: session.user.email,

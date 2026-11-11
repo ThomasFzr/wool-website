@@ -445,14 +445,22 @@ describe("releaseExpiredCheckoutSession", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
-  it("annule les réservations pending de la session et libère les pièces", async () => {
-    const creation = await createCreation({
+  /** Pièce verrouillée au nom de la réservation `reservationId`. */
+  function lockedCreation(reservationId: mongoose.Types.ObjectId, overrides: Record<string, any> = {}) {
+    return createCreation({
       reserved: true,
       reservedName: "Alice",
       reservedContact: "client@example.com",
       reservedAt: new Date(),
+      reservedByReservationId: reservationId,
+      ...overrides,
     });
-    await pendingReservation(creation._id);
+  }
+
+  it("annule les réservations pending de la session et libère leurs pièces", async () => {
+    const reservationId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(reservationId);
+    await pendingReservation(creation._id, { _id: reservationId });
 
     const result = await releaseExpiredCheckoutSession(paidSession({ status: "expired" }));
 
@@ -460,29 +468,79 @@ describe("releaseExpiredCheckoutSession", () => {
     const reservation = (await Reservation.findOne())!;
     expect(reservation.status).toBe("cancelled");
     expect(reservation.cancelReason).toBe("Session de paiement expirée");
-    // paymentStatus reste "pending" : seul le statut logistique change
-    expect(reservation.paymentStatus).toBe("pending");
+    // Le paiement est clos : un événement rejoué ne retrouve plus cette réservation
+    expect(reservation.paymentStatus).toBe("failed");
     const released = (await Creation.findById(creation._id))!;
     expect(released.reserved).toBe(false);
     expect(released.reservedContact).toBeUndefined();
+    expect(released.reservedByReservationId).toBeUndefined();
     expect(revalidatePath).toHaveBeenCalledWith("/");
   });
 
   it("retrouve les réservations via les metadata", async () => {
-    const creation = await createCreation({ reserved: true });
-    const reservation = await pendingReservation(creation._id, { stripeCheckoutSessionId: "autre" });
+    const reservationId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(reservationId);
+    await pendingReservation(creation._id, { _id: reservationId, stripeCheckoutSessionId: "autre" });
 
     const result = await releaseExpiredCheckoutSession(
-      paidSession({ metadata: { reservationIds: JSON.stringify([reservation._id.toString()]) } })
+      paidSession({ metadata: { reservationIds: JSON.stringify([reservationId.toString()]) } })
     );
 
     expect(result.cancelledCount).toBe(1);
     expect((await Creation.findById(creation._id))!.reserved).toBe(false);
   });
 
-  it("ne libère pas une pièce déjà vendue", async () => {
-    const creation = await createCreation({ sold: true, reserved: true });
+  it("ne libère pas une pièce verrouillée depuis par un autre acheteur", async () => {
+    const creation = await lockedCreation(new mongoose.Types.ObjectId(), {
+      reservedContact: "autre@example.com",
+    });
     await pendingReservation(creation._id);
+
+    const result = await releaseExpiredCheckoutSession(paidSession({ status: "expired" }));
+
+    expect(result.cancelledCount).toBe(1);
+    const stillLocked = (await Creation.findById(creation._id))!;
+    expect(stillLocked.reserved).toBe(true);
+    expect(stillLocked.reservedContact).toBe("autre@example.com");
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("un événement « expired » rejoué ne libère pas le verrou d'un nouvel acheteur", async () => {
+    const firstId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(firstId);
+    await pendingReservation(creation._id, { _id: firstId });
+    await releaseExpiredCheckoutSession(paidSession({ status: "expired" }));
+
+    // Un autre acheteur verrouille la pièce, puis Stripe rejoue l'événement
+    const secondId = new mongoose.Types.ObjectId();
+    await Creation.updateOne(
+      { _id: creation._id },
+      { $set: { reserved: true, reservedContact: "autre@example.com", reservedByReservationId: secondId } }
+    );
+    const replay = await releaseExpiredCheckoutSession(paidSession({ status: "expired" }));
+
+    expect(replay).toEqual({ cancelledCount: 0 });
+    const lockedAgain = (await Creation.findById(creation._id))!;
+    expect(lockedAgain.reserved).toBe(true);
+    expect(lockedAgain.reservedByReservationId!.toString()).toBe(secondId.toString());
+  });
+
+  it("ne traite pas une réservation basculée entre-temps par un appel concurrent", async () => {
+    const reservationId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(reservationId);
+    await pendingReservation(creation._id, { _id: reservationId });
+    vi.spyOn(Reservation, "findOneAndUpdate").mockResolvedValueOnce(null);
+
+    const result = await releaseExpiredCheckoutSession(paidSession());
+
+    expect(result.cancelledCount).toBe(0);
+    expect((await Creation.findById(creation._id))!.reserved).toBe(true);
+  });
+
+  it("ne libère pas une pièce déjà vendue", async () => {
+    const reservationId = new mongoose.Types.ObjectId();
+    const creation = await lockedCreation(reservationId, { sold: true });
+    await pendingReservation(creation._id, { _id: reservationId });
     await releaseExpiredCheckoutSession(paidSession());
     expect((await Creation.findById(creation._id))!.reserved).toBe(true);
   });

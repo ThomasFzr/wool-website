@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { headers } from "next/headers";
 import { POST } from "@/app/api/stripe/webhook/route";
@@ -31,8 +32,16 @@ function nextEvent(type: string, object: Record<string, unknown> = paidSession()
 }
 
 async function seedPendingOrder(creationOverrides: Record<string, unknown> = {}) {
-  const creation = await createCreation({ reserved: true, reservedContact: "client@example.com", ...creationOverrides });
+  // Pièce verrouillée au nom de la réservation pending, comme le fait le checkout
+  const reservationId = new mongoose.Types.ObjectId();
+  const creation = await createCreation({
+    reserved: true,
+    reservedContact: "client@example.com",
+    reservedByReservationId: reservationId,
+    ...creationOverrides,
+  });
   await Reservation.create({
+    _id: reservationId,
     creationId: creation._id,
     name: "Alice",
     contact: "client@example.com",
@@ -189,7 +198,7 @@ describe("POST /api/stripe/webhook", () => {
 
       expect(status).toBe(200);
       expect(body).toEqual({ received: true });
-      expect((await Reservation.findOne())!.status).toBe("cancelled");
+      expect((await Reservation.findOne())!).toMatchObject({ status: "cancelled", paymentStatus: "failed" });
       expect((await Creation.findById(creation._id))!.reserved).toBe(false);
       expect(stripe.checkout.sessions.retrieve).not.toHaveBeenCalled();
     });

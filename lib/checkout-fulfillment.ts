@@ -8,6 +8,7 @@ import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
+import { LOCK_FIELDS_UNSET, releaseCreationLocks } from "@/lib/creation-lock";
 
 export type FulfillmentResult = {
   /** true si la session Stripe est réellement payée (payment_status=paid, status=complete, PaymentIntent succeeded) */
@@ -188,12 +189,7 @@ export async function fulfillCheckoutSession(
         { _id: updatedReservation.creationId, sold: { $ne: true } },
         {
           $set: { sold: true, reserved: false },
-          $unset: {
-            reservedName: "",
-            reservedContact: "",
-            reservedMessage: "",
-            reservedAt: "",
-          },
+          $unset: LOCK_FIELDS_UNSET,
           $inc: { salesCount: 1 },
         },
         { new: true }
@@ -435,11 +431,12 @@ function buildEmailDispatcher({
 
 /**
  * Libère les articles d'une session Checkout expirée (checkout.session.expired) :
- * - passe les réservations encore "pending" de cette session à "cancelled"
+ * - passe les réservations encore "pending" de cette session à "cancelled" / "failed"
  *   (cancelledBy volontairement absent : l'enum du modèle n'accepte que "admin"/"user",
  *   aucun ne correspond à une expiration automatique) ;
- * - libère le flag `reserved` des créations concernées (uniquement si non vendues).
- * Idempotent : un second passage ne trouve plus de réservation "pending".
+ * - libère les pièces dont le verrou appartient ENCORE à ces réservations (un autre
+ *   acheteur a pu verrouiller la pièce depuis).
+ * Idempotent : un événement rejoué ne trouve plus de réservation "pending".
  */
 export async function releaseExpiredCheckoutSession(
   session: Stripe.Checkout.Session
@@ -463,44 +460,35 @@ export async function releaseExpiredCheckoutSession(
     return { cancelledCount: 0 };
   }
 
-  await Reservation.updateMany(
-    {
-      _id: { $in: pendingReservations.map((r: any) => r._id) },
-      paymentStatus: "pending",
-    },
-    {
-      $set: {
-        status: "cancelled",
-        cancelReason: "Session de paiement expirée",
-      },
-    }
-  );
-
-  const creationIds = pendingReservations
-    .map((r: any) => r.creationId)
-    .filter(Boolean);
-
-  if (creationIds.length > 0) {
-    await Creation.updateMany(
-      { _id: { $in: creationIds }, sold: { $ne: true } },
+  // Passage atomique pending → failed : seules les réservations basculées par CET
+  // appel libèrent leur pièce (deux événements concurrents ne libèrent rien deux fois)
+  const expired: any[] = [];
+  for (const reservation of pendingReservations) {
+    const updated = await Reservation.findOneAndUpdate(
+      { _id: reservation._id, paymentStatus: "pending" },
       {
-        $set: { reserved: false },
-        $unset: {
-          reservedName: "",
-          reservedContact: "",
-          reservedMessage: "",
-          reservedAt: "",
+        $set: {
+          status: "cancelled",
+          paymentStatus: "failed",
+          cancelReason: "Session de paiement expirée",
         },
       }
     );
+    if (updated) expired.push(updated);
+  }
 
+  const releasedCount = await releaseCreationLocks(
+    expired.map((r) => ({ creationId: r.creationId, reservationId: r._id }))
+  );
+
+  if (releasedCount > 0) {
     // Les articles redeviennent disponibles sur la vitrine
     revalidateCatalog();
   }
 
   console.log(
-    `[FULFILL] Session expirée ${session.id}: ${pendingReservations.length} réservation(s) annulée(s), ${creationIds.length} création(s) libérée(s)`
+    `[FULFILL] Session expirée ${session.id}: ${expired.length} réservation(s) annulée(s), ${releasedCount} création(s) libérée(s)`
   );
 
-  return { cancelledCount: pendingReservations.length };
+  return { cancelledCount: expired.length };
 }
