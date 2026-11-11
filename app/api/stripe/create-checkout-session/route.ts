@@ -80,7 +80,8 @@ export async function POST(req: NextRequest) {
 
     // Récupérer les créations et vérifier leur disponibilité
     const creationIds = items.map((item: any) => item.creationId);
-    const creations = await Creation.find({ _id: { $in: creationIds } });
+    // Une pièce cachée n'est pas en vente : traitée comme inexistante
+    const creations = await Creation.find({ _id: { $in: creationIds }, hidden: { $ne: true } });
 
     if (creations.length !== items.length) {
       return new NextResponse("Certaines créations n'existent pas", {
@@ -201,6 +202,8 @@ export async function POST(req: NextRequest) {
           _id: creation._id,
           sold: { $ne: true },
           reserved: { $ne: true },
+          // Cachée entre-temps par l'admin : plus en vente
+          hidden: { $ne: true },
         },
         { $set: lockFields(reservationId) }
       );

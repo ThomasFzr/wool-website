@@ -72,6 +72,32 @@ describe("POST /api/stripe/create-checkout-session", () => {
       expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
     });
 
+    it("refuse une pièce cachée comme une pièce inexistante, sans la verrouiller", async () => {
+      const hidden = await createCreation({ hidden: true });
+      const res = await checkout({ items: itemsOf(hidden) });
+      expect(res.status).toBe(404);
+      expect((await Creation.findById(hidden._id))!.reserved).toBe(false);
+      expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+    });
+
+    it("ne verrouille pas une pièce cachée pendant la commande", async () => {
+      const creation = await createCreation();
+      const realFind = Creation.find.bind(Creation);
+      vi.spyOn(Creation, "find").mockImplementationOnce(((...args: any[]) => {
+        const query = realFind(...(args as [any]));
+        // L'admin cache la pièce juste après la vérification de disponibilité
+        return query.then(async (docs: any) => {
+          await Creation.updateOne({ _id: creation._id }, { $set: { hidden: true } });
+          return docs;
+        });
+      }) as any);
+
+      const res = await checkout({ items: itemsOf(creation) });
+
+      expect(res.status).toBe(409);
+      expect((await Creation.findById(creation._id))!.reserved).toBe(false);
+    });
+
     it("refuse une création sans prix", async () => {
       const { insertedId } = await Creation.collection.insertOne({ title: "Sans prix", price: null });
       const res = await checkout({ items: [{ creationId: insertedId.toString() }] });
