@@ -8,6 +8,7 @@ import { emailTemplate } from "@/lib/emailTemplate";
 import { checkAdminAuth } from "@/lib/auth";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { escapeHtml } from "@/lib/escape";
+import { releaseCreationOfReservation } from "@/lib/creation-lock";
 
 // Whitelist des champs modifiables par le PATCH admin (anti mass assignment :
 // on ne passe jamais le body entier à findByIdAndUpdate)
@@ -184,15 +185,11 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
        ❌ PASSAGE EN "cancelled"
     ------------------------------*/
     if (body.status === "cancelled" && creation && statusChanged) {
-      // L'article redevient disponible
-      await Creation.findByIdAndUpdate(creation._id, {
-        $set: {
-          sold: false,
-        },
-      });
-
-      // 🔄 Invalider le cache après annulation (l'article redevient disponible)
-      revalidateCatalog();
+      // L'article redevient disponible, sauf s'il a été revendu depuis
+      // (ou si son verrou appartient à une autre réservation)
+      if (await releaseCreationOfReservation({ ...reservation.toObject(), creationId: creation._id })) {
+        revalidateCatalog();
+      }
 
       // ✅ Marquer que c'est l'admin qui a annulé
       (reservation as any).cancelledBy = "admin";
@@ -315,19 +312,13 @@ export async function DELETE(
       return new NextResponse("Reservation not found", { status: 404 });
     }
 
-    if (reservation.creationId) {
-      // Remettre l'article en disponible si suppression de la commande
-      await Creation.findByIdAndUpdate(reservation.creationId, {
-        $set: {
-          sold: false,
-        },
-      });
-    }
-
     await Reservation.findByIdAndDelete(id);
 
-    // 🔄 Invalider le cache après suppression (l'article redevient disponible)
-    revalidateCatalog();
+    // Une commande déjà annulée a déjà rendu sa pièce : on n'y touche plus.
+    // Sinon, remise en vente sauf si la pièce a été revendue depuis.
+    if (reservation.status !== "cancelled" && (await releaseCreationOfReservation(reservation))) {
+      revalidateCatalog();
+    }
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {
