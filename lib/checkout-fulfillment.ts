@@ -147,6 +147,7 @@ export async function fulfillCheckoutSession(
   // Traiter toutes les réservations (mises à jour atomiques)
   const processedReservations: any[] = [];
   const processedCreations: any[] = [];
+  const conflicts: SoldConflict[] = [];
 
   await Promise.all(
     reservations.map(async (reservation: any, index: number) => {
@@ -185,7 +186,7 @@ export async function fulfillCheckoutSession(
       // Marquer la création vendue + incrémenter salesCount ATOMIQUEMENT :
       // la condition `sold: { $ne: true }` garantit que l'incrément n'a lieu qu'une fois.
       // On libère aussi le flag `reserved` posé à la création de la session Checkout.
-      let creation = await Creation.findOneAndUpdate(
+      const creation = await Creation.findOneAndUpdate(
         { _id: updatedReservation.creationId, sold: { $ne: true } },
         {
           $set: { sold: true, reserved: false },
@@ -195,18 +196,29 @@ export async function fulfillCheckoutSession(
         { new: true }
       );
 
-      // Déjà vendue (cas limite) : on récupère quand même la création pour l'email,
-      // sans ré-incrémenter salesCount.
-      if (!creation) {
-        creation = await Creation.findById(updatedReservation.creationId);
-      }
-
       if (creation) {
         processedReservations.push(updatedReservation);
         processedCreations.push(creation);
+      } else {
+        // Pièce déjà vendue (ou supprimée) : ce paiement ne peut pas être honoré
+        conflicts.push({
+          reservation: updatedReservation,
+          creation: await Creation.findById(updatedReservation.creationId),
+        });
       }
     })
   );
+
+  if (conflicts.length > 0) {
+    const settled = await settleSoldConflicts({
+      session,
+      paymentIntentId,
+      conflicts,
+      shippingCost: deliveryMode === "shipping" ? totalShippingCost : 0,
+    });
+    revalidateOrders();
+    await runInBackground(buildConflictEmailDispatcher({ settled, appUrl }));
+  }
 
   if (processedReservations.length > 0 && processedCreations.length > 0) {
     // La vitrine et les commandes ont changé : invalider le cache.
@@ -225,16 +237,164 @@ export async function fulfillCheckoutSession(
       appUrl,
     });
 
-    try {
-      // `after()` exécute la tâche après l'envoi de la réponse HTTP (Next 15.1+)
-      after(dispatchEmails);
-    } catch {
-      // Hors contexte de requête : on attend, mais dispatchEmails ne throw jamais
-      await dispatchEmails();
-    }
+    await runInBackground(dispatchEmails);
   }
 
   return { paid: true, processedCount: processedReservations.length, pending: false };
+}
+
+/**
+ * Exécute une tâche après l'envoi de la réponse HTTP (`after()`, Next 15.1+) ;
+ * hors contexte de requête, l'attend directement. La tâche ne doit jamais throw.
+ */
+async function runInBackground(task: () => Promise<void>) {
+  try {
+    after(task);
+  } catch {
+    await task();
+  }
+}
+
+type SoldConflict = { reservation: any; creation: any | null };
+type SettledConflict = SoldConflict & { refunded: boolean };
+
+/**
+ * Paiement reçu pour une pièce déjà vendue (ou supprimée) : la réservation est
+ * annulée et la pièce remboursée automatiquement (montant connu = prix de la
+ * pièce). Les frais de port sont remboursés aussi quand AUCUN article de la
+ * commande n'a pu être honoré. Les clés d'idempotence Stripe empêchent un double
+ * remboursement si le traitement est rejoué. Sans remboursement possible, la
+ * réservation reste « paid » (visible dans l'admin) pour un remboursement manuel.
+ */
+async function settleSoldConflicts({
+  session,
+  paymentIntentId,
+  conflicts,
+  shippingCost,
+}: {
+  session: Stripe.Checkout.Session;
+  paymentIntentId: string | undefined;
+  conflicts: SoldConflict[];
+  shippingCost: number;
+}): Promise<SettledConflict[]> {
+  const stripe = getStripeInstance();
+
+  const refund = async (amount: number, idempotencyKey: string) => {
+    if (!paymentIntentId || !(amount > 0)) return false;
+    try {
+      await stripe.refunds.create(
+        { payment_intent: paymentIntentId, amount: Math.round(amount * 100) },
+        { idempotencyKey }
+      );
+      return true;
+    } catch (err) {
+      console.error(`[FULFILL] Remboursement impossible (${idempotencyKey}):`, err);
+      return false;
+    }
+  };
+
+  const settled: SettledConflict[] = [];
+  for (const { reservation, creation } of conflicts) {
+    const refunded = await refund(creation?.price, `conflict-${reservation._id}`);
+    await Reservation.updateOne(
+      { _id: reservation._id },
+      {
+        $set: {
+          status: "cancelled",
+          paymentStatus: refunded ? "refunded" : "paid",
+          cancelReason: refunded
+            ? "Pièce déjà vendue : paiement remboursé automatiquement"
+            : "Pièce déjà vendue : paiement à rembourser manuellement",
+        },
+      }
+    );
+    console.error(
+      `[FULFILL] Session ${session.id}: réservation ${reservation._id} en conflit (pièce déjà vendue), remboursée=${refunded}`
+    );
+    settled.push({ reservation, creation, refunded });
+  }
+
+  // Aucun article de la commande honoré (ni en cours de traitement par un appel
+  // concurrent) : rembourser aussi les frais de port
+  const honored = await Reservation.exists({
+    stripeCheckoutSessionId: session.id,
+    paymentStatus: { $in: ["paid", "pending"] },
+    status: { $ne: "cancelled" },
+  });
+  if (!honored && shippingCost > 0) {
+    await refund(shippingCost, `conflict-shipping-${session.id}`);
+  }
+
+  return settled;
+}
+
+/** Emails d'un conflit : l'acheteur est prévenu, la vendeuse alertée. Ne throw jamais. */
+function buildConflictEmailDispatcher({
+  settled,
+  appUrl,
+}: {
+  settled: SettledConflict[];
+  appUrl: string;
+}): () => Promise<void> {
+  const first = settled[0].reservation;
+  const buyerName = escapeHtml(first.name);
+  const buyerContact = escapeHtml(first.contact);
+  const lines = settled
+    .map(
+      ({ reservation, creation, refunded }) =>
+        `<li>${escapeHtml(creation?.title ?? `pièce supprimée (${reservation.creationId})`)} — ${
+          refunded ? "remboursée automatiquement" : "<strong>à rembourser manuellement</strong>"
+        }</li>`
+    )
+    .join("");
+  const allRefunded = settled.every((c) => c.refunded);
+
+  const sendBuyerEmail = () =>
+    sendEmail({
+      to: first.contact,
+      subject: "Article indisponible - Votre commande chez MailleMum",
+      html: emailTemplate(`
+        <h1 style="font-size:20px;margin:0 0 12px 0;color:#0f172a;">Article indisponible</h1>
+        <p style="font-size:14px;margin:0 0 12px 0;color:#475569;line-height:1.6;">
+          Bonjour <strong>${buyerName || "👋"}</strong>,<br/>
+          Désolée, ${settled.length > 1 ? "ces pièces uniques ont" : "cette pièce unique a"} été vendue${settled.length > 1 ? "s" : ""} juste avant votre paiement :
+        </p>
+        <ul style="font-size:14px;color:#0f172a;">${settled.map(({ creation }) => `<li>${escapeHtml(creation?.title ?? "Article")}</li>`).join("")}</ul>
+        <p style="font-size:14px;margin:12px 0 0 0;color:#475569;">
+          ${allRefunded ? "Le montant correspondant vous a été remboursé : il apparaîtra sur votre compte sous quelques jours." : "Nous revenons vers vous très vite pour vous rembourser."}
+        </p>
+      `),
+    });
+
+  const sendSellerEmail = () => {
+    if (!process.env.SELLER_EMAIL) return Promise.resolve(null);
+    return sendEmail({
+      to: process.env.SELLER_EMAIL,
+      subject: `⚠️ Paiement reçu pour une pièce déjà vendue`,
+      html: emailTemplate(`
+        <h1 style="font-size:18px;margin:0 0 12px 0;">Paiement en conflit</h1>
+        <p style="font-size:14px;margin:0 0 12px 0;">
+          <strong>${buyerName}</strong> (${buyerContact}) a payé des pièces déjà vendues :
+        </p>
+        <ul style="font-size:14px;">${lines}</ul>
+        <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+          <a href="${appUrl}/admin/reservations" style="display:inline-block;background:#0f172a;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Voir les commandes</a>
+        </p>
+      `),
+    });
+  };
+
+  return async () => {
+    const results = await Promise.allSettled([sendBuyerEmail(), sendSellerEmail()]);
+    results.forEach((result, i) => {
+      if (result.status === "rejected") {
+        console.error(
+          `[FULFILL] Échec de l'email de conflit ${i === 0 ? "acheteur" : "vendeur"}:`,
+          (result.reason as any)?.message || result.reason
+        );
+      }
+    });
+  };
 }
 
 /**

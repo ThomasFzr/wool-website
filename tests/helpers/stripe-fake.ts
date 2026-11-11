@@ -16,6 +16,9 @@ export function makeFakeStripe() {
         listLineItems: vi.fn().mockResolvedValue({ data: [] }),
       },
     },
+    refunds: {
+      create: vi.fn().mockResolvedValue({ id: "re_test", status: "succeeded" }),
+    },
     paymentIntents: {
       retrieve: vi.fn().mockResolvedValue({ id: "pi_test", status: "succeeded" }),
     },

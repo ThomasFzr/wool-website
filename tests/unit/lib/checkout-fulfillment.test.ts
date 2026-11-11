@@ -383,28 +383,124 @@ describe("fulfillCheckoutSession", () => {
       expect(emailTo("client@example.com")).toHaveLength(1);
     });
 
-    it("n'incrémente pas les ventes d'une pièce déjà vendue mais confirme quand même le paiement", async () => {
+    it("ne confirme pas une pièce déjà vendue : réservation annulée et pièce remboursée", async () => {
       const creation = await createCreation({ sold: true, salesCount: 1 });
       await pendingReservation(creation._id);
 
       const result = await fulfillCheckoutSession(paidSession());
 
-      expect(result.processedCount).toBe(1);
+      expect(result).toEqual({ paid: true, processedCount: 0, pending: false });
       expect((await Creation.findById(creation._id))!.salesCount).toBe(1);
+      expect(stripe.refunds.create).toHaveBeenCalledWith(
+        { payment_intent: "pi_test", amount: 4000 },
+        { idempotencyKey: `conflict-${(await Reservation.findOne())!._id}` }
+      );
+      expect((await Reservation.findOne())!).toMatchObject({
+        status: "cancelled",
+        paymentStatus: "refunded",
+        cancelReason: "Pièce déjà vendue : paiement remboursé automatiquement",
+      });
+      // Pas de « Paiement confirmé » : l'acheteur est prévenu, la vendeuse alertée
       expect(emailTo("client@example.com")).toHaveLength(1);
+      expect(emailTo("client@example.com")[0][0].subject).toBe("Article indisponible - Votre commande chez MailleMum");
+      expect(emailTo("client@example.com")[0][0].html).toContain("vous a été remboursé");
+      expect(emailTo("vendeuse@example.com")[0][0].subject).toBe("⚠️ Paiement reçu pour une pièce déjà vendue");
+      expect(revalidatePath).toHaveBeenCalledWith("/account/orders");
     });
 
-    it("valide la réservation d'une création supprimée sans envoyer d'email", async () => {
-      await pendingReservation(new mongoose.Types.ObjectId());
+    it("rembourse aussi les frais de port quand aucun article n'est honoré", async () => {
+      const creation = await createCreation({ sold: true });
+      await pendingReservation(creation._id);
 
-      const result = await fulfillCheckoutSession(paidSession());
+      await fulfillCheckoutSession(
+        paidSession({ metadata: { deliveryMode: "shipping", shippingCost: "6" } })
+      );
 
-      // BUG: la réservation passe à "paid" mais processedCount vaut 0 et aucun email
-      // de confirmation ne part : l'acheteur a payé sans recevoir de confirmation.
+      expect(stripe.refunds.create).toHaveBeenCalledWith(
+        { payment_intent: "pi_test", amount: 600 },
+        { idempotencyKey: "conflict-shipping-cs_test_1" }
+      );
+    });
+
+    it("garde les frais de port quand un autre article de la commande est honoré", async () => {
+      const free = await createCreation({ title: "Libre" });
+      const sold = await createCreation({ title: "Vendue", sold: true });
+      await pendingReservation(free._id);
+      await pendingReservation(sold._id);
+
+      const result = await fulfillCheckoutSession(
+        paidSession({ metadata: { deliveryMode: "shipping", shippingCost: "6" } })
+      );
+
+      expect(result.processedCount).toBe(1);
+      expect(stripe.refunds.create).toHaveBeenCalledTimes(1);
+      expect(stripe.refunds.create.mock.calls[0][0].amount).toBe(4000);
+      const confirmation = emailTo("client@example.com").find(([arg]) => arg.subject.includes("Paiement confirmé"))!;
+      expect(confirmation[0].html).toContain("Libre");
+      expect(confirmation[0].html).not.toContain("Vendue");
+    });
+
+    it("laisse la réservation payée pour un remboursement manuel quand le remboursement échoue", async () => {
+      const creation = await createCreation({ sold: true });
+      await pendingReservation(creation._id);
+      stripe.refunds.create.mockRejectedValue(new Error("refund ko"));
+
+      await fulfillCheckoutSession(paidSession());
+
+      expect((await Reservation.findOne())!).toMatchObject({
+        status: "cancelled",
+        paymentStatus: "paid",
+        cancelReason: "Pièce déjà vendue : paiement à rembourser manuellement",
+      });
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("Remboursement impossible"),
+        expect.any(Error)
+      );
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("à rembourser manuellement");
+      expect(emailTo("client@example.com")[0][0].html).toContain("Nous revenons vers vous");
+    });
+
+    it("signale une création supprimée sans pouvoir la rembourser automatiquement", async () => {
+      await pendingReservation(new mongoose.Types.ObjectId(), { name: "" });
+
+      const result = await fulfillCheckoutSession(paidSession({ payment_intent: null }));
+
       expect(result).toEqual({ paid: true, processedCount: 0, pending: false });
+      expect(stripe.refunds.create).not.toHaveBeenCalled();
       expect((await Reservation.findOne())!.paymentStatus).toBe("paid");
-      expect(sendEmail).not.toHaveBeenCalled();
-      expect(revalidatePath).not.toHaveBeenCalled();
+      expect((await Reservation.findOne())!.status).toBe("cancelled");
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("pièce supprimée");
+      expect(emailTo("client@example.com")[0][0].html).toContain("Article");
+      expect(revalidatePath).not.toHaveBeenCalledWith("/");
+    });
+
+    it("accorde le pluriel quand plusieurs pièces sont en conflit et journalise les emails en échec", async () => {
+      vi.stubEnv("SELLER_EMAIL", "");
+      const a = await createCreation({ title: "A", sold: true });
+      const b = await createCreation({ title: "B", sold: true });
+      await pendingReservation(a._id);
+      await pendingReservation(b._id);
+      vi.mocked(sendEmail).mockRejectedValueOnce(new Error("Resend indisponible"));
+
+      await fulfillCheckoutSession(paidSession());
+
+      expect(vi.mocked(sendEmail).mock.calls[0][0].html).toContain("ces pièces uniques ont été vendues");
+      expect(console.error).toHaveBeenCalledWith(
+        "[FULFILL] Échec de l'email de conflit acheteur:",
+        "Resend indisponible"
+      );
+    });
+
+    it("journalise l'échec de l'email de conflit côté vendeuse", async () => {
+      const creation = await createCreation({ sold: true });
+      await pendingReservation(creation._id);
+      vi.mocked(sendEmail)
+        .mockResolvedValueOnce({ data: { id: "email" }, error: null } as any)
+        .mockRejectedValueOnce("quota dépassé");
+
+      await fulfillCheckoutSession(paidSession());
+
+      expect(console.error).toHaveBeenCalledWith("[FULFILL] Échec de l'email de conflit vendeur:", "quota dépassé");
     });
 
     it("ne fait jamais échouer le paiement quand un email échoue", async () => {
