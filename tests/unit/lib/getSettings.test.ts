@@ -42,8 +42,14 @@ describe("getSettings", () => {
     expect(settings!.pickupConditions).toBeUndefined();
   });
 
+  it("lit le document « main », celui que l'admin modifie, et pas un autre", async () => {
+    await Settings.collection.insertOne({ _id: "ancien" as any, title: "Ancien" });
+    await Settings.collection.insertOne({ _id: "main" as any, title: "Actuel" });
+    expect((await getSettings())!.title).toBe("Actuel");
+  });
+
   it("renvoie null en cas d'erreur de base", async () => {
-    vi.spyOn(Settings, "findOne").mockImplementation(() => {
+    vi.spyOn(Settings, "findById").mockImplementation(() => {
       throw new Error("base indisponible");
     });
     const error = vi.spyOn(console, "error").mockImplementation(() => {});

@@ -23,5 +23,9 @@ declare module "next-auth/jwt" {
     provider?: string;
     role?: "user" | "admin";
     userId?: string;
+    /** Dernière revérification du compte en base (ms). */
+    roleCheckedAt?: number;
+    /** Date de connexion (ms), comparée à User.passwordChangedAt. */
+    authAt?: number;
   }
 }

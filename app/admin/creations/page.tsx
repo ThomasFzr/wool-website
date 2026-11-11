@@ -94,6 +94,28 @@ function AdminCreationsContent() {
   const [initialOrder, setInitialOrder] = useState<string[]>([]);
   
   const hasLoadedCreations = useRef(false);
+  // Images passées par le formulaire ouvert : celles envoyées puis abandonnées (formulaire
+  // annulé, image retirée avant d'enregistrer) sont supprimées de Cloudinary à la fermeture.
+  const formImageIds = useRef(new Set<string>());
+
+  function handleFormChange(next: CreationFormData) {
+    next.imagePublicIds.forEach((id) => formImageIds.current.add(id));
+    setForm(next);
+  }
+
+  /** Supprime les images vues dans le formulaire, sauf `keep` et celles déjà enregistrées. */
+  function cleanupFormImages(keep: string[]) {
+    const kept = new Set([...keep, ...(initialFormData?.imagePublicIds ?? [])]);
+    const publicIds = [...formImageIds.current].filter((id) => !kept.has(id));
+    formImageIds.current.clear();
+    if (publicIds.length === 0) return;
+    // Le serveur garde de toute façon les images encore utilisées par une création
+    fetch("/api/admin/cloudinary-cleanup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publicIds }),
+    }).catch((err) => console.error("Nettoyage des images impossible:", err));
+  }
 
   const colorOptions = Array.from(
     new Set(
@@ -315,8 +337,9 @@ function AdminCreationsContent() {
 
     const payload = {
       title: form.title.trim(),
-      description: form.description || undefined,
-      seoDescription: form.seoDescription || undefined,
+      // Champs facultatifs envoyés même vides : sinon on ne peut pas les effacer
+      description: form.description,
+      seoDescription: form.seoDescription,
       imageUrl: form.images.length > 0 ? form.images[0] : "",
       images: form.images,
       imagePublicIds: form.imagePublicIds,
@@ -324,9 +347,9 @@ function AdminCreationsContent() {
       color: form.color.trim(),
       type: form.type.trim(),
       showAsNew: form.showAsNew,
-      yarnBrand: form.yarnBrand || undefined,
+      yarnBrand: form.yarnBrand,
       weight: form.weight && form.weight.trim() !== "" && form.weight !== "0" ? Number(form.weight) : null,
-      yarnPrice: form.yarnPrice ? Number(form.yarnPrice) : undefined,
+      yarnPrice: form.yarnPrice ? Number(form.yarnPrice) : null,
       relatedCreations: form.relatedCreations || [],
     };
 
@@ -347,6 +370,9 @@ function AdminCreationsContent() {
 
     setMessage(editingId ? "Création mise à jour ✔️" : "Création ajoutée ✔️");
     setTimeout(() => setMessage(null), 3000);
+    // Les images retirées d'une création enregistrée sont supprimées par le PATCH ;
+    // ici, celles envoyées puis retirées avant l'enregistrement.
+    cleanupFormImages(form.imagePublicIds);
     
     setForm(initialFormState);
     setInitialFormData(undefined);
@@ -408,6 +434,7 @@ function AdminCreationsContent() {
   }
 
   function handleCancelEdit() {
+    cleanupFormImages([]);
     setEditingId(null);
     setForm(initialFormState);
     setInitialFormData(undefined);
@@ -725,7 +752,7 @@ function AdminCreationsContent() {
         isOpen={showEditModal}
         isEdit={true}
         form={form}
-        onFormChange={setForm}
+        onFormChange={handleFormChange}
         onSubmit={handleSubmit}
         onCancel={handleCancelEdit}
         uploading={false}
@@ -742,7 +769,7 @@ function AdminCreationsContent() {
         isOpen={showCreateModal}
         isEdit={false}
         form={form}
-        onFormChange={setForm}
+        onFormChange={handleFormChange}
         onSubmit={handleSubmit}
         onCancel={handleCancelEdit}
         uploading={false}

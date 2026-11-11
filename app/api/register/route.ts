@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
-      return NextResponse.json({ error: "User exists" }, { status: 409 });
+      return NextResponse.json({ error: "Un compte existe déjà avec cet email" }, { status: 409 });
     }
 
     const hashed = await bcrypt.hash(password, 10);
@@ -61,6 +61,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur, réessayez plus tard" }, { status: 500 });
   }
 }

@@ -57,6 +57,47 @@ describe("GET /api/admin/reservations", () => {
     expect(body).toMatchObject({ page: 2, total: 5, totalPages: 3 });
   });
 
+  it("pagine par commande : tous les articles d'une commande sur la même page", async () => {
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 4; j++) {
+        await createReservation({
+          name: `C${i}-${j}`,
+          stripeCheckoutSessionId: `cs_${i}`,
+          paymentStatus: "paid",
+          createdAt: new Date(2024, 0, i + 1, j),
+        });
+      }
+    }
+    asAdmin();
+
+    const { body } = await readJson(await list("?page=2&limit=1"));
+    expect(body.reservations.map((r: any) => r.name)).toEqual(["C1-3", "C1-2", "C1-1", "C1-0"]);
+    expect(body).toMatchObject({ page: 2, total: 3, totalPages: 3 });
+  });
+
+  it("montre la commande entière quand un seul article correspond au filtre", async () => {
+    await createReservation({ name: "Expédié", stripeCheckoutSessionId: "cs_1", paymentStatus: "paid", status: "shipped" });
+    await createReservation({ name: "Annulé", stripeCheckoutSessionId: "cs_1", paymentStatus: "paid", status: "cancelled" });
+    await createReservation({ name: "Autre", stripeCheckoutSessionId: "cs_2", paymentStatus: "paid", status: "cancelled" });
+    asAdmin();
+
+    const { body } = await readJson(await list("?status=shipped"));
+    expect(body.reservations.map((r: any) => r.name).sort()).toEqual(["Annulé", "Expédié"]);
+    expect(body.total).toBe(1);
+  });
+
+  it("ramène page et limit invalides aux valeurs par défaut, limit bornée à 100", async () => {
+    await createReservation({ name: "Seule" });
+    asAdmin();
+    for (const query of ["?page=-1&limit=0", "?page=abc&limit=abc", "?limit=100000"]) {
+      const { status, body } = await readJson(await list(query));
+      expect(status).toBe(200);
+      expect(body).toMatchObject({ page: 1, total: 1, totalPages: 1 });
+    }
+    const { body } = await readJson(await list("?page=5"));
+    expect(body).toMatchObject({ reservations: [], page: 5, total: 1 });
+  });
+
   it("filtre par statut, création et recherche textuelle", async () => {
     const creation = await createCreation();
     await createReservation({ name: "Cible", status: "shipped", creationId: creation._id, message: "taille (M)" });
@@ -68,6 +109,9 @@ describe("GET /api/admin/reservations", () => {
     const query = `?status=shipped&creationId=${creation.id}&search=${encodeURIComponent("(m)")}`;
     const { body } = await readJson(await list(query));
     expect(body.reservations.map((r: any) => r.name)).toEqual(["Cible"]);
+
+    const invalid = await readJson(await list("?creationId=pas-un-id"));
+    expect(invalid.body).toEqual({ reservations: [], page: 1, totalPages: 0, total: 0 });
   });
 
   it("recherche aussi dans le nom et le contact, sans tenir compte de la casse", async () => {
@@ -156,6 +200,8 @@ describe("POST /api/admin/reservations", () => {
         status: "preparing",
         paymentStatus: "paid",
         seenByAdmin: true,
+        // Prix figé au moment de la commande (stats)
+        price: 50,
       });
       expect(r.paidAt).toBeInstanceOf(Date);
     }

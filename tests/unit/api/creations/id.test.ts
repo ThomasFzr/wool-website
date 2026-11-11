@@ -136,11 +136,26 @@ describe("PATCH /api/creations/[id]", () => {
     expect((await patch(new mongoose.Types.ObjectId().toString(), { title: "X" })).status).toBe(404);
   });
 
-  it("répond 500 pour un identifiant mal formé", async () => {
-    // BUG: un id non-ObjectId (ex. un slug) fait lever un CastError → 500 au lieu de 404
+  it("répond 404 pour un identifiant mal formé", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await patch("pas-un-id", { title: "X" })).status).toBe(500);
+    expect((await patch("pas-un-id", { title: "X" })).status).toBe(404);
+  });
+
+  it("supprime de Cloudinary les images retirées, pas celles gardées ni celles d'une autre création", async () => {
+    await createCreation({ imagePublicIds: ["partagee"] });
+    const c = await createCreation({ imagePublicIds: ["a", "b", "partagee"] });
+    asAdmin();
+    expect((await patch(c._id.toString(), { imagePublicIds: ["b"], images: ["https://img/b.jpg"] })).status).toBe(200);
+    expect(destroy.mock.calls.map((call) => call[0])).toEqual(["a"]);
+  });
+
+  it("ne supprime aucune image quand imagePublicIds n'est pas envoyé", async () => {
+    const id = await insertRawCreation({ title: "Sans ids", price: 10, color: "Noir", type: "bonnet" });
+    const c = await createCreation({ imagePublicIds: ["a"] });
+    asAdmin();
+    await patch(c._id.toString(), { description: "x" });
+    await patch(id.toString(), { imagePublicIds: [] });
+    expect(destroy).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -170,6 +185,38 @@ describe("PATCH /api/creations/[id]", () => {
     const res = await readJson(await patch(id.toString(), { description: "x" }));
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/couleur/);
+  });
+
+  it("nettoie la description SEO (rendue en HTML) à l'enregistrement", async () => {
+    const c = await createCreation();
+    asAdmin();
+    await patch(c._id.toString(), { seoDescription: '<p onclick="x()">Doux</p><iframe src="https://evil.example"></iframe>' });
+    expect((await fresh(c._id)).seoDescription).toBe("<p>Doux</p>");
+  });
+
+  it("garde les anciens slugs d'une création renommée pour rediriger les anciens liens", async () => {
+    const c = await createCreation({ title: "Bonnet", slug: "bonnet" });
+    asAdmin();
+    await patch(c._id.toString(), { title: "Bonnet rose" });
+    expect(await fresh(c._id)).toMatchObject({ slug: "bonnet-rose", previousSlugs: ["bonnet"] });
+
+    // Même titre : rien ne change
+    await patch(c._id.toString(), { title: "Bonnet rose" });
+    expect((await fresh(c._id)).previousSlugs).toEqual(["bonnet"]);
+
+    await patch(c._id.toString(), { title: "Bonnet bleu" });
+    expect(await fresh(c._id)).toMatchObject({ slug: "bonnet-bleu", previousSlugs: ["bonnet", "bonnet-rose"] });
+
+    // Retour à un ancien titre : le slug est repris et sort de l'historique
+    await patch(c._id.toString(), { title: "Bonnet" });
+    expect(await fresh(c._id)).toMatchObject({ slug: "bonnet", previousSlugs: ["bonnet-rose", "bonnet-bleu"] });
+  });
+
+  it("n'ajoute pas d'ancien slug à une création qui n'en avait pas", async () => {
+    const id = await insertRawCreation({ title: "Vieux", price: 10, type: "bonnet", color: "Rouge" });
+    asAdmin();
+    await patch(id.toString(), { title: "Neuf" });
+    expect(await fresh(id)).toMatchObject({ slug: "neuf", previousSlugs: [] });
   });
 
   it("met à jour les champs simples, nettoie les textes et régénère le slug", async () => {
@@ -239,8 +286,8 @@ describe("PATCH /api/creations/[id]", () => {
     expect(doc.imageUrl).toBe("");
   });
 
-  it("incrémente salesCount quand l'article passe à vendu", async () => {
-    const c = await createCreation();
+  it("marque vendu sans toucher salesCount (seules les commandes comptent les ventes)", async () => {
+    const c = await createCreation({ salesCount: 1 });
     asAdmin();
     await patch(c._id.toString(), { sold: true });
     const doc = await fresh(c._id);
@@ -248,9 +295,10 @@ describe("PATCH /api/creations/[id]", () => {
     expect(doc.salesCount).toBe(1);
   });
 
-  it("n'incrémente pas salesCount si l'article était déjà vendu", async () => {
+  it("ne gonfle pas salesCount sur une bascule vendu → disponible → vendu", async () => {
     const c = await createCreation({ sold: true, salesCount: 1 });
     asAdmin();
+    await patch(c._id.toString(), { sold: false });
     await patch(c._id.toString(), { sold: true });
     expect((await fresh(c._id)).salesCount).toBe(1);
   });
@@ -458,10 +506,15 @@ describe("DELETE /api/creations/[id]", () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
-  it("répond 500 pour un identifiant mal formé", async () => {
-    // BUG: un id non-ObjectId fait lever un CastError → 500 au lieu de 404
+  it("répond 404 pour un identifiant mal formé", async () => {
+    asAdmin();
+    expect((await del("pas-un-id")).status).toBe(404);
+  });
+
+  it("répond 500 si la base échoue", async () => {
     asAdmin();
     vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await del("pas-un-id")).status).toBe(500);
+    vi.spyOn(Creation, "findById").mockRejectedValueOnce(new Error("db down"));
+    expect((await del(new mongoose.Types.ObjectId().toString())).status).toBe(500);
   });
 });

@@ -104,6 +104,8 @@ export const authOptions: NextAuthOptions = {
                 unset.resetToken = "";
                 unset.resetTokenExpiry = "";
                 updates.provider = account.provider;
+                // Révoque la session éventuellement ouverte avec ce mot de passe (callback jwt)
+                updates.passwordChangedAt = new Date();
               }
             }
             if (existingUser.provider !== "credentials") {
@@ -134,7 +136,9 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.userId = user.id;
         token.role = user.role ?? "user";
-        (token as any).roleCheckedAt = Date.now();
+        token.roleCheckedAt = Date.now();
+        // Date de connexion : une session ouverte avant un changement de mot de passe est révoquée
+        token.authAt = Date.now();
       }
 
       if (account) {
@@ -147,26 +151,32 @@ export const authOptions: NextAuthOptions = {
           if (dbUser) {
             token.role = dbUser.role;
             token.userId = dbUser._id.toString();
-            (token as any).roleCheckedAt = Date.now();
+            token.roleCheckedAt = Date.now();
           }
         }
       }
 
-      // Revérifier périodiquement le rôle en DB (révocation admin effective sans reconnexion)
-      const roleCheckedAt = (token as any).roleCheckedAt as number | undefined;
-      const stale = !roleCheckedAt || Date.now() - roleCheckedAt > ROLE_REFRESH_INTERVAL;
+      // Revérifier périodiquement le compte en DB (révocation admin, compte supprimé, mot de
+      // passe changé) : effectif sans reconnexion, au plus ROLE_REFRESH_INTERVAL après.
+      const stale = !token.roleCheckedAt || Date.now() - token.roleCheckedAt > ROLE_REFRESH_INTERVAL;
       if ((trigger === "update" || stale) && token.email) {
+        let dbUser: IUserDocument | null;
         try {
           await connectToDatabase();
-          const dbUser = await User.findOne({ email: token.email }).lean<IUserDocument | null>();
-          if (dbUser) {
-            token.role = dbUser.role;
-            token.userId = dbUser._id.toString();
-          }
-          (token as any).roleCheckedAt = Date.now();
+          dbUser = await User.findOne({ email: token.email }).lean<IUserDocument | null>();
         } catch (error) {
+          // Base indisponible : on garde le token plutôt que de déconnecter tout le monde
           console.error("[JWT] Role refresh error:", error);
+          return token;
         }
+        // Lever une erreur fait vider le cookie de session par next-auth (session révoquée).
+        if (!dbUser) throw new Error("Session révoquée : compte supprimé");
+        if (dbUser.passwordChangedAt && (token.authAt ?? 0) < new Date(dbUser.passwordChangedAt).getTime()) {
+          throw new Error("Session révoquée : mot de passe changé");
+        }
+        token.role = dbUser.role;
+        token.userId = dbUser._id.toString();
+        token.roleCheckedAt = Date.now();
       }
 
       return token;

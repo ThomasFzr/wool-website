@@ -147,46 +147,32 @@ function AdminReservationsContent() {
         if (status === "shipped") {
             body.shippedAt = new Date().toISOString();
         }
-        
-        // Si on a des articles groupés (commande), mettre à jour tous les articles
+        // Commande sélectionnée : le serveur met à jour tous ses articles (même hors de la
+        // page affichée) et n'envoie qu'un email pour la commande
         if (selectedOrderItems.length > 0) {
-            await Promise.all(
-                selectedOrderItems.map(item => 
-                    fetch(`/api/admin/reservations/${item._id}`, {
-                        method: "PATCH",
-                        body: JSON.stringify({
-                            ...body,
-                            // Le tracking number seulement sur le premier article
-                            trackingNumber: tracking && item === selectedOrderItems[0] ? tracking : item.trackingNumber,
-                        }),
-                        headers: { "Content-Type": "application/json" },
-                    })
-                )
-            );
-        } else {
-            // Sinon, mettre à jour seulement la réservation sélectionnée
-            await fetch(`/api/admin/reservations/${id}`, {
-                method: "PATCH",
-                body: JSON.stringify(body),
-                headers: { "Content-Type": "application/json" },
-            });
+            body.wholeOrder = true;
+        }
+
+        const res = await fetch(`/api/admin/reservations/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+            headers: { "Content-Type": "application/json" },
+        });
+        if (!res.ok) {
+            alert("La mise à jour de la commande a échoué. Réessayez.");
+            return;
         }
         setTrackingNumber("");
         load();
     }
 
     async function deleteReservation(id: string) {
-        // Si on a des articles groupés, supprimer toute la commande
-        if (selectedOrderItems.length > 0) {
-            // Supprimer tous les articles de la commande en parallèle
-            await Promise.all(
-                selectedOrderItems.map(item => 
-                    fetch(`/api/admin/reservations/${item._id}`, { method: "DELETE" })
-                )
-            );
-        } else {
-            // Sinon, supprimer seulement l'article sélectionné
-            await fetch(`/api/admin/reservations/${id}`, { method: "DELETE" });
+        // Commande sélectionnée : supprimer tous ses articles
+        const query = selectedOrderItems.length > 0 ? "?wholeOrder=1" : "";
+        const res = await fetch(`/api/admin/reservations/${id}${query}`, { method: "DELETE" });
+        if (!res.ok) {
+            alert("La suppression a échoué. Réessayez.");
+            return;
         }
         load();
     }

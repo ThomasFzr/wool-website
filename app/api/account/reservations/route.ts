@@ -6,6 +6,16 @@ import Reservation from "@/models/Reservation";
 import "@/models/Creation";
 import { escapeRegex } from "@/lib/escape";
 
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 100;
+
+/** Entier strictement positif lu dans l'URL, sinon la valeur par défaut ; borné à max. */
+function positiveInt(value: string | null, fallback: number, max = Infinity) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) return fallback;
+  return Math.min(n, max);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -20,8 +30,8 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
 
     const searchParams = req.nextUrl.searchParams;
-    const page = Number(searchParams.get("page") || 1);
-    const limit = Number(searchParams.get("limit") || 10);
+    const page = positiveInt(searchParams.get("page"), 1);
+    const limit = positiveInt(searchParams.get("limit"), DEFAULT_LIMIT, MAX_LIMIT);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
 

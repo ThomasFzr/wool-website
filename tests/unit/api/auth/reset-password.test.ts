@@ -71,6 +71,8 @@ describe("POST /api/auth/reset-password", () => {
     expect(user!.resetTokenExpiry).toBeNull();
     // Le lien reçu par email prouve l'adresse : le mot de passe survivra à une liaison Google
     expect(user!.emailVerifiedAt).toBeInstanceOf(Date);
+    // Les sessions ouvertes avant la réinitialisation sont révoquées (callback jwt)
+    expect(user!.passwordChangedAt).toBeInstanceOf(Date);
 
     // Le token ne sert qu'une fois
     expect((await post({ token: TOKEN, password: "autre123" })).status).toBe(400);
@@ -84,10 +86,18 @@ describe("POST /api/auth/reset-password", () => {
     expect((await findUser())!.emailVerifiedAt).toEqual(verifiedAt);
   });
 
-  it("répond 500 sur un token qui n'est pas une chaîne", async () => {
-    // Pas de validation de type : crypto.update lève une erreur, convertie en 500 (et non 400).
+  it("refuse un token ou un mot de passe qui n'est pas une chaîne", async () => {
+    await createUserWithToken();
+    for (const body of [{ token: 123, password: "nouveau1" }, { token: TOKEN, password: 1234567 }]) {
+      const { status, body: res } = await readJson(await post(body));
+      expect(status).toBe(400);
+      expect(res.error).toBe("Token et mot de passe requis");
+    }
+  });
+
+  it("répond 500 sur un corps JSON invalide", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const { status, body } = await readJson(await post({ token: 123, password: "nouveau1" }));
+    const { status, body } = await readJson(await post("{pas du json"));
     expect(status).toBe(500);
     expect(body.error).toBe("Erreur lors de la réinitialisation du mot de passe");
   });

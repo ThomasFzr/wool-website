@@ -167,6 +167,11 @@ describe("authOptions", () => {
       expect(dbUser!.resetToken).toBeUndefined();
       expect(dbUser!.resetTokenExpiry).toBeUndefined();
       expect(dbUser!.emailVerifiedAt).toBeInstanceOf(Date);
+      // La session déjà ouverte par l'attaquant avec ce mot de passe est révoquée
+      expect(dbUser!.passwordChangedAt).toBeInstanceOf(Date);
+      await expect(
+        jwt({ token: { email: "victime@example.com", authAt: Date.now() - 60_000 } })
+      ).rejects.toThrow("mot de passe changé");
       expect(await authorize({ email: "victime@example.com", password: "secret123" })).toBeNull();
     });
 
@@ -266,10 +271,34 @@ describe("authOptions", () => {
       expect(token.role).toBe("admin");
     });
 
-    it("revérifie un token sans date de vérification et garde le rôle si l'utilisateur a disparu", async () => {
-      const token = await jwt({ token: { email: "supprime@example.com", role: "admin", userId: "u1" } });
-      expect(token).toMatchObject({ role: "admin", userId: "u1" });
-      expect(typeof token.roleCheckedAt).toBe("number");
+    it("révoque la session d'un compte supprimé (y compris un ancien admin)", async () => {
+      await expect(
+        jwt({ token: { email: "supprime@example.com", role: "admin", userId: "u1" } })
+      ).rejects.toThrow("compte supprimé");
+    });
+
+    it("note la date de connexion dans le token", async () => {
+      const token = await jwt({ token: { email: "x@example.com" }, user: { id: "u1" } as any, account: credAccount });
+      expect(token.authAt).toBeTypeOf("number");
+      expect(token.authAt).toBeLessThanOrEqual(Date.now());
+    });
+
+    it("révoque une session ouverte avant un changement de mot de passe", async () => {
+      await User.create({ email: "client@example.com", passwordChangedAt: new Date() });
+      const authAt = Date.now() - 60_000;
+      await expect(jwt({ token: { email: "client@example.com", authAt } })).rejects.toThrow("mot de passe changé");
+    });
+
+    it("révoque une session sans date de connexion (antérieure au correctif) après un changement", async () => {
+      await User.create({ email: "client@example.com", passwordChangedAt: new Date(Date.now() - 86_400_000) });
+      await expect(jwt({ token: { email: "client@example.com" } })).rejects.toThrow("mot de passe changé");
+    });
+
+    it("garde une session ouverte après le changement de mot de passe", async () => {
+      const dbUser = await User.create({ email: "client@example.com", passwordChangedAt: new Date(Date.now() - 60_000) });
+      const token = await jwt({ token: { email: "client@example.com", authAt: Date.now() } });
+      expect(token.userId).toBe(dbUser._id.toString());
+      expect(token.roleCheckedAt).toBeTypeOf("number");
     });
 
     it("ne revérifie pas sans email dans le token", async () => {

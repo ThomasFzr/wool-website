@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent, ChangeEvent } from "react";
+import { signIn } from "next-auth/react";
 import { Button, Input, Card } from "@/components";
 
 type ProfileFormData = {
@@ -119,6 +120,14 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
         setMessage(error.error || "Erreur lors de la mise à jour");
         return;
       }
+
+      // Le changement révoque les sessions ouvertes avant, y compris celle-ci : on se
+      // reconnecte avec le nouveau mot de passe pour rester connecté.
+      await signIn("credentials", {
+        email: user.email,
+        password: form.newPassword,
+        redirect: false,
+      });
 
       setMessage("Mot de passe mis à jour ✔️");
       setForm({ ...form, currentPassword: "", newPassword: "", confirmPassword: "" });

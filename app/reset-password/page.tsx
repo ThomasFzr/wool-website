@@ -1,7 +1,7 @@
 // app/reset-password/page.tsx
 "use client";
 
-import { FormEvent, useState, useEffect, Suspense } from "react";
+import { FormEvent, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -10,17 +10,11 @@ function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const tokenParam = searchParams.get("token");
-    if (!tokenParam) {
-      setMessage("Token manquant ou invalide");
-    }
-    setToken(tokenParam);
-  }, [searchParams]);
+  // Lu directement dans l'URL : avec un état rempli par un effet, le premier rendu
+  // affichait « Token invalide » un instant même avec un lien valide.
+  const token = searchParams.get("token");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -103,7 +97,7 @@ function ResetPasswordForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+            className="w-full rounded-lg border px-3 py-2 text-base"
           />
 
           <input
@@ -113,7 +107,7 @@ function ResetPasswordForm() {
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+            className="w-full rounded-lg border px-3 py-2 text-base"
           />
 
           <button

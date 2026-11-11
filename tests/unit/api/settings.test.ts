@@ -129,7 +129,7 @@ describe("POST /api/settings", () => {
       allowedPostalCodes: ["69001"],
       message: "Lyon",
     });
-    expect(revalidatePath).toHaveBeenCalledWith("/");
+    expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
   });
 
   it("complète des conditions de retrait partielles", async () => {

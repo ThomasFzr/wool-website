@@ -4,419 +4,249 @@ import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
 
-// Regroupe des réservations en commandes (une commande = une session Stripe,
-// ou une réservation seule si pas de session)
-function groupIntoOrders(reservations: any[]): Map<string, any[]> {
-    const ordersMap = new Map<string, any[]>();
-    reservations.forEach((res: any) => {
-        const key = res.stripeCheckoutSessionId || res._id.toString();
-        if (!ordersMap.has(key)) {
-            ordersMap.set(key, []);
-        }
-        ordersMap.get(key)!.push(res);
-    });
-    return ordersMap;
+const DAY_MS = 24 * 3600 * 1000;
+const TIMEZONE = "Europe/Paris";
+
+// Mêmes commandes que la liste admin : paiements validés et commandes manuelles (sans Stripe).
+// Les paniers abandonnés (session Stripe jamais payée) ne sont pas des commandes.
+const ORDER_FILTER = {
+  $or: [
+    { paymentStatus: "paid" },
+    { stripeCheckoutSessionId: { $exists: false } },
+    { stripeCheckoutSessionId: null },
+  ],
+};
+
+const STATUS_PRIORITY: Record<string, number> = {
+  cancelled: 0,
+  pending: 2,
+  preparing: 2,
+  shipped: 3,
+  in_transit: 4,
+  delivered: 5,
+  validated: 6,
+};
+
+type CreationInfo = {
+  _id: { toString(): string };
+  title?: string;
+  price?: number;
+  imageUrl?: string;
+  yarnPrice?: number | null;
+  weight?: number | null;
+};
+
+type OrderReservation = {
+  _id: { toString(): string };
+  stripeCheckoutSessionId?: string | null;
+  status?: string;
+  paymentStatus?: string;
+  price?: number | null;
+  shippingCost?: number | null;
+  paidAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  creationId?: CreationInfo | null;
+};
+
+const monthFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+});
+
+/** Mois civil à Paris (« 2026-06 ») : une vente du 1er à 0 h 30 compte dans le bon mois. */
+function monthKey(date: Date) {
+  return monthFormatter.format(date).slice(0, 7);
 }
 
+/** Les 12 derniers mois civils à Paris, du plus ancien au mois courant. */
+function lastTwelveMonths(now: Date) {
+  const [year, month] = monthKey(now).split("-").map(Number);
+  return Array.from({ length: 12 }, (_, i) => {
+    // Le 15 à midi UTC tombe dans le même mois à Paris : sert au libellé
+    const d = new Date(Date.UTC(year, month - 1 - (11 - i), 15, 12));
+    return {
+      key: monthKey(d),
+      label: d.toLocaleDateString("fr-FR", { month: "short", year: "numeric", timeZone: TIMEZONE }),
+    };
+  });
+}
+
+function groupIntoOrders<T extends OrderReservation>(reservations: T[]): Map<string, T[]> {
+  const orders = new Map<string, T[]>();
+  for (const r of reservations) {
+    const key = r.stripeCheckoutSessionId || r._id.toString();
+    const items = orders.get(key);
+    if (items) items.push(r);
+    else orders.set(key, [r]);
+  }
+  return orders;
+}
+
+const isSale = (r: OrderReservation) => r.paymentStatus === "paid" && r.status !== "cancelled";
+const saleDate = (r: OrderReservation) => r.paidAt ?? r.updatedAt;
+// Prix figé au moment de la commande ; les commandes antérieures n'en ont pas : prix actuel.
+const salePrice = (r: OrderReservation) => r.price ?? r.creationId?.price ?? 0;
+const unitCostOf = (c: CreationInfo | null | undefined) =>
+  c?.weight && c.yarnPrice ? (c.weight / 100) * c.yarnPrice : 0;
+
 export async function GET() {
-    try {
-        const session = await checkAdminAuth();
-        if (!session) {
-            return new NextResponse("Unauthorized", { status: 401 });
-        }
-
-        await connectToDatabase();
-
-        const now = new Date();
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-
-        // Toutes les requêtes indépendantes en parallèle, avec des projections
-        // minimales (on ne charge plus les documents complets pour compter)
-        const [
-            allReservations,
-            totalCreations,
-            soldCreations,
-            availableCreations,
-            salesResult,
-            revenueResult,
-            soldCreationsDetails,
-            reservationsLast7Days,
-            validatedReservationsLast7Days,
-            reservationsLast30Days,
-            validatedReservationsLast30Days,
-            reservationsAgg,
-            salesAgg,
-            costsAgg,
-        ] = await Promise.all([
-            Reservation.find({}).select("stripeCheckoutSessionId status").lean(),
-            Creation.countDocuments(),
-            Creation.countDocuments({ sold: true }),
-            Creation.countDocuments({ sold: { $ne: true } }),
-            // Nombre total de ventes (somme de tous les salesCount)
-            Creation.aggregate([
-                { $match: { salesCount: { $exists: true, $ne: null, $gt: 0 } } },
-                { $group: { _id: null, totalSales: { $sum: "$salesCount" } } }
-            ]),
-            // Revenus totaux (salesCount * price de chaque création)
-            Creation.aggregate([
-                { $match: { salesCount: { $exists: true, $ne: null, $gt: 0 } } },
-                {
-                    $project: {
-                        revenue: { $multiply: ["$salesCount", { $ifNull: ["$price", 0] }] }
-                    }
-                },
-                { $group: { _id: null, totalRevenue: { $sum: "$revenue" } } }
-            ]),
-            // Liste détaillée des créations vendues avec les infos de coût
-            Creation.find({ salesCount: { $exists: true, $ne: null, $gt: 0 } })
-                .select("title price salesCount imageUrl yarnPrice weight _id")
-                .lean(),
-            Reservation.find({ createdAt: { $gte: sevenDaysAgo } })
-                .select("stripeCheckoutSessionId").lean(),
-            Reservation.find({
-                paymentStatus: "paid",
-                $or: [
-                    { paidAt: { $gte: sevenDaysAgo } },
-                    { paidAt: null, updatedAt: { $gte: sevenDaysAgo } }
-                ]
-            }).select("stripeCheckoutSessionId").lean(),
-            Reservation.find({ createdAt: { $gte: thirtyDaysAgo } })
-                .select("stripeCheckoutSessionId").lean(),
-            Reservation.find({
-                paymentStatus: "paid",
-                $or: [
-                    { paidAt: { $gte: thirtyDaysAgo } },
-                    { paidAt: null, updatedAt: { $gte: thirtyDaysAgo } }
-                ]
-            }).select("stripeCheckoutSessionId creationId")
-              .populate("creationId", "price")
-              .lean(),
-            // Agrégation des commandes par mois (grouper par stripeCheckoutSessionId)
-            Reservation.aggregate([
-                {
-                    $match: {
-                        createdAt: { $gte: twelveMonthsAgo }
-                    }
-                },
-                {
-                    $group: {
-                        _id: {
-                            sessionId: { $ifNull: ["$stripeCheckoutSessionId", "$_id"] },
-                            year: { $year: "$createdAt" },
-                            month: { $month: "$createdAt" }
-                        },
-                        minDate: { $min: "$createdAt" },
-                        hasValidated: {
-                            $max: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, 1, 0] }
-                        }
-                    }
-                },
-                {
-                    $group: {
-                        _id: {
-                            year: { $year: "$minDate" },
-                            month: { $month: "$minDate" }
-                        },
-                        total: { $sum: 1 },
-                        validated: { $sum: "$hasValidated" }
-                    }
-                }
-            ]),
-            // Agrégation des ventes par mois (basé sur les commandes payées)
-            Reservation.aggregate([
-                {
-                    $match: {
-                        paymentStatus: "paid"
-                    }
-                },
-                {
-                    $project: {
-                        creationId: 1,
-                        saleDate: { $ifNull: ["$paidAt", "$updatedAt"] }
-                    }
-                },
-                {
-                    $match: {
-                        saleDate: { $gte: twelveMonthsAgo }
-                    }
-                },
-                {
-                    $lookup: {
-                        from: "creations",
-                        localField: "creationId",
-                        foreignField: "_id",
-                        as: "creation"
-                    }
-                },
-                {
-                    $unwind: "$creation"
-                },
-                {
-                    $group: {
-                        _id: {
-                            year: { $year: "$saleDate" },
-                            month: { $month: "$saleDate" }
-                        },
-                        count: { $sum: 1 },
-                        revenue: { $sum: "$creation.price" }
-                    }
-                }
-            ]),
-            // Agrégation des coûts par mois (créations créées ce mois-là)
-            Creation.aggregate([
-                {
-                    $match: {
-                        createdAt: { $gte: twelveMonthsAgo }
-                    }
-                },
-                {
-                    $project: {
-                        createdAt: 1,
-                        // Coût unitaire fixe : (weight / 100) * yarnPrice
-                        unitCost: {
-                            $cond: {
-                                if: {
-                                    $and: [
-                                        { $ne: ["$weight", null] },
-                                        { $ne: ["$yarnPrice", null] }
-                                    ]
-                                },
-                                then: {
-                                    $multiply: [
-                                        { $divide: ["$weight", 100] },
-                                        "$yarnPrice"
-                                    ]
-                                },
-                                else: 0
-                            }
-                        }
-                    }
-                },
-                {
-                    $group: {
-                        _id: {
-                            year: { $year: "$createdAt" },
-                            month: { $month: "$createdAt" }
-                        },
-                        cost: { $sum: "$unitCost" }
-                    }
-                }
-            ]),
-        ]);
-
-        // Compter les commandes (groupées par stripeCheckoutSessionId)
-        const ordersMap = groupIntoOrders(allReservations);
-        const totalOrders = ordersMap.size;
-
-        // Compter les commandes par statut
-        const ordersByStatus = {
-            preparing: 0,
-            validated: 0,
-            cancelled: 0,
-            shipped: 0,
-            in_transit: 0,
-            delivered: 0,
-        };
-
-        const statusPriority: Record<string, number> = {
-            cancelled: 0,
-            pending: 2,
-            preparing: 2,
-            shipped: 3,
-            in_transit: 4,
-            delivered: 5,
-            validated: 6,
-        };
-
-        ordersMap.forEach((items) => {
-            // Prendre le statut le plus avancé de la commande
-            const sortedByStatus = [...items].sort((a, b) =>
-                (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0)
-            );
-            const highestStatus = sortedByStatus[0].status;
-
-            if (highestStatus === "pending" || highestStatus === "preparing") {
-                ordersByStatus.preparing++;
-            } else if (highestStatus === "validated") {
-                ordersByStatus.validated++;
-            } else if (highestStatus === "cancelled") {
-                ordersByStatus.cancelled++;
-            } else if (highestStatus === "shipped") {
-                ordersByStatus.shipped++;
-            } else if (highestStatus === "in_transit") {
-                ordersByStatus.in_transit++;
-            } else if (highestStatus === "delivered") {
-                ordersByStatus.delivered++;
-            }
-        });
-
-        const totalSales = salesResult.length > 0 ? salesResult[0].totalSales : 0;
-        const totalRevenue = revenueResult.length > 0 ? revenueResult[0].totalRevenue : 0;
-
-        // Pour chaque création vendue, récupérer la date de la dernière vente
-        const creationIds = soldCreationsDetails.map((c: any) => c._id);
-
-        const lastSaleDates = await Reservation.aggregate([
-            {
-                $match: {
-                    creationId: { $in: creationIds },
-                    paymentStatus: "paid"
-                }
-            },
-            {
-                $project: {
-                    creationId: 1,
-                    saleDate: { $ifNull: ["$paidAt", "$updatedAt"] }
-                }
-            },
-            {
-                $group: {
-                    _id: "$creationId",
-                    lastSaleDate: { $max: "$saleDate" }
-                }
-            }
-        ]);
-
-        // Créer un map pour accès rapide (convertir les ObjectId en string)
-        const saleDateMap = new Map();
-        lastSaleDates.forEach((item: any) => {
-            const creationIdStr = item._id.toString();
-            saleDateMap.set(creationIdStr, item.lastSaleDate);
-        });
-
-        const soldCreationsList = soldCreationsDetails.map((creation: any) => {
-            const creationIdStr = creation._id.toString();
-            const saleDate = saleDateMap.get(creationIdStr);
-
-            // Coût unitaire fixe depuis la création : (weight / 100) * yarnPrice
-            const unitCost = creation.weight && creation.yarnPrice
-                ? (creation.weight / 100) * creation.yarnPrice
-                : 0;
-            const totalCost = unitCost * creation.salesCount;
-            const creationRevenue = (creation.price || 0) * creation.salesCount;
-            const profit = creationRevenue - totalCost;
-
-            return {
-                _id: creation._id.toString(),
-                title: creation.title,
-                price: creation.price || 0,
-                salesCount: creation.salesCount,
-                totalRevenue: creationRevenue,
-                unitCost: unitCost,
-                totalCost: totalCost,
-                profit: profit,
-                imageUrl: creation.imageUrl,
-                lastSaleDate: saleDate || null, // Date de la dernière vente
-            };
-        })
-        .sort((a, b) => {
-            // Trier par date de vente décroissante (les plus récentes en premier)
-            if (!a.lastSaleDate && !b.lastSaleDate) return 0;
-            if (!a.lastSaleDate) return 1;
-            if (!b.lastSaleDate) return -1;
-
-            const dateA = new Date(a.lastSaleDate).getTime();
-            const dateB = new Date(b.lastSaleDate).getTime();
-            return dateB - dateA;
-        });
-
-        // Prix moyen par vente
-        const averagePrice = totalSales > 0 ? totalRevenue / totalSales : 0;
-
-        // Compteurs de commandes sur 7 et 30 jours
-        const ordersLast7Days = groupIntoOrders(reservationsLast7Days).size;
-        const validatedLast7Days = groupIntoOrders(validatedReservationsLast7Days).size;
-        const ordersLast30Days = groupIntoOrders(reservationsLast30Days).size;
-        const validatedLast30Days = groupIntoOrders(validatedReservationsLast30Days).size;
-
-        // Revenus et nombre de ventes des 30 derniers jours
-        const soldCountLast30Days = validatedReservationsLast30Days.length;
-        const revenueLast30Days = validatedReservationsLast30Days.reduce((sum: number, reservation: any) => {
-            const creation = reservation.creationId;
-            return sum + (creation?.price || 0);
-        }, 0);
-
-        // Créer un map pour un accès rapide
-        const resMap = new Map();
-        reservationsAgg.forEach((r: any) => {
-            const key = `${r._id.year}-${r._id.month}`;
-            resMap.set(key, r);
-        });
-
-        const salesMap = new Map();
-        salesAgg.forEach((s: any) => {
-            const key = `${s._id.year}-${s._id.month}`;
-            salesMap.set(key, s);
-        });
-
-        const costsMap = new Map();
-        costsAgg.forEach((c: any) => {
-            const key = `${c._id.year}-${c._id.month}`;
-            costsMap.set(key, c);
-        });
-
-        // Construire les données mensuelles
-        const monthlyData = [];
-        for (let i = 11; i >= 0; i--) {
-            const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const year = monthStart.getFullYear();
-            const month = monthStart.getMonth() + 1;
-            const key = `${year}-${month}`;
-
-            const resData = resMap.get(key);
-            const salesData = salesMap.get(key);
-            const costData = costsMap.get(key);
-
-            const revenue = salesData?.revenue || 0;
-            const cost = costData?.cost || 0; // Coût de toutes les créations créées ce mois
-            const profit = revenue - cost; // Les ventes compensent les coûts
-
-            monthlyData.push({
-                month: monthStart.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
-                orders: resData?.total || 0,
-                validated: resData?.validated || 0,
-                revenue: revenue,
-                cost: cost,
-                profit: profit,
-                sold: salesData?.count || 0
-            });
-        }
-
-        return NextResponse.json({
-            orders: {
-                total: totalOrders,
-                preparing: ordersByStatus.preparing,
-                validated: ordersByStatus.validated,
-                cancelled: ordersByStatus.cancelled,
-                shipped: ordersByStatus.shipped,
-                in_transit: ordersByStatus.in_transit,
-                delivered: ordersByStatus.delivered,
-                last7Days: ordersLast7Days,
-                last30Days: ordersLast30Days,
-                validatedLast7Days,
-                validatedLast30Days,
-            },
-            creations: {
-                total: totalCreations,
-                sold: soldCreations, // Nombre de créations actuellement vendues
-                available: availableCreations,
-            },
-            revenue: {
-                total: totalRevenue,
-                average: averagePrice,
-                last30Days: revenueLast30Days,
-                soldLast30Days: soldCountLast30Days,
-                totalSales: totalSales, // Nombre total de ventes (historique avec salesCount)
-                soldCreations: soldCreationsList, // Liste détaillée des créations vendues
-            },
-            monthlyData
-        });
-    } catch (err) {
-        console.error(err);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+  try {
+    const session = await checkAdminAuth();
+    if (!session) {
+      return new NextResponse("Unauthorized", { status: 401 });
     }
+
+    await connectToDatabase();
+
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * DAY_MS);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS);
+    const months = lastTwelveMonths(now);
+    const monthKeys = new Set(months.map((m) => m.key));
+    // Large borne basse pour les coûts : le filtre exact se fait par mois à Paris
+    const costsSince = new Date(now.getTime() - 400 * DAY_MS);
+
+    const [reservations, totalCreations, soldCreations, availableCreations, recentCreations] =
+      await Promise.all([
+        Reservation.find(ORDER_FILTER)
+          .select("stripeCheckoutSessionId status paymentStatus price shippingCost paidAt createdAt updatedAt creationId")
+          .populate("creationId", "title price imageUrl yarnPrice weight")
+          .lean<OrderReservation[]>(),
+        Creation.countDocuments(),
+        Creation.countDocuments({ sold: true }),
+        Creation.countDocuments({ sold: { $ne: true } }),
+        Creation.find({ createdAt: { $gte: costsSince } })
+          .select("createdAt weight yarnPrice")
+          .lean<(CreationInfo & { createdAt: Date })[]>(),
+      ]);
+
+    const orders = [...groupIntoOrders(reservations).values()];
+
+    // Statut d'une commande = statut le plus avancé de ses articles
+    const ordersByStatus = { preparing: 0, validated: 0, cancelled: 0, shipped: 0, in_transit: 0, delivered: 0 };
+    for (const items of orders) {
+      const priority = (r: OrderReservation) => STATUS_PRIORITY[r.status ?? ""] || 0;
+      const highest = [...items].sort((a, b) => priority(b) - priority(a))[0].status;
+      if (highest === "pending" || highest === "preparing") ordersByStatus.preparing++;
+      else if (highest && highest in ordersByStatus) ordersByStatus[highest as keyof typeof ordersByStatus]++;
+    }
+
+    const orderDate = (items: OrderReservation[]) =>
+      new Date(Math.min(...items.map((r) => new Date(r.createdAt).getTime())));
+    const orderSales = (items: OrderReservation[]) => items.filter(isSale);
+    // Frais de port payés par la commande (portés par un seul article), gardés tant
+    // qu'au moins un article n'est pas annulé
+    const orderShipping = (items: OrderReservation[]) =>
+      orderSales(items).length > 0
+        ? items
+            .filter((r) => r.paymentStatus === "paid")
+            .reduce((sum, r) => sum + (r.shippingCost || 0), 0)
+        : 0;
+    const orderSaleDate = (items: OrderReservation[]) =>
+      new Date(Math.max(...orderSales(items).map((r) => new Date(saleDate(r)).getTime())));
+
+    const sales = reservations.filter(isSale);
+    const salesRevenue = sales.reduce((sum, r) => sum + salePrice(r), 0);
+    const shippingRevenue = orders.reduce((sum, items) => sum + orderShipping(items), 0);
+
+    const since = (date: Date) => (d: Date) => new Date(d).getTime() >= date.getTime();
+    const paidOrders = orders.filter((items) => orderSales(items).length > 0);
+    const countOrdersSince = (date: Date) => orders.filter((items) => since(date)(orderDate(items))).length;
+    const paidOrdersSince = (date: Date) => paidOrders.filter((items) => since(date)(orderSaleDate(items)));
+
+    const paidLast30Days = paidOrdersSince(thirtyDaysAgo);
+    const salesLast30Days = sales.filter((r) => since(thirtyDaysAgo)(saleDate(r)));
+    const revenueLast30Days =
+      salesLast30Days.reduce((sum, r) => sum + salePrice(r), 0) +
+      paidLast30Days.reduce((sum, items) => sum + orderShipping(items), 0);
+
+    // Détail par création vendue
+    const byCreation = new Map<string, OrderReservation[]>();
+    for (const r of sales) {
+      const key = r.creationId?._id.toString() ?? "deleted";
+      const list = byCreation.get(key);
+      if (list) list.push(r);
+      else byCreation.set(key, [r]);
+    }
+    const soldCreationsList = [...byCreation.entries()]
+      .map(([id, items]) => {
+        const creation = items[0].creationId;
+        const unitCost = unitCostOf(creation);
+        const totalRevenue = items.reduce((sum, r) => sum + salePrice(r), 0);
+        const totalCost = unitCost * items.length;
+        return {
+          _id: id,
+          title: creation?.title ?? "Création supprimée",
+          price: creation?.price ?? 0,
+          salesCount: items.length,
+          totalRevenue,
+          unitCost,
+          totalCost,
+          profit: totalRevenue - totalCost,
+          imageUrl: creation?.imageUrl,
+          lastSaleDate: new Date(Math.max(...items.map((r) => new Date(saleDate(r)).getTime()))),
+        };
+      })
+      .sort((a, b) => b.lastSaleDate.getTime() - a.lastSaleDate.getTime());
+
+    // Historique mensuel (mois civils à Paris)
+    const monthly = new Map(
+      months.map((m) => [m.key, { month: m.label, orders: 0, validated: 0, revenue: 0, cost: 0, profit: 0, sold: 0 }])
+    );
+    const bucket = (date: Date) => monthKeys.has(monthKey(date)) ? monthly.get(monthKey(date))! : null;
+    for (const items of orders) {
+      const m = bucket(orderDate(items));
+      if (!m) continue;
+      m.orders++;
+      if (orderSales(items).length > 0) m.validated++;
+    }
+    for (const r of sales) {
+      const m = bucket(new Date(saleDate(r)));
+      if (!m) continue;
+      m.sold++;
+      m.revenue += salePrice(r);
+    }
+    for (const items of paidOrders) {
+      const m = bucket(orderSaleDate(items));
+      if (m) m.revenue += orderShipping(items);
+    }
+    // Coût de la laine des créations créées dans le mois
+    for (const c of recentCreations) {
+      const m = bucket(new Date(c.createdAt));
+      if (m) m.cost += unitCostOf(c);
+    }
+    const monthlyData = [...monthly.values()].map((m) => ({ ...m, profit: m.revenue - m.cost }));
+
+    return NextResponse.json({
+      orders: {
+        total: orders.length,
+        ...ordersByStatus,
+        last7Days: countOrdersSince(sevenDaysAgo),
+        last30Days: countOrdersSince(thirtyDaysAgo),
+        validatedLast7Days: paidOrdersSince(sevenDaysAgo).length,
+        validatedLast30Days: paidLast30Days.length,
+      },
+      creations: {
+        total: totalCreations,
+        sold: soldCreations, // Nombre de créations actuellement vendues
+        available: availableCreations,
+      },
+      revenue: {
+        // Chiffre d'affaires : articles au prix payé + frais de port
+        total: salesRevenue + shippingRevenue,
+        // Prix moyen d'un article vendu (hors frais de port)
+        average: sales.length > 0 ? salesRevenue / sales.length : 0,
+        last30Days: revenueLast30Days,
+        soldLast30Days: salesLast30Days.length,
+        totalSales: sales.length,
+        soldCreations: soldCreationsList,
+      },
+      monthlyData,
+    });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
 }

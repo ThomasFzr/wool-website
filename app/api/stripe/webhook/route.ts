@@ -3,9 +3,10 @@ import { headers } from "next/headers";
 import Stripe from "stripe";
 import { connectToDatabase } from "@/lib/db";
 import { getStripeInstance } from "@/lib/stripe";
-import { getAppUrl } from "@/lib/url";
+import { getEmailBaseUrl } from "@/lib/url";
 import {
   fulfillCheckoutSession,
+  handleChargeRefunded,
   releaseExpiredCheckoutSession,
 } from "@/lib/checkout-fulfillment";
 
@@ -58,7 +59,8 @@ export async function POST(req: NextRequest) {
       const fullSession = await stripe.checkout.sessions.retrieve(session.id);
 
       const result = await fulfillCheckoutSession(fullSession, {
-        appUrl: getAppUrl(headersList),
+        // Ne sert qu'aux liens des emails
+        appUrl: getEmailBaseUrl(headersList),
       });
       console.log(
         `[WEBHOOK] Session ${fullSession.id}: paid=${result.paid}, réservations traitées=${result.processedCount}`
@@ -81,6 +83,13 @@ export async function POST(req: NextRequest) {
       console.log(
         `[WEBHOOK] Session expirée ${session.id}: ${result.cancelledCount} réservation(s) annulée(s)`
       );
+    }
+
+    // Remboursement fait depuis Stripe : la commande passe remboursée, la pièce revient en vente
+    if (event.type === "charge.refunded") {
+      const charge = event.data.object as Stripe.Charge;
+      const result = await handleChargeRefunded(charge);
+      console.log(`[WEBHOOK] Remboursement ${charge.id}: ${result.refundedCount} réservation(s) remboursée(s)`);
     }
 
     return NextResponse.json({ received: true });

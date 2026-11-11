@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from "react";
 import { useSession } from "next-auth/react";
+import { isPostalCodeAllowed, normalizePostalCode } from "@/lib/postal-code";
 
 export type CartItem = {
   creationId: string;
@@ -128,7 +129,10 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
       const removed = current.filter((item) => !available.has(item.creationId));
       if (removed.length === 0) return;
 
-      setItems((prev) => prev.filter((item) => available.has(item.creationId)));
+      // Ne retirer que les articles vérifiés et indisponibles : un article ajouté pendant
+      // la requête n'a pas été vérifié et reste dans le panier
+      const removedIds = new Set(removed.map((item) => item.creationId));
+      setItems((prev) => prev.filter((item) => !removedIds.has(item.creationId)));
       setUnavailableNotice(
         removed.length === 1
           ? `« ${removed[0].title} » n'est plus disponible et a été retiré de votre panier.`
@@ -223,6 +227,24 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
       window.removeEventListener("focus", handleFocus);
     };
   }, [mounted, userEmail, hasPostalCodeRestriction, loadUserPostalCode]);
+
+  // Panier modifié dans un autre onglet : reprendre son contenu (l'événement storage
+  // n'est émis que dans les AUTRES onglets, et seulement si la valeur change).
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      try {
+        if (e.key === STORAGE_KEY) {
+          setItems(e.newValue ? JSON.parse(e.newValue) : []);
+        } else if (e.key === DELIVERY_MODE_KEY && (e.newValue === "pickup" || e.newValue === "shipping")) {
+          setDeliveryModeState(e.newValue);
+        }
+      } catch (error) {
+        console.error("Erreur lors de la synchronisation du panier:", error);
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   // Sauvegarder le panier dans localStorage à chaque changement
   useEffect(() => {
@@ -330,27 +352,15 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
     if (pickupConditions.allowedPostalCodes && pickupConditions.allowedPostalCodes.length > 0) {
       // Si l'utilisateur n'est pas connecté ou n'a pas de code postal, on ne peut pas vérifier
       // On considère que c'est disponible mais on affichera un message
-      if (!userEmail || !userPostalCode) {
+      if (!userEmail || !normalizePostalCode(userPostalCode)) {
         return {
           available: false,
           reason: "Veuillez renseigner votre code postal dans votre profil pour utiliser la remise en main propre",
         };
       }
 
-      // Normaliser le code postal (enlever les espaces, mettre en majuscules)
-      const normalizedUserCode = userPostalCode.trim().toUpperCase();
-      const normalizedAllowedCodes = pickupConditions.allowedPostalCodes.map(code => code.trim().toUpperCase());
-
-      // Vérifier si le code postal correspond (support des codes partiels, ex: 75 pour 75001, 75002, etc.)
-      const isAllowed = normalizedAllowedCodes.some(allowedCode => {
-        // Correspondance exacte
-        if (normalizedUserCode === allowedCode) return true;
-        // Correspondance partielle (si le code autorisé est un préfixe)
-        if (normalizedUserCode.startsWith(allowedCode)) return true;
-        // Correspondance partielle inverse (si le code de l'utilisateur est un préfixe du code autorisé)
-        if (allowedCode.startsWith(normalizedUserCode)) return true;
-        return false;
-      });
+      // Un code autorisé couvre les codes qui commencent par lui (ex. 75 pour 75001, 75002…)
+      const isAllowed = isPostalCodeAllowed(userPostalCode, pickupConditions.allowedPostalCodes);
 
       if (!isAllowed) {
         return {

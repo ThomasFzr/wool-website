@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getAppUrl } from "@/lib/url";
+import { getAppUrl, getEmailBaseUrl } from "@/lib/url";
 
 const withHost = (host: string | null, extra: Record<string, string> = {}) => {
   const h = new Headers(extra);
@@ -30,13 +30,21 @@ describe("getAppUrl", () => {
     }
   );
 
-  it("ne reconnaît pas la boucle locale IPv6 [::1]", () => {
-    // BUG: isLocalHost découpe sur le premier ":" ; pour "[::1]:3000" le nom d'hôte obtenu
-    // est "[" et la comparaison avec "[::1]" n'aboutit jamais. L'hôte est rejeté et l'URL
-    // retombe sur l'environnement au lieu de http://[::1]:3000.
-    vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
-    vi.stubEnv("NEXTAUTH_URL", "");
-    expect(getAppUrl(withHost("[::1]:3000"))).toBe("http://localhost:3000");
+  it("reconnaît la boucle locale IPv6 [::1]", () => {
+    expect(getAppUrl(withHost("[::1]:3000"))).toBe("http://[::1]:3000");
+  });
+
+  it("refuse un hôte local en production Vercel", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.maillemum.fr");
+    expect(getAppUrl(withHost("localhost:3000"))).toBe("https://www.maillemum.fr");
+  });
+
+  it("refuse un hôte « local » suivi d'autre chose", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.maillemum.fr");
+    for (const host of ["localhost:3000/evil", "localhost@evil.example", "[::1"]) {
+      expect(getAppUrl(withHost(host))).toBe("https://www.maillemum.fr");
+    }
   });
 
   it("respecte x-forwarded-proto", () => {
@@ -65,10 +73,11 @@ describe("getAppUrl", () => {
     expect(getAppUrl(withHost("deploy.example.com"))).toBe("https://deploy.example.com");
   });
 
-  it("accepte les previews *.vercel.app", () => {
-    expect(getAppUrl(withHost("wool-git-tests.vercel.app"))).toBe(
-      "https://wool-git-tests.vercel.app"
-    );
+  it("accepte l'URL de branche de ce déploiement mais pas n'importe quel *.vercel.app", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.maillemum.fr");
+    vi.stubEnv("VERCEL_BRANCH_URL", "wool-git-tests-moi.vercel.app");
+    expect(getAppUrl(withHost("wool-git-tests-moi.vercel.app"))).toBe("https://wool-git-tests-moi.vercel.app");
+    expect(getAppUrl(withHost("attaquant.vercel.app"))).toBe("https://www.maillemum.fr");
   });
 
   it("ignore un en-tête Host falsifié et retombe sur l'environnement", () => {
@@ -77,5 +86,29 @@ describe("getAppUrl", () => {
     vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
     vi.stubEnv("VERCEL_URL", "");
     expect(getAppUrl(withHost("evil.example.com"))).toBe("https://maillemum.fr");
+  });
+});
+
+describe("getEmailBaseUrl", () => {
+  it("utilise toujours le domaine officiel en production, quel que soit l'hôte", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.maillemum.fr/");
+    vi.stubEnv("VERCEL_URL", "wool-abc.vercel.app");
+    expect(getEmailBaseUrl(withHost("wool-abc.vercel.app"))).toBe("https://www.maillemum.fr");
+  });
+
+  it("suit l'origine de la requête hors production (tests en local ou en preview)", () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.maillemum.fr");
+    vi.stubEnv("VERCEL_URL", "wool-abc.vercel.app");
+    expect(getEmailBaseUrl(withHost("wool-abc.vercel.app"))).toBe("https://wool-abc.vercel.app");
+  });
+
+  it("retombe sur l'origine de la requête en production sans NEXT_PUBLIC_APP_URL", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+    vi.stubEnv("NEXTAUTH_URL", "");
+    vi.stubEnv("VERCEL_URL", "wool-abc.vercel.app");
+    expect(getEmailBaseUrl(withHost("wool-abc.vercel.app"))).toBe("https://wool-abc.vercel.app");
   });
 });

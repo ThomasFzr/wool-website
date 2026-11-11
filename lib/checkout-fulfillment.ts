@@ -9,7 +9,7 @@ import { emailTemplate } from "@/lib/emailTemplate";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 import CheckoutNotification from "@/models/CheckoutNotification";
-import { LOCK_FIELDS_UNSET, releaseCreationLocks } from "@/lib/creation-lock";
+import { LOCK_FIELDS_UNSET, releaseCreationLocks, releaseSoldCreation } from "@/lib/creation-lock";
 
 export type FulfillmentResult = {
   /** true si la session Stripe est réellement payée (payment_status=paid, status=complete, PaymentIntent succeeded) */
@@ -819,4 +819,50 @@ export async function releaseExpiredCheckoutSession(
   );
 
   return { cancelledCount: expired.length };
+}
+
+/**
+ * Remboursement intégral fait depuis le tableau de bord Stripe (événement charge.refunded) :
+ * les articles encore payés de ce paiement passent remboursés et annulés, et leurs pièces
+ * sont remises en vente (sauf revendues depuis). Un remboursement partiel n'est que
+ * journalisé : il ne dit pas quel article est remboursé, l'admin ajuste la commande.
+ */
+export async function handleChargeRefunded(
+  charge: Stripe.Charge
+): Promise<{ refundedCount: number }> {
+  const paymentIntentId =
+    typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+  if (!paymentIntentId) return { refundedCount: 0 };
+
+  if (!charge.refunded) {
+    console.log(
+      `[FULFILL] Remboursement partiel du paiement ${paymentIntentId} (${charge.amount_refunded / 100} €) : commande à ajuster à la main`
+    );
+    return { refundedCount: 0 };
+  }
+
+  const paid = await Reservation.find({ stripePaymentIntentId: paymentIntentId, paymentStatus: "paid" });
+  let refundedCount = 0;
+  let released = false;
+  for (const reservation of paid) {
+    // Passage atomique paid → refunded : un événement rejoué ne traite rien deux fois
+    const updated = await Reservation.findOneAndUpdate(
+      { _id: reservation._id, paymentStatus: "paid" },
+      {
+        $set: {
+          paymentStatus: "refunded",
+          status: "cancelled",
+          cancelledBy: "admin",
+          cancelReason: "Commande remboursée",
+        },
+      }
+    );
+    if (!updated) continue;
+    refundedCount++;
+    if (updated.creationId && (await releaseSoldCreation(updated.creationId, updated._id))) released = true;
+  }
+
+  if (released) revalidateCatalog();
+  if (refundedCount > 0) revalidateOrders();
+  return { refundedCount };
 }

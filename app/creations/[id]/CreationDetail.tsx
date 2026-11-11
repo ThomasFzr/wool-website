@@ -7,6 +7,7 @@ import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import { useCart } from "@/contexts/CartContext";
 import { Toast } from "@/components/Toast";
 import { CreationCard } from "@/components/CreationCard";
+import { useIsNewArticle } from "@/hooks/useIsNewArticle";
 
 export type Creation = {
   _id: string;
@@ -50,6 +51,7 @@ const cursorRight = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/
 // Composant Bouton Flèche (utilisé uniquement dans la Lightbox)
 const ArrowButton = ({ direction, onClick, className = "" }: { direction: 'left' | 'right', onClick: (e: React.MouseEvent) => void, className?: string }) => (
   <button
+    type="button"
     onClick={onClick}
     className={`hidden md:flex absolute top-1/2 -translate-y-1/2 z-50 items-center justify-center 
     w-12 h-12 bg-white rounded-full shadow-lg text-slate-900 transition-all duration-200 
@@ -88,6 +90,10 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   // --- ÉTATS MODALE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const modalScrollRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  // Élément qui avait le focus avant l'ouverture de la visionneuse (rendu à la fermeture)
+  const focusBeforeModalRef = useRef<HTMLElement | null>(null);
   
   // Zoom & Pan
   const [modalZoomLevel, setModalZoomLevel] = useState(1);
@@ -108,52 +114,25 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
   // Décompte "nouveau" : 7 jours depuis visibleAt (si défini) ou createdAt
   const refDate = creation.visibleAt || creation.createdAt;
-  const isNewArticle = creation.showAsNew && refDate
-    ? (new Date().getTime() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24) < 7
-    : creation.showAsNew;
+  const isNewArticle = useIsNewArticle(creation.showAsNew, refDate);
 
-  // Préchargement des images principales (800px)
+  // Préchargement des seules images voisines de l'image affichée (800 px, celles de la
+  // galerie ; 1200 px dans la visionneuse quand elle est ouverte). Précharger toute la
+  // galerie aux deux tailles dès l'arrivée coûtait cher en données sur mobile.
   useEffect(() => {
-    if (images.length > 0) {
-      images.forEach((src) => {
-        const img = new Image();
-        img.src = optimizeCloudinaryUrl(src, { width: 800, quality: 80, format: 'auto' });
-      });
-    }
-  }, [images]);
-
-  // Préchargement des images haute résolution pour la lightbox (en arrière-plan)
-  useEffect(() => {
-    if (images.length === 0) return;
-
-    // Fonction pour précharger les images haute résolution
-    const preloadLightboxImages = () => {
-      images.forEach((src) => {
-        const img = new Image();
-        img.src = optimizeCloudinaryUrl(src, { width: 1200, quality: 85, format: 'auto' });
-      });
-    };
-
-    // Utiliser requestIdleCallback si disponible, sinon attendre que la page soit chargée
-    if (typeof window !== 'undefined') {
-      if ('requestIdleCallback' in window && typeof (window as any).requestIdleCallback === 'function') {
-        // Précharger pendant les périodes d'inactivité du navigateur
-        (window as any).requestIdleCallback(preloadLightboxImages, { timeout: 2000 });
-      } else {
-        // Fallback : attendre que la page soit complètement chargée + délai
-        const handleLoad = () => {
-          setTimeout(preloadLightboxImages, 1000);
-        };
-        
-        if (document.readyState === 'complete') {
-          setTimeout(preloadLightboxImages, 1000);
-        } else {
-          window.addEventListener('load', handleLoad);
-          return () => window.removeEventListener('load', handleLoad);
-        }
-      }
-    }
-  }, [images]);
+    if (images.length <= 1) return;
+    const neighbours = new Set([
+      (currentIndex + 1) % images.length,
+      (currentIndex - 1 + images.length) % images.length,
+    ]);
+    const size = isModalOpen
+      ? { width: 1200, quality: 85, format: 'auto' as const }
+      : { width: 800, quality: 80, format: 'auto' as const };
+    neighbours.forEach((idx) => {
+      const img = new Image();
+      img.src = optimizeCloudinaryUrl(images[idx], size);
+    });
+  }, [images, currentIndex, isModalOpen]);
 
   // Bloquer scroll body si modale ouverte
   useEffect(() => {
@@ -257,7 +236,38 @@ export function CreationDetail({ creation }: CreationDetailProps) {
       setModalPan({ x: 0, y: 0 });
   }
 
-  function openModal() { setIsModalOpen(true); }
+  function openModal() {
+    focusBeforeModalRef.current = document.activeElement as HTMLElement | null;
+    setIsModalOpen(true);
+  }
+
+  // Visionneuse accessible au clavier : focus sur « Fermer » à l'ouverture, Tab reste dans
+  // la visionneuse, et le focus revient où il était à la fermeture.
+  useEffect(() => {
+    if (!isModalOpen) return;
+    closeButtonRef.current?.focus();
+    function trapFocus(e: KeyboardEvent) {
+      if (e.key !== "Tab" || !modalRef.current) return;
+      const focusables = Array.from(modalRef.current.querySelectorAll<HTMLElement>("button")).filter(
+        (el) => el.offsetParent !== null
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", trapFocus);
+    return () => {
+      document.removeEventListener("keydown", trapFocus);
+      focusBeforeModalRef.current?.focus();
+    };
+  }, [isModalOpen]);
 
   // Pan Handlers
   function handlePanStart(clientX: number, clientY: number) {
@@ -327,7 +337,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
           {images.length > 1 && (
             <div className="hidden md:flex md:flex-col md:w-24 relative items-center justify-center">
                {images.length > 4 && <button onClick={scrollThumbnailsUp} disabled={thumbnailScroll === 0} className="mb-1 rounded-full bg-white/90 p-1.5 shadow-lg hover:bg-white cursor-pointer disabled:opacity-50"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg></button>}
-              <div className="flex flex-col gap-1.5 overflow-hidden px-1 py-1" style={{ height: '318px' }}><div className="flex flex-col gap-1.5 transition-transform duration-300" style={{ transform: `translateY(-${thumbnailScroll * 77.5}px)` }}>{images.map((img, idx) => (<button key={idx} onClick={() => { interactionSourceRef.current = 'select'; setCurrentIndex(idx); }} className={`aspect-square overflow-hidden rounded-lg cursor-pointer transition-all ${idx === currentIndex ? "ring-2 ring-slate-900 opacity-100" : "ring-1 ring-slate-300 opacity-60 hover:opacity-100"}`} style={{ width: '76px', height: '76px', flexShrink: 0 }}><img src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })} alt={`Miniature ${idx + 1}`} title={`${creation.title} - Miniature ${idx + 1}`} className="h-full w-full object-cover" /></button>))}</div></div>
+              <div className="flex flex-col gap-1.5 overflow-hidden px-1 py-1" style={{ height: '318px' }}><div className="flex flex-col gap-1.5 transition-transform duration-300" style={{ transform: `translateY(-${thumbnailScroll * 77.5}px)` }}>{images.map((img, idx) => (<button key={idx} onClick={() => { interactionSourceRef.current = 'select'; setCurrentIndex(idx); }} className={`aspect-square overflow-hidden rounded-lg cursor-pointer transition-all ${idx === currentIndex ? "ring-2 ring-slate-900 opacity-100" : "ring-1 ring-slate-300 opacity-60 hover:opacity-100"}`} style={{ width: '76px', height: '76px', flexShrink: 0 }}><img src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })} alt={`Miniature ${idx + 1}`} title={`${creation.title} - Miniature ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" /></button>))}</div></div>
               {images.length > 4 && <button onClick={scrollThumbnailsDown} disabled={thumbnailScroll >= images.length - 4} className="mt-1 rounded-full bg-white/90 p-1.5 shadow-lg hover:bg-white cursor-pointer disabled:opacity-50"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></button>}
             </div>
           )}
@@ -344,7 +354,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               >
                 {images.map((img, idx) => (
                     <div key={idx} className="relative h-full w-full shrink-0 snap-center flex items-center justify-center cursor-pointer" onClick={openModal}>
-                      <img src={optimizeCloudinaryUrl(img, { width: 800, quality: 80, format: 'auto' })} alt={`Image ${idx + 1}`} title={`${creation.title} - Image ${idx + 1}`} className="h-full w-full object-contain" draggable={false} />
+                      <img src={optimizeCloudinaryUrl(img, { width: 800, quality: 80, format: 'auto' })} alt={`Image ${idx + 1}`} title={`${creation.title} - Image ${idx + 1}`} className="h-full w-full object-contain" draggable={false} loading={idx === 0 ? "eager" : "lazy"} />
                     </div>
                 ))}
               </div>
@@ -353,7 +363,8 @@ export function CreationDetail({ creation }: CreationDetailProps) {
               <div className="hidden md:block h-full w-full relative" > {/* Retrait de cursor-zoom-in global */}
                 {currentImageUrl ? (
                     <>
-                    <img src={currentImageUrl} alt="Main" title={creation.title} className="h-full w-full object-contain" draggable={false} />
+                    {/* lazy : masquée sur mobile, elle n'y est alors pas téléchargée */}
+                    <img src={currentImageUrl} alt="Main" title={creation.title} className="h-full w-full object-contain" draggable={false} loading="lazy" />
                     
                     {/* --- ZONES DE NAVIGATION AVEC CURSEUR PERSONNALISÉ --- */}
                     {images.length > 1 && (
@@ -415,11 +426,26 @@ export function CreationDetail({ creation }: CreationDetailProps) {
       {/* --- MODALE FULLSCREEN --- */}
       {isModalOpen && (
         <div 
+          ref={modalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Photos de ${creation.title}`}
           className="fixed inset-0 z-[60] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-200"
           onClick={() => setIsModalOpen(false)}
         >
+          {/* Position annoncée aux lecteurs d'écran */}
+          <p className="sr-only" aria-live="polite">
+            Photo {currentIndex + 1} sur {images.length}
+          </p>
+
           {/* Bouton fermer */}
-          <button className="absolute top-4 right-4 p-4 text-white/80 hover:text-white z-50 cursor-pointer">
+          <button
+            ref={closeButtonRef}
+            type="button"
+            aria-label="Fermer la visionneuse"
+            onClick={() => setIsModalOpen(false)}
+            className="absolute top-4 right-4 p-4 text-white/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white z-50 cursor-pointer"
+          >
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
 
@@ -445,7 +471,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 >
                     <img
                         src={optimizeCloudinaryUrl(img, { width: 1200, quality: 85, format: 'auto' })}
-                        alt={`Zoom ${idx}`}
+                        alt={`${creation.title} – photo ${idx + 1} sur ${images.length}`}
                         title={`${creation.title} - Vue détaillée ${idx + 1}`}
                         onClick={handleImageClick}
                         className="max-h-screen max-w-screen object-contain transition-transform duration-200 ease-out will-change-transform"
@@ -456,6 +482,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                             cursor: modalZoomLevel > 1 ? 'grab' : 'zoom-in'
                         }}
                         draggable={false}
+                        loading={idx === currentIndex ? "eager" : "lazy"}
                     />
                 </div>
              ))}

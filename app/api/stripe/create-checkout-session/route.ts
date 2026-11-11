@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import { getStripeInstance } from "@/lib/stripe";
 import { getAppUrl } from "@/lib/url";
+import { isPostalCodeAllowed, normalizePostalCode } from "@/lib/postal-code";
 import { releaseCreationLocks } from "@/lib/creation-lock";
 import { revalidateCatalog } from "@/lib/revalidate";
 import Creation from "@/models/Creation";
@@ -120,27 +121,14 @@ export async function POST(req: NextRequest) {
         const user = await User.findOne({ email: session.user.email }).select("postalCode").lean() as { postalCode?: string } | null;
         const userPostalCode = user?.postalCode;
 
-        if (!userPostalCode) {
+        if (!normalizePostalCode(userPostalCode)) {
           return new NextResponse(
             "Veuillez renseigner votre code postal dans votre profil pour utiliser la remise en main propre",
             { status: 400 }
           );
         }
 
-        // Normaliser le code postal
-        const normalizedUserCode = userPostalCode.trim().toUpperCase();
-        const normalizedAllowedCodes = conditions.allowedPostalCodes.map(code => code.trim().toUpperCase());
-
-        // Vérifier si le code postal correspond
-        const isAllowed = normalizedAllowedCodes.some(allowedCode => {
-          // Correspondance exacte
-          if (normalizedUserCode === allowedCode) return true;
-          // Correspondance partielle (si le code autorisé est un préfixe)
-          if (normalizedUserCode.startsWith(allowedCode)) return true;
-          // Correspondance partielle inverse (si le code de l'utilisateur est un préfixe du code autorisé)
-          if (allowedCode.startsWith(normalizedUserCode)) return true;
-          return false;
-        });
+        const isAllowed = isPostalCodeAllowed(userPostalCode, conditions.allowedPostalCodes);
 
         if (!isAllowed) {
           return new NextResponse(
@@ -357,6 +345,8 @@ export async function POST(req: NextRequest) {
       status: "preparing",
       paymentStatus: "pending",
       deliveryMode,
+      // Prix payé, figé (le prix de la création peut changer ensuite)
+      price: creation.price || 0,
       // Mettre les frais de livraison uniquement sur le premier article
       shippingCost: index === 0 ? totalShippingCost : 0,
     }));
@@ -428,8 +418,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: checkoutSession.url });
   } catch (err: any) {
     console.error("Erreur lors de la création de la session Stripe:", err);
+    // Message générique : le détail (Stripe, MongoDB) reste dans les journaux
     return new NextResponse(
-      err.message || "Server error",
+      "Le paiement n'a pas pu être préparé. Réessayez dans quelques instants.",
       { status: 500 }
     );
   }

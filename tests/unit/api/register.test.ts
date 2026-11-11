@@ -71,7 +71,7 @@ describe("POST /api/register", () => {
     await User.create({ email: "client@example.com", provider: "google" });
     const { status, body } = await readJson(await post({ ...valid, email: "CLIENT@example.com" }));
     expect(status).toBe(409);
-    expect(body.error).toBe("User exists");
+    expect(body.error).toBe("Un compte existe déjà avec cet email");
     expect(await User.countDocuments()).toBe(1);
   });
 
@@ -94,6 +94,6 @@ describe("POST /api/register", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { status, body } = await readJson(await post("{pas du json"));
     expect(status).toBe(500);
-    expect(body.error).toBe("Server error");
+    expect(body.error).toBe("Erreur serveur, réessayez plus tard");
   });
 });

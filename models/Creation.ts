@@ -4,6 +4,8 @@ const schema = new Schema(
   {
     title: { type: String, required: true },
     slug: { type: String, unique: true, sparse: true },
+    // Anciens slugs (titre renommé) : redirigés en 301 vers le slug actuel
+    previousSlugs: { type: [String], default: undefined, index: true },
     description: String,
     seoDescription: String, // Description complète pour le référencement
     imageUrl: String,

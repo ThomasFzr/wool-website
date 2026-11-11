@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
@@ -8,6 +9,22 @@ import { checkAdminAuth } from "@/lib/auth";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { escapeRegex } from "@/lib/escape";
 
+const MAX_LIMIT = 100;
+
+/** Entier strictement positif lu dans l'URL, sinon la valeur par défaut ; borné à max. */
+function positiveInt(value: string | null, fallback: number, max = Infinity) {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1) return fallback;
+    return Math.min(n, max);
+}
+
+/**
+ * GET /api/admin/reservations
+ * Pagine par COMMANDE (articles d'une même session de paiement) et non par article :
+ * une page contient toujours tous les articles de ses commandes, pour que les actions
+ * groupées portent sur la commande entière. `total` et `totalPages` comptent des commandes.
+ * Les filtres retiennent les commandes dont au moins un article correspond.
+ */
 export async function GET(req: Request) {
     try {
         const session = await checkAdminAuth();
@@ -19,8 +36,8 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url);
 
-        const page = Number(searchParams.get("page") || 1);
-        const limit = Number(searchParams.get("limit") || 10);
+        const page = positiveInt(searchParams.get("page"), 1);
+        const limit = positiveInt(searchParams.get("limit"), 10, MAX_LIMIT);
         const status = searchParams.get("status");
         const creationId = searchParams.get("creationId");
         const search = searchParams.get("search");
@@ -39,7 +56,14 @@ export async function GET(req: Request) {
         const conditions: any[] = [paymentFilter];
         
         if (status) conditions.push({ status });
-        if (creationId) conditions.push({ creationId });
+        if (creationId) {
+            // Un id invalide ne correspond à aucune commande
+            if (!mongoose.isValidObjectId(creationId)) {
+                return NextResponse.json({ reservations: [], page, totalPages: 0, total: 0 });
+            }
+            // $match d'agrégation : pas de conversion automatique en ObjectId
+            conditions.push({ creationId: new mongoose.Types.ObjectId(creationId) });
+        }
         
         if (search) {
             const regex = { $regex: escapeRegex(search), $options: "i" };
@@ -55,15 +79,41 @@ export async function GET(req: Request) {
         // Utiliser $and si plusieurs conditions, sinon utiliser directement
         const query: any = conditions.length > 1 ? { $and: conditions } : conditions[0];
 
-        const [total, reservations] = await Promise.all([
-            Reservation.countDocuments(query),
-            Reservation.find(query)
-                .sort({ createdAt: -1 })
-                .skip((page - 1) * limit)
-                .limit(limit)
-                .populate("creationId")
-                .lean(),
+        // Commandes correspondantes, de la plus récente à la plus ancienne
+        const [result] = await Reservation.aggregate([
+            { $match: query },
+            {
+                $group: {
+                    _id: { $ifNull: ["$stripeCheckoutSessionId", { $toString: "$_id" }] },
+                    lastCreatedAt: { $max: "$createdAt" },
+                },
+            },
+            { $sort: { lastCreatedAt: -1, _id: -1 } },
+            {
+                $facet: {
+                    total: [{ $count: "count" }],
+                    keys: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+                },
+            },
         ]);
+        const total: number = result.total[0]?.count ?? 0;
+        const keys: string[] = result.keys.map((k: { _id: string }) => k._id);
+
+        // Tous les articles (visibles) de ces commandes, même ceux hors filtre
+        const reservations = keys.length === 0 ? [] : await Reservation.find({
+            $and: [
+                paymentFilter,
+                {
+                    $or: [
+                        { stripeCheckoutSessionId: { $in: keys } },
+                        { _id: { $in: keys.filter((k) => mongoose.isValidObjectId(k)) } },
+                    ],
+                },
+            ],
+        })
+            .sort({ createdAt: -1 })
+            .populate("creationId")
+            .lean();
 
         return NextResponse.json({
             reservations,
@@ -150,6 +200,7 @@ export async function POST(req: Request) {
                 message: message || "",
                 status: status,
                 paymentStatus: "paid", // Les commandes admin sont considérées comme payées
+                price: creation.price, // Prix figé (stats), obligatoire sur une création
                 paidAt: now,
                 seenByAdmin: true, // Déjà vue par l'admin
                 stripeCheckoutSessionId: adminOrderId, // Utiliser un ID unique pour grouper les réservations de cette commande
