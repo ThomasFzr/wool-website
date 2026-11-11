@@ -100,3 +100,28 @@ test("une pièce verrouillée par un autre acheteur ne peut pas être payée", a
   await alert.dismiss();
   await other.close();
 });
+
+test("paiement abandonné puis relancé : l'ancienne session est expirée, la nouvelle aboutit", async ({
+  page,
+  request,
+}) => {
+  await login(page, E2E_CLIENT, "/");
+  await addToCart(page, rose.slug);
+  await page.goto("/cart");
+  await page.getByRole("button", { name: "Procéder au paiement" }).click();
+  await expect(page).toHaveURL(/localhost:3101\/pay\//);
+
+  // Retour au site sans payer, puis nouvelle tentative
+  await page.getByRole("link", { name: "Annuler" }).click();
+  await expect(page).toHaveURL(/\/checkout\/cancel/);
+  await page.goto("/cart");
+  await page.getByRole("button", { name: "Procéder au paiement" }).click();
+  await expect(page).toHaveURL(/localhost:3101\/pay\//);
+
+  const [latest, previous] = await fakeStripeSessions(request);
+  expect(previous.status).toBe("expired");
+  expect(latest.status).toBe("open");
+
+  await page.getByRole("button", { name: "Payer" }).click();
+  await expect(page.getByRole("heading", { name: "Paiement confirmé !" })).toBeVisible();
+});
