@@ -1,3 +1,6 @@
+# Désactivé côté GitHub (gh workflow disable Tests) : Actions est bloqué par le budget à 0 $
+# du compte sur ce dépôt privé. Le hook .githooks/pre-push le remplace en local.
+# Réactiver : gh workflow enable Tests
 name: Tests
 
 on:
