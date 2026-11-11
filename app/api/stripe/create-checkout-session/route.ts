@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/db";
 import { getStripeInstance } from "@/lib/stripe";
 import { getAppUrl } from "@/lib/url";
 import { releaseCreationLocks } from "@/lib/creation-lock";
+import { revalidateCatalog } from "@/lib/revalidate";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import Settings from "@/models/Settings";
@@ -420,6 +421,9 @@ export async function POST(req: NextRequest) {
       }
       throw dbErr;
     }
+
+    // Les pièces verrouillées apparaissent « Réservé » sur la vitrine
+    revalidateCatalog();
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (err: any) {

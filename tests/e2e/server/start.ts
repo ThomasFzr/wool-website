@@ -42,7 +42,6 @@ async function main() {
       GOOGLE_CLIENT_ID: "e2e-google-client",
       GOOGLE_CLIENT_SECRET: "e2e-google-secret",
       NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: "e2e",
-      NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: "e2e",
       CLOUDINARY_API_KEY: "e2e",
       CLOUDINARY_API_SECRET: "e2e",
       GEMINI_API_KEY: "",

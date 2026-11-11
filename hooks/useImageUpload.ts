@@ -1,7 +1,12 @@
 import { useState, ChangeEvent } from "react";
 
-const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+type UploadSignature = {
+  cloudName: string;
+  apiKey: string;
+  signature: string;
+  timestamp: number;
+  upload_preset?: string;
+};
 
 export function useImageUpload() {
   const [uploading, setUploading] = useState(false);
@@ -15,22 +20,27 @@ export function useImageUpload() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      throw new Error("Cloudinary n'est pas configuré.");
-    }
-
     try {
       setUploading(true);
+
+      // Envoi signé par le serveur (réservé à l'admin) : Cloudinary refuse les envois anonymes
+      const signRes = await fetch("/api/admin/cloudinary-signature", { method: "POST" });
+      if (!signRes.ok) throw new Error("Signature Cloudinary refusée");
+      const { cloudName, apiKey, signature, timestamp, upload_preset } =
+        (await signRes.json()) as UploadSignature;
 
       // Uploads en parallèle (l'ordre de sélection est préservé par le map)
       const results = await Promise.all(
         Array.from(files).map(async (file) => {
           const formData = new FormData();
           formData.append("file", file);
-          formData.append("upload_preset", UPLOAD_PRESET);
+          formData.append("api_key", apiKey);
+          formData.append("timestamp", String(timestamp));
+          formData.append("signature", signature);
+          if (upload_preset) formData.append("upload_preset", upload_preset);
 
           const res = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+            `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
             { method: "POST", body: formData }
           );
 

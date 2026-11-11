@@ -5,7 +5,8 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { makeRequest, readJson } from "../../helpers/http";
 
-const post = (body: unknown) => POST(makeRequest("/api/register", { method: "POST", body }));
+const post = (body: unknown, headers?: Record<string, string>) =>
+  POST(makeRequest("/api/register", { method: "POST", body, headers }));
 const valid = { name: "Client", email: "client@example.com", password: "secret123" };
 
 describe("POST /api/register", () => {
@@ -72,6 +73,21 @@ describe("POST /api/register", () => {
     expect(status).toBe(409);
     expect(body.error).toBe("User exists");
     expect(await User.countDocuments()).toBe(1);
+  });
+
+  it("limite les inscriptions par IP et par heure, tentatives refusées comprises", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(500_000 * 3_600_000 + 1_000);
+    const ip = { "x-real-ip": "203.0.113.7" };
+    for (let i = 1; i <= 5; i++) {
+      expect((await post({ ...valid, email: `client${i}@example.com` }, ip)).status).toBe(200);
+    }
+
+    const { status, body } = await readJson(await post({ ...valid, email: "client6@example.com" }, ip));
+    expect(status).toBe(429);
+    expect(body.error).toMatch(/Trop d'inscriptions/);
+    expect(await User.countDocuments()).toBe(5);
+
+    expect((await post({ ...valid, email: "client6@example.com" }, { "x-real-ip": "198.51.100.1" })).status).toBe(200);
   });
 
   it("répond 500 sur un corps JSON invalide", async () => {

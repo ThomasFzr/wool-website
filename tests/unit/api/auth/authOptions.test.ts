@@ -9,8 +9,8 @@ import User from "@/models/User";
 // Les callbacks et authorize sont appelés directement : on teste notre logique, pas next-auth.
 const callbacks = authOptions.callbacks!;
 const credentials = authOptions.providers.find((p) => p.id === "credentials") as any;
-const authorize = (creds?: Record<string, string>) =>
-  credentials.options.authorize(creds, {} as any) as Promise<any>;
+const authorize = (creds?: Record<string, string>, headers: Record<string, string> = {}) =>
+  credentials.options.authorize(creds, { headers } as any) as Promise<any>;
 
 const signIn = (user: Partial<AuthUser>, account: Partial<Account> | null) =>
   callbacks.signIn!({ user: user as AuthUser, account: account as Account | null } as any);
@@ -32,6 +32,12 @@ describe("authOptions", () => {
     expect(authOptions.providers.map((p) => p.id)).toEqual(["google", "credentials"]);
     expect(authOptions.session?.strategy).toBe("jwt");
     expect(authOptions.pages?.signIn).toBe("/login");
+  });
+
+  it("branche l'adaptateur sur le client MongoDB partagé, obtenu à chaque appel", async () => {
+    await User.create({ email: "adapter@example.com", provider: "google" });
+    const found = await authOptions.adapter!.getUserByEmail!("adapter@example.com");
+    expect(found).toMatchObject({ email: "adapter@example.com" });
   });
 
   describe("authorize (email + mot de passe)", () => {
@@ -70,6 +76,27 @@ describe("authOptions", () => {
       expect(user).not.toHaveProperty("password");
     });
 
+    it("bloque une IP après 10 échecs en 15 minutes, même avec le bon mot de passe", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(2_000_000 * 900_000 + 1_000);
+      const ip = { "x-real-ip": "203.0.113.7" };
+      await User.create({ email: "google@example.com", provider: "google" });
+      // Tous les types d'échec comptent : compte inconnu, compte sans mot de passe, mauvais mot de passe
+      expect(await authorize({ email: "inconnu@example.com", password: "x" }, ip)).toBeNull();
+      expect(await authorize({ email: "google@example.com", password: "x" }, ip)).toBeNull();
+      for (let i = 0; i < 7; i++) {
+        expect(await authorize({ email: "client@example.com", password: "mauvais" }, ip)).toBeNull();
+      }
+      // Une connexion réussie ne compte pas comme un échec
+      expect(await authorize({ email: "client@example.com", password: "secret123" }, ip)).not.toBeNull();
+      expect(await authorize({ email: "client@example.com", password: "mauvais" }, ip)).toBeNull();
+
+      expect(await authorize({ email: "client@example.com", password: "secret123" }, ip)).toBeNull();
+      // Une autre IP n'est pas concernée
+      expect(
+        await authorize({ email: "client@example.com", password: "secret123" }, { "x-real-ip": "198.51.100.1" })
+      ).not.toBeNull();
+    });
+
     it("renvoie name undefined quand le compte n'a pas de nom", async () => {
       await User.create({
         email: "anonyme@example.com",
@@ -93,6 +120,7 @@ describe("authOptions", () => {
       expect(await signIn({ email: "nouveau@example.com", name: "Nouveau" }, google)).toBe(true);
       const dbUser = await User.findOne({ email: "nouveau@example.com" });
       expect(dbUser).toMatchObject({ name: "Nouveau", provider: "google", role: "user" });
+      expect(dbUser!.emailVerifiedAt).toBeInstanceOf(Date);
     });
 
     it("crée l'utilisateur Google avec un nom null quand Google n'en fournit pas", async () => {
@@ -105,11 +133,49 @@ describe("authOptions", () => {
       expect(await User.countDocuments()).toBe(0);
     });
 
-    it("garde le provider credentials quand un compte local se connecte avec Google", async () => {
-      await User.create({ email: "client@example.com", name: "Ancien", provider: "credentials" });
+    it("garde le mot de passe et le provider credentials d'un compte à l'email prouvé qui se connecte avec Google", async () => {
+      const verifiedAt = new Date("2026-01-01");
+      await User.create({
+        email: "client@example.com",
+        name: "Ancien",
+        provider: "credentials",
+        password: "hash",
+        emailVerifiedAt: verifiedAt,
+      });
       await signIn({ email: "client@example.com", name: "Nom Google" }, google);
-      const dbUser = await User.findOne({ email: "client@example.com" });
-      expect(dbUser).toMatchObject({ name: "Nom Google", provider: "credentials" });
+      const dbUser = await User.findOne({ email: "client@example.com" }).select("+password");
+      expect(dbUser).toMatchObject({ name: "Nom Google", provider: "credentials", password: "hash" });
+      expect(dbUser!.emailVerifiedAt).toEqual(verifiedAt);
+    });
+
+    it("retire le mot de passe d'un compte à l'email jamais prouvé à la première connexion Google (pré-prise de contrôle)", async () => {
+      // Quelqu'un s'est inscrit avec l'adresse de la victime : la connexion Google de la
+      // victime ne doit pas lui laisser un accès par mot de passe au même compte.
+      await User.create({
+        email: "victime@example.com",
+        provider: "credentials",
+        password: "hash-attaquant",
+        resetToken: "t",
+        resetTokenExpiry: new Date(Date.now() + 60_000),
+      });
+      await signIn({ email: "victime@example.com", name: "Victime" }, google);
+      const dbUser = await User.findOne({ email: "victime@example.com" }).select(
+        "+password +resetToken +resetTokenExpiry"
+      );
+      expect(dbUser).toMatchObject({ name: "Victime", provider: "google" });
+      expect(dbUser!.password).toBeUndefined();
+      expect(dbUser!.resetToken).toBeUndefined();
+      expect(dbUser!.resetTokenExpiry).toBeUndefined();
+      expect(dbUser!.emailVerifiedAt).toBeInstanceOf(Date);
+      expect(await authorize({ email: "victime@example.com", password: "secret123" })).toBeNull();
+    });
+
+    it("ne prouve pas l'email lors d'une connexion credentials", async () => {
+      await User.create({ email: "local@example.com", provider: "credentials", password: "hash" });
+      await signIn({ email: "local@example.com" }, credAccount);
+      const dbUser = await User.findOne({ email: "local@example.com" }).select("+password");
+      expect(dbUser!.password).toBe("hash");
+      expect(dbUser!.emailVerifiedAt).toBeUndefined();
     });
 
     it("met à jour le provider d'un compte non credentials et conserve l'ancien nom", async () => {

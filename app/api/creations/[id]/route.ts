@@ -258,6 +258,20 @@ export async function DELETE(
       return new NextResponse("Not found", { status: 404 });
     }
 
+    // Une pièce vendue garde ses commandes (historique client, comptabilité) : on la cache
+    // au lieu de la supprimer. Idem pendant un paiement en cours sur la pièce.
+    const hasPaidOrders = await Reservation.exists({ creationId: id, paymentStatus: "paid" });
+    if (hasPaidOrders || creation.reserved) {
+      return NextResponse.json(
+        {
+          error: hasPaidOrders
+            ? "Cette création a des commandes payées : masquez-la plutôt que de la supprimer."
+            : "Un paiement est en cours sur cette création : réessayez plus tard ou masquez-la.",
+        },
+        { status: 409 }
+      );
+    }
+
     // 🔥 1) Supprimer les images Cloudinary par leurs public_id stockés (en parallèle)
     if (Array.isArray(creation.imagePublicIds)) {
       await Promise.allSettled(
@@ -300,7 +314,7 @@ export async function DELETE(
       );
     }
 
-    // 3) Supprimer toutes les réservations liées à cette création
+    // 3) Supprimer les réservations liées (aucune n'est payée, cf. plus haut)
     await Reservation.deleteMany({ creationId: id });
 
     // 4) Enfin, supprimer la création de la base

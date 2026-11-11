@@ -132,9 +132,9 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 
 # Cloudinary
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
-NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your-upload-preset
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
+CLOUDINARY_UPLOAD_PRESET=your-signed-upload-preset # optional, server-side only
 
 # Resend (for password reset emails)
 RESEND_API_KEY=your-resend-api-key
@@ -177,11 +177,10 @@ Users can register with email and password. Passwords are hashed with bcrypt.
 
 1. Create a [Cloudinary account](https://cloudinary.com/)
 2. Get your cloud name from the dashboard
-3. Create an unsigned upload preset:
-   - Go to Settings → Upload
-   - Scroll to "Upload presets"
-   - Create new preset (unsigned)
-   - Copy the preset name
+3. Uploads are signed by the server (`/api/admin/cloudinary-signature`, admin only) with the API secret:
+   no unsigned preset is needed. Optionally create a **signed** upload preset (Settings → Upload →
+   Upload presets) and set its name in `CLOUDINARY_UPLOAD_PRESET`.
+   Never keep an unsigned preset: anyone who knows its name can upload to the account.
 4. Add credentials to `.env.local`
 
 ## 📧 Email Setup (Resend)

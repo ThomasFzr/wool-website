@@ -16,6 +16,8 @@ export type Creation = {
   color?: string;
   type?: "bonnet" | "tour de cou" | "bandeau";
   sold?: boolean;
+  /** Verrouillée par un paiement en cours (ou réservée par l'admin) : pas achetable pour l'instant */
+  reserved?: boolean;
   showAsNew?: boolean;
   createdAt?: string;
   visibleAt?: string; // Date de première mise en ligne (décompte "nouveau" à partir de là)
@@ -68,6 +70,10 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
         {creation.sold ? (
           <span className="absolute left-2 top-2 z-10 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
             Vendu
+          </span>
+        ) : creation.reserved ? (
+          <span className="absolute left-2 top-2 z-10 rounded-full bg-amber-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+            Réservé
           </span>
         ) : isNewArticle ? (
           <span className="absolute left-2 top-2 z-10 rounded-full bg-red-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">

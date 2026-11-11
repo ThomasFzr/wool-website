@@ -119,12 +119,12 @@ function ContactForm() {
     }
 
     try {
-      const { website, ...formData } = form;
+      // Le honeypot part aussi au serveur : les robots postent sans passer par cette page
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
+          ...form,
           creationId: creationId || null,
           creationIds: selectedCreationIds.length > 0 ? selectedCreationIds : undefined,
         }),

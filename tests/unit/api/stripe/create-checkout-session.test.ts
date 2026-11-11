@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import mongoose from "mongoose";
+import { revalidatePath } from "next/cache";
 import { POST } from "@/app/api/stripe/create-checkout-session/route";
 import { connectToDatabase } from "@/lib/db";
 import { getStripeInstance } from "@/lib/stripe";
@@ -158,6 +159,8 @@ describe("POST /api/stripe/create-checkout-session", () => {
       expect(locked.reservedName).toBe("Alice");
       // Le verrou est au nom de la réservation : elle seule pourra le libérer
       expect(locked.reservedByReservationId!.toString()).toBe(reservation._id.toString());
+      // La vitrine affiche la pièce « Réservé »
+      expect(revalidatePath).toHaveBeenCalledWith("/");
     });
 
     it("utilise l'image historique ou aucune image, et omet la description sans couleur", async () => {

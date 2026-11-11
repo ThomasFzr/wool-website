@@ -620,13 +620,42 @@ describe("CartProvider — remise en main propre", () => {
     expect(result.current.isPickupAvailable).toBe(true);
   });
 
-  it("bascule en livraison au chargement avant même de connaître le code postal", async () => {
-    // BUG: tant que le profil n'est pas chargé, userPostalCode vaut null donc le retrait est
-    // jugé indisponible et le mode bascule (définitivement) en livraison, puis est enregistré.
-    // Un utilisateur au code postal autorisé qui avait choisi le retrait le perd à chaque visite.
+  it("garde le retrait choisi pendant le chargement du profil quand le code postal est autorisé", async () => {
+    // Au premier rendu, le code postal n'est pas encore chargé : le retrait paraît
+    // indisponible, mais le choix enregistré ne doit pas être écrasé pour autant.
     localStorage.setItem(DELIVERY_MODE_KEY, "pickup");
-    const result = await pickupState({ ...base, allowedPostalCodes: ["75"] }, { postalCode: "75011" });
+    let resolveProfile!: () => void;
+    const profileLoaded = new Promise<void>((res) => (resolveProfile = res));
+    fetchMock.mockImplementationOnce(async (url: string) => {
+      if (url !== "/api/account/profile") throw new Error(`URL inattendue : ${url}`);
+      await profileLoaded;
+      return { ok: true, json: async () => ({ postalCode: "75011" }) } as Response;
+    });
+    signedInAs("client@example.com");
+    const { result } = renderCart({ pickupConditions: { ...base, allowedPostalCodes: ["75"] } });
+    await flush();
+    expect(result.current.isPickupAvailable).toBe(false);
+    expect(result.current.deliveryMode).toBe("pickup");
+
+    await act(async () => resolveProfile());
+    await flush();
     expect(result.current.isPickupAvailable).toBe(true);
+    expect(result.current.deliveryMode).toBe("pickup");
+    expect(localStorage.getItem(DELIVERY_MODE_KEY)).toBe("pickup");
+  });
+
+  it("garde le retrait tant que la session charge", async () => {
+    localStorage.setItem(DELIVERY_MODE_KEY, "pickup");
+    vi.mocked(useSession).mockReturnValue({ data: null, status: "loading" } as ReturnType<typeof useSession>);
+    const { result } = renderCart({ pickupConditions: { ...base, allowedPostalCodes: ["75"] } });
+    await flush();
+    expect(result.current.isPickupAvailable).toBe(false);
+    expect(result.current.deliveryMode).toBe("pickup");
+  });
+
+  it("bascule en livraison une fois le profil chargé si le code postal n'est pas autorisé", async () => {
+    localStorage.setItem(DELIVERY_MODE_KEY, "pickup");
+    const result = await pickupState({ ...base, allowedPostalCodes: ["75"] }, { postalCode: "69001" });
     expect(result.current.deliveryMode).toBe("shipping");
     expect(localStorage.getItem(DELIVERY_MODE_KEY)).toBe("shipping");
   });

@@ -63,13 +63,16 @@ type CartProviderProps = {
 };
 
 export function CartProvider({ children, shippingCost = 5, pickupConditions = null }: CartProviderProps) {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const userEmail = session?.user?.email ?? null;
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [deliveryMode, setDeliveryModeState] = useState<DeliveryMode>("pickup");
   const [userPostalCode, setUserPostalCode] = useState<string | null>(null);
+  // Compte (email, ou null pour un visiteur) dont le code postal a été chargé ; undefined
+  // tant que rien n'est chargé. Sert à ne pas juger le retrait sur un profil pas encore lu.
+  const [postalCodeLoadedFor, setPostalCodeLoadedFor] = useState<string | null | undefined>(undefined);
   const [unavailableNotice, setUnavailableNotice] = useState<string | null>(null);
 
   // Charger le panier et le mode de livraison depuis localStorage au montage
@@ -185,6 +188,7 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
     } else {
       setUserPostalCode(null);
     }
+    setPostalCodeLoadedFor(userEmail);
   }, [userEmail]);
 
   // Charger le code postal de l'utilisateur connecté
@@ -359,12 +363,15 @@ export function CartProvider({ children, shippingCost = 5, pickupConditions = nu
     return { available: true, reason: null };
   }, [pickupConditions, totalPrice, userEmail, userPostalCode]);
 
-  // Si le mode pickup est sélectionné mais n'est plus disponible, basculer vers shipping
+  // Si le mode pickup est sélectionné mais n'est plus disponible, basculer vers shipping.
+  // Pas avant de connaître la session et le code postal du compte : au premier rendu, le
+  // retrait paraît indisponible faute de code postal et le choix serait perdu à chaque visite.
+  const pickupStateKnown = sessionStatus !== "loading" && postalCodeLoadedFor === userEmail;
   useEffect(() => {
-    if (deliveryMode === "pickup" && !isPickupAvailable && mounted) {
+    if (deliveryMode === "pickup" && !isPickupAvailable && mounted && pickupStateKnown) {
       setDeliveryModeState("shipping");
     }
-  }, [isPickupAvailable, deliveryMode, mounted]);
+  }, [isPickupAvailable, deliveryMode, mounted, pickupStateKnown]);
 
   const value = useMemo<CartContextType>(
     () => ({

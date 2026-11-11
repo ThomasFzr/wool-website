@@ -69,9 +69,19 @@ describe("POST /api/auth/reset-password", () => {
     expect(await bcrypt.compare("nouveau1", user!.password!)).toBe(true);
     expect(user!.resetToken).toBeNull();
     expect(user!.resetTokenExpiry).toBeNull();
+    // Le lien reçu par email prouve l'adresse : le mot de passe survivra à une liaison Google
+    expect(user!.emailVerifiedAt).toBeInstanceOf(Date);
 
     // Le token ne sert qu'une fois
     expect((await post({ token: TOKEN, password: "autre123" })).status).toBe(400);
+  });
+
+  it("garde la date de preuve d'email déjà connue", async () => {
+    await createUserWithToken();
+    const verifiedAt = new Date("2026-01-01");
+    await User.updateOne({ email: "client@example.com" }, { emailVerifiedAt: verifiedAt });
+    expect((await post({ token: TOKEN, password: "nouveau1" })).status).toBe(200);
+    expect((await findUser())!.emailVerifiedAt).toEqual(verifiedAt);
   });
 
   it("répond 500 sur un token qui n'est pas une chaîne", async () => {

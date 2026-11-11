@@ -12,7 +12,7 @@ const NEUTRAL = { message: "Si ce compte existe, un email a été envoyé" };
 const post = (body: unknown, headers?: Record<string, string>) =>
   POST(makeRequest("/api/auth/forgot-password", { method: "POST", body, headers }));
 
-// Le rate limit est en mémoire au niveau du module : chaque test utilise une adresse distincte.
+// Le rate limit est en base (vidée entre les tests) : une adresse distincte par test reste plus lisible.
 let n = 0;
 const uniqueEmail = () => `client${++n}@example.com`;
 
@@ -83,7 +83,8 @@ describe("POST /api/auth/forgot-password", () => {
   it("limite à une demande par minute et par adresse, puis réautorise", async () => {
     const email = uniqueEmail();
     await User.create({ email, provider: "credentials" });
-    const now = Date.now();
+    // Début d'une fenêtre d'une minute (les fenêtres sont alignées sur l'horloge)
+    const now = 30_000_000 * 60_000 + 1_000;
     const clock = vi.spyOn(Date, "now").mockReturnValue(now);
 
     await post({ email });
@@ -95,10 +96,28 @@ describe("POST /api/auth/forgot-password", () => {
     expect(body).toEqual(NEUTRAL);
     expect(sendEmail).toHaveBeenCalledTimes(1);
 
-    // Passé le délai, l'entrée est purgée et une nouvelle demande part
+    // Fenêtre suivante : une nouvelle demande part
     clock.mockReturnValue(now + 61_000);
     await post({ email });
     expect(sendEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it("limite les demandes par IP, toutes adresses confondues, sans le révéler", async () => {
+    const emails = Array.from({ length: 6 }, uniqueEmail);
+    await User.create(emails.map((email) => ({ email, provider: "credentials" })));
+    const ip = { "x-real-ip": "203.0.113.7" };
+
+    for (const email of emails.slice(0, 5)) await post({ email }, ip);
+    expect(sendEmail).toHaveBeenCalledTimes(5);
+
+    const { status, body } = await readJson(await post({ email: emails[5] }, ip));
+    expect(status).toBe(200);
+    expect(body).toEqual(NEUTRAL);
+    expect(sendEmail).toHaveBeenCalledTimes(5);
+
+    // Une autre IP n'est pas concernée
+    await post({ email: emails[5] }, { "x-real-ip": "198.51.100.1" });
+    expect(sendEmail).toHaveBeenCalledTimes(6);
   });
 
   it("répond 500 si l'envoi de l'email échoue", async () => {

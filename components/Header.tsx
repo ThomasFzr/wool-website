@@ -123,7 +123,10 @@ export function Header({ title, subtitle, pendingReservations: initialPending = 
                   if (!session) {
                     // Navigation directe vers /login : signIn() sans provider passe par
                     // /api/auth/providers et redirige vers /api/auth/error si cet appel échoue
-                    router.push("/login?callbackUrl=/");
+                    // Revenir sur la page courante après connexion
+                    const here = window.location.pathname + window.location.search;
+                    const callbackUrl = window.location.pathname === "/login" ? "/" : here;
+                    router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
                   } else {
                     setAccountMenuOpen((o) => !o);
                   }

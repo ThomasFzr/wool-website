@@ -394,7 +394,8 @@ function AdminCreationsContent() {
     const res = await fetch(`/api/creations/${id}`, { method: "DELETE" });
 
     if (!res.ok) {
-      alert("Erreur lors de la suppression.");
+      const data = await res.json().catch(() => null);
+      alert(data?.error ?? "Erreur lors de la suppression.");
       return;
     }
 

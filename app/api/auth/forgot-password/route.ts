@@ -5,24 +5,14 @@ import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import { getAppUrl } from "@/lib/url";
+import { clientIp, hitRateLimit } from "@/lib/rate-limit";
 import crypto from "crypto";
 
-// Rate limit en mémoire (best-effort en serverless : chaque instance a sa propre Map,
-// purgée paresseusement — suffisant pour freiner l'abus d'envoi d'emails).
-const lastRequestByEmail = new Map<string, number>();
-const MIN_INTERVAL_MS = 60_000;
-
-function isRateLimited(email: string): boolean {
-  const now = Date.now();
-  // Purge paresseuse des entrées expirées
-  for (const [key, ts] of lastRequestByEmail) {
-    if (now - ts > MIN_INTERVAL_MS) lastRequestByEmail.delete(key);
-  }
-  const last = lastRequestByEmail.get(email);
-  if (last && now - last < MIN_INTERVAL_MS) return true;
-  lastRequestByEmail.set(email, now);
-  return false;
-}
+// Un email de réinitialisation par adresse et par minute, et un nombre de demandes borné
+// par IP (sinon une seule machine peut faire envoyer des emails à des milliers d'adresses).
+const EMAIL_WINDOW_MS = 60_000;
+const IP_MAX_REQUESTS = 5;
+const IP_WINDOW_MS = 15 * 60_000;
 
 // Réponse unique quelle que soit l'issue : ne révèle ni l'existence du compte,
 // ni son provider (anti énumération de comptes).
@@ -45,11 +35,14 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    if (isRateLimited(normalizedEmail)) {
+    await connectToDatabase();
+
+    // Toujours la réponse neutre : un 429 révélerait qu'une demande vient d'être faite
+    const ipCount = await hitRateLimit(`forgot:ip:${clientIp(req.headers)}`, IP_WINDOW_MS);
+    if (ipCount > IP_MAX_REQUESTS) return neutralResponse();
+    if ((await hitRateLimit(`forgot:email:${normalizedEmail}`, EMAIL_WINDOW_MS)) > 1) {
       return neutralResponse();
     }
-
-    await connectToDatabase();
 
     const user = await User.findOne({ email: normalizedEmail });
 
