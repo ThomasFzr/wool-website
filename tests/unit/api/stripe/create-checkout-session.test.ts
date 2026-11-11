@@ -327,22 +327,84 @@ describe("POST /api/stripe/create-checkout-session", () => {
       );
     });
 
-    it("ignore l'échec d'expiration d'une ancienne session déjà close", async () => {
+    /** Pièce verrouillée par un ancien checkout du client (session cs_old). */
+    async function staleCheckout() {
       const staleId = new mongoose.Types.ObjectId();
       const creation = await createCreation({
         reserved: true,
         reservedContact: "client@example.com",
         reservedByReservationId: staleId,
       });
-      await Reservation.create({
+      const stale = await Reservation.create({
         _id: staleId,
         creationId: creation._id,
         contact: "client@example.com",
         paymentStatus: "pending",
+        status: "preparing",
         stripeCheckoutSessionId: "cs_old",
       });
+      return { creation, stale };
+    }
+
+    it("accepte une ancienne session que Stripe dit déjà expirée", async () => {
+      const { creation } = await staleCheckout();
       stripe.checkout.sessions.expire.mockRejectedValue(new Error("already expired"));
+      stripe.checkout.sessions.retrieve.mockResolvedValue({ id: "cs_old", status: "expired" });
       expect((await checkout({ items: itemsOf(creation) })).status).toBe(200);
+    });
+
+    it("refuse sans rien invalider quand l'ancienne session a été payée entre-temps", async () => {
+      const { creation, stale } = await staleCheckout();
+      stripe.checkout.sessions.expire.mockRejectedValue(new Error("session complete"));
+      stripe.checkout.sessions.retrieve.mockResolvedValue({ id: "cs_old", status: "complete" });
+
+      const res = await checkout({ items: itemsOf(creation) });
+
+      expect(res.status).toBe(409);
+      expect(await res.text()).toMatch(/paiement a déjà été effectué pour « Bonnet Mérinos »/);
+      // L'ancienne réservation reste « pending » : le webhook pourra l'enregistrer
+      expect((await Reservation.findById(stale._id))!.paymentStatus).toBe("pending");
+      expect((await Creation.findById(creation._id))!.reservedByReservationId!.toString()).toBe(stale._id.toString());
+      expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+    });
+
+    it("refuse et libère les autres pièces du panier quand l'ancienne session reste ouverte", async () => {
+      const free = await createCreation({ title: "Libre" });
+      const { creation, stale } = await staleCheckout();
+      stripe.checkout.sessions.expire.mockRejectedValue(new Error("réseau"));
+      stripe.checkout.sessions.retrieve.mockResolvedValue({ id: "cs_old", status: "open" });
+
+      const res = await checkout({ items: itemsOf(free, creation) });
+
+      expect(res.status).toBe(409);
+      expect(await res.text()).toMatch(/précédente session de paiement pour « Bonnet Mérinos » est encore ouverte/);
+      expect((await Reservation.findById(stale._id))!.paymentStatus).toBe("pending");
+      expect((await Creation.findById(free._id))!.reserved).toBe(false);
+    });
+
+    it("refuse quand Stripe ne permet ni d'expirer ni de relire l'ancienne session", async () => {
+      const { creation } = await staleCheckout();
+      stripe.checkout.sessions.expire.mockRejectedValue(new Error("réseau"));
+      stripe.checkout.sessions.retrieve.mockRejectedValue(new Error("réseau"));
+      expect((await checkout({ items: itemsOf(creation) })).status).toBe(409);
+      expect(console.error).toHaveBeenCalledWith("[CHECKOUT] Session cs_old introuvable :", expect.any(Error));
+    });
+
+    it("reverrouille la pièce quand l'expiration l'a déjà libérée (webhook arrivé entre-temps)", async () => {
+      const { creation } = await staleCheckout();
+      stripe.checkout.sessions.expire.mockImplementation(async () => {
+        await Creation.updateOne(
+          { _id: creation._id },
+          { $set: { reserved: false }, $unset: { reservedByReservationId: "" } }
+        );
+        return {};
+      });
+
+      expect((await checkout({ items: itemsOf(creation) })).status).toBe(200);
+      const fresh = (await Reservation.findOne({ stripeCheckoutSessionId: "cs_new" }))!;
+      const locked = (await Creation.findById(creation._id))!;
+      expect(locked.reserved).toBe(true);
+      expect(locked.reservedByReservationId!.toString()).toBe(fresh._id.toString());
     });
 
     it("n'expire aucune session quand l'ancien identifiant de session est vide", async () => {

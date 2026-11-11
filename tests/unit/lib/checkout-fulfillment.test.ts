@@ -94,10 +94,63 @@ describe("fulfillCheckoutSession", () => {
   });
 
   describe("commande payée", () => {
-    it("répond payé sans rien traiter quand aucune réservation ne correspond", async () => {
+    it("rembourse et signale un paiement sans aucune réservation", async () => {
       const result = await fulfillCheckoutSession(paidSession());
+
       expect(result).toEqual({ paid: true, processedCount: 0, pending: false });
-      expect(sendEmail).not.toHaveBeenCalled();
+      expect(stripe.refunds.create).toHaveBeenCalledWith(
+        { payment_intent: "pi_test" },
+        { idempotencyKey: "orphan-cs_test_1" }
+      );
+      expect(emailTo("client@example.com")[0][0].subject).toBe("Paiement non enregistré - MailleMum");
+      expect(emailTo("client@example.com")[0][0].html).toContain("intégralement remboursé");
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("Remboursement automatique effectué");
+    });
+
+    it("rembourse une session payée dont les réservations avaient été remplacées", async () => {
+      const creation = await createCreation();
+      await pendingReservation(creation._id, { paymentStatus: "failed", status: "cancelled" });
+
+      const result = await fulfillCheckoutSession(paidSession());
+
+      expect(result.processedCount).toBe(0);
+      expect(stripe.refunds.create).toHaveBeenCalledWith(
+        { payment_intent: "pi_test" },
+        { idempotencyKey: "orphan-cs_test_1" }
+      );
+      expect((await Creation.findById(creation._id))!.sold).toBe(false);
+    });
+
+    it("signale un remboursement manuel quand Stripe refuse ou sans PaymentIntent", async () => {
+      vi.stubEnv("SELLER_EMAIL", "");
+      stripe.refunds.create.mockRejectedValueOnce(new Error("refund ko"));
+      await fulfillCheckoutSession(paidSession());
+      expect(emailTo("client@example.com")[0][0].html).toContain("Nous revenons vers vous");
+      expect(console.error).toHaveBeenCalledWith("[FULFILL] Remboursement impossible (orphan-cs_test_1):", expect.any(Error));
+
+      vi.mocked(sendEmail).mockClear();
+      vi.stubEnv("SELLER_EMAIL", "vendeuse@example.com");
+      await fulfillCheckoutSession(paidSession({ payment_intent: null, customer_email: null, amount_total: null }));
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("à rembourser depuis Stripe");
+      expect(emailTo("vendeuse@example.com")[0][0].html).toContain("0.00 €");
+    });
+
+    it("journalise les emails de paiement orphelin en échec", async () => {
+      vi.mocked(sendEmail).mockRejectedValueOnce(new Error("Resend indisponible")).mockRejectedValueOnce("quota");
+      await fulfillCheckoutSession(paidSession());
+      expect(console.error).toHaveBeenCalledWith(
+        "[FULFILL] Échec de l'email de paiement orphelin acheteur:",
+        "Resend indisponible"
+      );
+      expect(console.error).toHaveBeenCalledWith("[FULFILL] Échec de l'email de paiement orphelin vendeur:", "quota");
+    });
+
+    it("ne rembourse pas un traitement déjà fait par un autre appel (idempotence)", async () => {
+      const creation = await createCreation();
+      await pendingReservation(creation._id);
+      await fulfillCheckoutSession(paidSession());
+      await fulfillCheckoutSession(paidSession());
+      expect(stripe.refunds.create).not.toHaveBeenCalled();
     });
 
     it("valide la réservation, marque la pièce unique vendue et libère le verrou", async () => {

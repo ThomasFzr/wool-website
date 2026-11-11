@@ -111,6 +111,7 @@ export async function fulfillCheckoutSession(
 
   if (reservations.length === 0) {
     console.error(`[FULFILL] Aucune réservation trouvée pour la session ${session.id}`);
+    await settleOrphanPayment({ session, paymentIntentId, appUrl });
     return { paid: true, processedCount: 0, pending: false };
   }
 
@@ -209,6 +210,20 @@ export async function fulfillCheckoutSession(
     })
   );
 
+  // Aucune réservation en attente : soit un autre appel les a déjà traitées
+  // (webhook + verify-session, idempotence), soit elles avaient été invalidées
+  // (session remplacée, expirée) et ce paiement ne correspond à aucune commande.
+  if (processedReservations.length === 0 && conflicts.length === 0) {
+    const recorded = await Reservation.exists({
+      _id: { $in: reservations.map((r: any) => r._id) },
+      paymentStatus: { $in: ["paid", "refunded"] },
+    });
+    if (!recorded) {
+      console.error(`[FULFILL] Session ${session.id} payée sans réservation en attente`);
+      await settleOrphanPayment({ session, paymentIntentId, appUrl, buyerName: reservations[0].name });
+    }
+  }
+
   if (conflicts.length > 0) {
     const settled = await settleSoldConflicts({
       session,
@@ -253,6 +268,84 @@ async function runInBackground(task: () => Promise<void>) {
   } catch {
     await task();
   }
+}
+
+/**
+ * Paiement reçu pour une session qui ne correspond plus à aucune commande en
+ * attente : remboursement intégral (clé d'idempotence par session) et alerte.
+ */
+async function settleOrphanPayment({
+  session,
+  paymentIntentId,
+  appUrl,
+  buyerName,
+}: {
+  session: Stripe.Checkout.Session;
+  paymentIntentId: string | undefined;
+  appUrl: string;
+  buyerName?: string;
+}) {
+  let refunded = false;
+  if (paymentIntentId) {
+    try {
+      await getStripeInstance().refunds.create(
+        { payment_intent: paymentIntentId },
+        { idempotencyKey: `orphan-${session.id}` }
+      );
+      refunded = true;
+    } catch (err) {
+      console.error(`[FULFILL] Remboursement impossible (orphan-${session.id}):`, err);
+    }
+  }
+
+  const buyerEmail = session.customer_email;
+  const amount = ((session.amount_total ?? 0) / 100).toFixed(2);
+  const safeSessionId = escapeHtml(session.id);
+
+  await runInBackground(async () => {
+    const results = await Promise.allSettled([
+      buyerEmail
+        ? sendEmail({
+            to: buyerEmail,
+            subject: "Paiement non enregistré - MailleMum",
+            html: emailTemplate(`
+              <h1 style="font-size:20px;margin:0 0 12px 0;color:#0f172a;">Paiement non enregistré</h1>
+              <p style="font-size:14px;margin:0 0 12px 0;color:#475569;line-height:1.6;">
+                Bonjour <strong>${escapeHtml(buyerName) || "👋"}</strong>,<br/>
+                Nous avons reçu un paiement de ${amount} € qui ne correspond plus à une commande en cours
+                (une nouvelle session de paiement l'avait remplacée).
+                ${refunded ? "Il vous a été intégralement remboursé." : "Nous revenons vers vous très vite pour vous rembourser."}
+              </p>
+            `),
+          })
+        : Promise.resolve(null),
+      process.env.SELLER_EMAIL
+        ? sendEmail({
+            to: process.env.SELLER_EMAIL,
+            subject: "⚠️ Paiement reçu sans commande en attente",
+            html: emailTemplate(`
+              <h1 style="font-size:18px;margin:0 0 12px 0;">Paiement sans commande</h1>
+              <p style="font-size:14px;margin:0 0 12px 0;">
+                Session Stripe <code>${safeSessionId}</code> (${escapeHtml(buyerEmail)}) : ${amount} € payés
+                alors qu'aucune réservation n'était en attente.
+                ${refunded ? "Remboursement automatique effectué." : "<strong>Remboursement automatique impossible : à rembourser depuis Stripe.</strong>"}
+              </p>
+              <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+                <a href="${appUrl}/admin/reservations">Voir les commandes</a>
+              </p>
+            `),
+          })
+        : Promise.resolve(null),
+    ]);
+    results.forEach((result, i) => {
+      if (result.status === "rejected") {
+        console.error(
+          `[FULFILL] Échec de l'email de paiement orphelin ${i === 0 ? "acheteur" : "vendeur"}:`,
+          (result.reason as any)?.message || result.reason
+        );
+      }
+    });
+  });
 }
 
 type SoldConflict = { reservation: any; creation: any | null };
