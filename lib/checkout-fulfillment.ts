@@ -122,14 +122,9 @@ export async function fulfillCheckoutSession(
   let shippingInfo =
     (session as any).shipping_details || (session as any).shipping;
 
-  if (!shippingInfo?.address && paymentIntentId) {
-    try {
-      const pi =
-        paymentIntent || (await stripe.paymentIntents.retrieve(paymentIntentId));
-      shippingInfo = (pi as any).shipping || (pi as any).shipping_details;
-    } catch (err) {
-      console.log("[FULFILL] Impossible de récupérer le PaymentIntent pour l'adresse:", err);
-    }
+  // Le PaymentIntent a déjà été récupéré plus haut pour vérifier le paiement
+  if (!shippingInfo?.address && paymentIntent) {
+    shippingInfo = (paymentIntent as any).shipping || (paymentIntent as any).shipping_details;
   }
 
   const shippingAddress: ShippingAddress | null = shippingInfo?.address

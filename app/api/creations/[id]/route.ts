@@ -8,29 +8,6 @@ import { cloudinary } from "@/lib/cloudinary";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
 
-/**
- * Récupère le public_id Cloudinary depuis une URL secure_url
- * Exemple :
- * https://res.cloudinary.com/xxx/image/upload/v12345/folder/image_xyz.webp
- * → folder/image_xyz
- */
-function extractPublicId(url?: string | null): string | null {
-  if (!url) return null;
-
-  try {
-    const parts = url.split("/upload/")[1];
-    if (!parts) return null;
-
-    const withoutExtension = parts.split(".")[0];
-
-    return withoutExtension;
-  } catch (err) {
-    console.error("❌ extractPublicId error:", err);
-    return null;
-  }
-}
-
-
 async function checkAuth(req: NextRequest) {
   const session = await checkAdminAuth();
   return session !== null;

@@ -10,15 +10,11 @@ function normalizeDate(dateString: string | undefined): string {
     return new Date().toISOString();
   }
   
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return new Date().toISOString();
-    }
-    return date.toISOString();
-  } catch {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
     return new Date().toISOString();
   }
+  return date.toISOString();
 }
 
 // Les infos version/git ne changent pas pendant la vie du process :

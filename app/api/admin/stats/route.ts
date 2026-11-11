@@ -284,27 +284,27 @@ export async function GET() {
         // Créer un map pour accès rapide (convertir les ObjectId en string)
         const saleDateMap = new Map();
         lastSaleDates.forEach((item: any) => {
-            const creationIdStr = item._id?.toString() || item._id;
+            const creationIdStr = item._id.toString();
             saleDateMap.set(creationIdStr, item.lastSaleDate);
         });
 
         const soldCreationsList = soldCreationsDetails.map((creation: any) => {
-            const creationIdStr = creation._id?.toString() || creation._id;
+            const creationIdStr = creation._id.toString();
             const saleDate = saleDateMap.get(creationIdStr);
 
             // Coût unitaire fixe depuis la création : (weight / 100) * yarnPrice
             const unitCost = creation.weight && creation.yarnPrice
                 ? (creation.weight / 100) * creation.yarnPrice
                 : 0;
-            const totalCost = unitCost * (creation.salesCount || 0);
-            const creationRevenue = (creation.price || 0) * (creation.salesCount || 0);
+            const totalCost = unitCost * creation.salesCount;
+            const creationRevenue = (creation.price || 0) * creation.salesCount;
             const profit = creationRevenue - totalCost;
 
             return {
                 _id: creation._id.toString(),
                 title: creation.title,
                 price: creation.price || 0,
-                salesCount: creation.salesCount || 0,
+                salesCount: creation.salesCount,
                 totalRevenue: creationRevenue,
                 unitCost: unitCost,
                 totalCost: totalCost,

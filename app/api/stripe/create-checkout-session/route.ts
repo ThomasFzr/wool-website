@@ -309,7 +309,7 @@ export async function POST(req: NextRequest) {
       creationId: item.creationId,
       userId: (session.user as any).id,
       name: session.user?.name || "",
-      contact: session.user?.email || "",
+      contact: session.user.email,
       status: "preparing",
       paymentStatus: "pending",
       deliveryMode,

@@ -38,8 +38,10 @@ export async function GET(req: NextRequest, context: AdminRouteContext) {
       : [reservation];
 
     // Chercher l'adresse de livraison (peut être sur n'importe quel article de la commande)
-    const addr = reservation.shippingAddress ||
-                 allReservations.find((r: any) => r.shippingAddress)?.shippingAddress;
+    // Mongoose renvoie toujours un objet pour ce chemin imbriqué, même vide : tester son contenu
+    const ADDRESS_FIELDS = ["name", "line1", "line2", "postalCode", "city", "country"];
+    const hasAddress = (r: any) => ADDRESS_FIELDS.some((field) => r.shippingAddress[field]);
+    const addr = [reservation, ...allReservations].find(hasAddress)?.shippingAddress;
 
     // Récupérer l'adresse de l'expéditeur depuis les variables d'environnement ou utiliser des valeurs par défaut
     const senderName = process.env.SHIPPING_SENDER_NAME || "MailleMum";
@@ -58,7 +60,7 @@ export async function GET(req: NextRequest, context: AdminRouteContext) {
       const cityLine = [addr.postalCode, addr.city].filter(Boolean).join(" ");
       if (cityLine) parts.push(cityLine);
       if (addr.country) parts.push(addr.country);
-      recipientAddress = parts.length > 0 ? parts.join("\n") : "Adresse incomplète";
+      recipientAddress = parts.join("\n");
     }
 
     // Générer le bordereau au format texte
