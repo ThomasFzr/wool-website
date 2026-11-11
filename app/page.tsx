@@ -63,6 +63,7 @@ async function getCreations(): Promise<CreationType[]> {
     color: c.color,
     type: c.type,
     sold: c.sold,
+    reserved: c.reserved,
     showAsNew: c.showAsNew,
     createdAt: c.createdAt?.toISOString(),
     visibleAt: c.visibleAt?.toISOString(),

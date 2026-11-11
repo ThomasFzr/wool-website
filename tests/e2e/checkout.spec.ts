@@ -81,6 +81,11 @@ test("une pièce verrouillée par un autre acheteur ne peut pas être payée", a
   page,
   browser,
 }) => {
+  // Second acheteur (admin, autre session navigateur) : met la pièce au panier pendant qu'elle est libre
+  const other = await browser.newPage();
+  await login(other, { email: "admin@maillemum.test", password: "Admin-e2e-123" }, "/");
+  await addToCart(other, bleu.slug);
+
   // Premier acheteur : arrive jusqu'à Stripe (la pièce est verrouillée)
   await login(page, E2E_CLIENT, "/");
   await addToCart(page, bleu.slug);
@@ -88,10 +93,14 @@ test("une pièce verrouillée par un autre acheteur ne peut pas être payée", a
   await page.getByRole("button", { name: "Procéder au paiement" }).click();
   await expect(page).toHaveURL(/localhost:3101\/pay\//);
 
-  // Second acheteur (admin, autre session navigateur) : refus
-  const other = await browser.newPage();
-  await login(other, { email: "admin@maillemum.test", password: "Admin-e2e-123" }, "/");
-  await addToCart(other, bleu.slug);
+  // La vitrine et la fiche affichent désormais la pièce comme réservée
+  await other.goto("/");
+  await expect(other.locator(`#creation-${bleu.slug}`).getByText("Réservé")).toBeVisible();
+  await other.goto(`/creations/${bleu.slug}`);
+  await expect(other.getByText("Article réservé")).toBeVisible();
+  await expect(other.getByRole("button", { name: "Ajouter au panier" })).toBeDisabled();
+
+  // Le paiement de la pièce restée au panier est refusé
   await other.goto("/cart");
   const dialog = other.waitForEvent("dialog");
   await other.getByRole("button", { name: "Procéder au paiement" }).click();

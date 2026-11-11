@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
     user.password = hashedPassword;
     user.resetToken = null;
     user.resetTokenExpiry = null;
+    // Le lien a été reçu dans la boîte mail : l'adresse est prouvée
+    user.emailVerifiedAt ??= new Date();
     await user.save();
 
     return NextResponse.json(

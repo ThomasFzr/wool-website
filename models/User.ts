@@ -16,6 +16,8 @@ export interface IUser {
   city?: string | null;
   postalCode?: string | null;
   emailNotifications?: boolean;
+  /** Date à laquelle la possession de l'email a été prouvée (connexion Google, lien de réinitialisation). */
+  emailVerifiedAt?: Date | null;
 }
 
 //
@@ -44,6 +46,7 @@ const userSchema = new Schema<IUserDocument>(
     city: { type: String },
     postalCode: { type: String },
     emailNotifications: { type: Boolean, default: true },
+    emailVerifiedAt: { type: Date },
   },
   { timestamps: true }
 );

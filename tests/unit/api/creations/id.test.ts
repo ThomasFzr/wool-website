@@ -377,8 +377,9 @@ describe("DELETE /api/creations/[id]", () => {
   it("supprime la création, ses images Cloudinary et ses réservations", async () => {
     const c = await createCreation({ imagePublicIds: ["img/a", "", "img/b"] });
     const other = await createCreation();
-    await Reservation.create({ creationId: c._id });
-    await Reservation.create({ creationId: other._id });
+    await Reservation.create({ creationId: c._id, paymentStatus: "failed", status: "cancelled" });
+    await Reservation.create({ creationId: c._id, paymentStatus: "refunded" });
+    await Reservation.create({ creationId: other._id, paymentStatus: "paid" });
     asAdmin();
     vi.spyOn(console, "error").mockImplementation(() => {});
     destroy.mockResolvedValueOnce({} as any).mockRejectedValueOnce(new Error("cloudinary down"));
@@ -393,6 +394,33 @@ describe("DELETE /api/creations/[id]", () => {
     expect(await Reservation.countDocuments({ creationId: c._id })).toBe(0);
     expect(await Reservation.countDocuments({ creationId: other._id })).toBe(1);
     expect(revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("refuse de supprimer une création qui a des commandes payées (à masquer à la place)", async () => {
+    const c = await createCreation({ sold: true, imagePublicIds: ["img/a"] });
+    await Reservation.create({ creationId: c._id, paymentStatus: "paid", status: "delivered" });
+    asAdmin();
+
+    const { status, body } = await readJson(await del(c._id.toString()));
+
+    expect(status).toBe(409);
+    expect(body.error).toMatch(/commandes payées/);
+    expect(await Creation.findById(c._id)).not.toBeNull();
+    expect(await Reservation.countDocuments({ creationId: c._id })).toBe(1);
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it("refuse de supprimer une création verrouillée par un paiement en cours", async () => {
+    const c = await createCreation({ reserved: true, reservedAt: new Date() });
+    await Reservation.create({ creationId: c._id, paymentStatus: "pending" });
+    asAdmin();
+
+    const { status, body } = await readJson(await del(c._id.toString()));
+
+    expect(status).toBe(409);
+    expect(body.error).toMatch(/paiement est en cours/);
+    expect(await Creation.findById(c._id)).not.toBeNull();
+    expect(await Reservation.countDocuments({ creationId: c._id })).toBe(1);
   });
 
   it("déduit les public_id depuis les URL pour les anciennes créations", async () => {

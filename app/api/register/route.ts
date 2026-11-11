@@ -2,12 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
+import { clientIp, hitRateLimit } from "@/lib/rate-limit";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Inscriptions par IP et par heure (création de comptes en masse)
+const REGISTER_MAX_PER_IP = 5;
+const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
+
+    if ((await hitRateLimit(`register:ip:${clientIp(req.headers)}`, REGISTER_WINDOW_MS)) > REGISTER_MAX_PER_IP) {
+      return NextResponse.json(
+        { error: "Trop d'inscriptions depuis cette connexion. Réessayez plus tard." },
+        { status: 429 }
+      );
+    }
+
     const { name, email, password } = await req.json();
 
     if (!email || !password) {

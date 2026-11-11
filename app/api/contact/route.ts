@@ -7,43 +7,27 @@ import Creation from "@/models/Creation";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
 import { escapeHtml } from "@/lib/escape";
+import { clientIp, hitRateLimit } from "@/lib/rate-limit";
+import mongoose from "mongoose";
 
-// Rate limiting en mémoire (best-effort : en serverless chaque instance a sa
-// propre Map — suffisant pour freiner l'abus, purge paresseuse à chaque appel)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+// Messages par IP (stockage partagé, cf. lib/rate-limit.ts)
+const CONTACT_MAX_PER_IP = 5;
+const CONTACT_WINDOW_MS = 10 * 60_000;
+const MAX_CREATIONS = 20;
 
-function checkRateLimit(identifier: string, maxRequests = 3, windowMs = 60000): boolean {
-  const now = Date.now();
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // Purge paresseuse des entrées expirées (pas de setInterval qui retient le process)
-  for (const [key, value] of rateLimitMap.entries()) {
-    if (now > value.resetTime) {
-      rateLimitMap.delete(key);
-    }
-  }
-
-  const record = rateLimitMap.get(identifier);
-
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(identifier, { count: 1, resetTime: now + windowMs });
-    return true;
-  }
-
-  if (record.count >= maxRequests) {
-    return false;
-  }
-
-  record.count++;
-  return true;
-}
+// Frontières de mot Unicode : \b ne connaît que [A-Za-z0-9_], si bien que « con » était
+// trouvé dans « conçu » (le ç n'étant pas une lettre pour \b).
+const words = (alternatives: string) =>
+  new RegExp(`(?<![\\p{L}\\p{N}])(${alternatives})(?![\\p{L}\\p{N}])`, "iu");
 
 // Détection de spam
 function containsSpam(text: string): boolean {
   const spamPatterns = [
-    /\b(viagra|cialis|casino|lottery|winner|cryptocurrency|bitcoin)\b/i,
+    words("viagra|cialis|casino|lottery|winner|cryptocurrency|bitcoin"),
     /https?:\/\/[^\s]+\.(ru|cn|tk)/i, // Domaines suspects
     /<a\s+href=/i, // Liens HTML
-    /\b\d{10,}\b/, // Trop de chiffres consécutifs
   ];
   return spamPatterns.some(pattern => pattern.test(text));
 }
@@ -51,12 +35,12 @@ function containsSpam(text: string): boolean {
 // Détection d'insultes et langage offensant
 function containsOffensiveContent(text: string): boolean {
   const offensiveWords = [
-    // Insultes courantes en français
-    /\b(connard|connasse|salope|putain|pute|merde|chier|enculé|enculer|fdp|con|conne|bite|couille|pd|pédé)\b/i,
-    /\b(ta gueule|ferme ta|nique|niker|niquer|enc[uû]l|baiser|bâtard|batard|crevard|débile|abruti)\b/i,
-    /\b(idiot|imbécile|crétin|taré|mongol|attardé|salaud|ordure|mec de merde|fils de|enfoiré)\b/i,
+    // Insultes courantes en français (« con » seul exclu : trop de faux positifs)
+    words("connard|connasse|salope|putain|pute|merde|chier|enculé|enculer|fdp|conne|bite|couille|pd|pédé"),
+    words("ta gueule|ferme ta|nique|niker|niquer|enc[uû]l|baiser|bâtard|batard|crevard|débile|abruti"),
+    words("idiot|imbécile|crétin|taré|mongol|attardé|salaud|ordure|mec de merde|fils de pute|enfoiré"),
     // Insultes en anglais
-    /\b(fuck|fucking|shit|bitch|asshole|bastard|cunt|dick|pussy)\b/i,
+    words("fuck|fucking|shit|bitch|asshole|bastard|cunt|dick|pussy"),
     // Variantes avec caractères spéciaux
     /c[o0@]nn[a4@]rd/i,
     /p[uù]t[a4@][1il]n/i,
@@ -65,15 +49,18 @@ function containsOffensiveContent(text: string): boolean {
   return offensiveWords.some(pattern => pattern.test(text));
 }
 
+const isNonEmptyString = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     await connectToDatabase();
 
-    const { name, email, subject, message, creationId, creationIds } = await req.json();
+    const body = await req.json();
+    const { name, email, subject, message, creationId, creationIds, website } = body ?? {};
 
     // Validation de base
-    if (!name || !email || !subject || !message) {
+    if (![name, email, subject, message].every(isNonEmptyString)) {
       return NextResponse.json(
         { error: "Tous les champs sont requis." },
         { status: 400 }
@@ -88,13 +75,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Rate limiting par email
-    const rateLimitKey = session?.user?.id || email.toLowerCase();
-    if (!checkRateLimit(rateLimitKey, 3, 60000)) {
+    if (!EMAIL_REGEX.test(email.trim())) {
+      return NextResponse.json({ error: "Adresse email invalide." }, { status: 400 });
+    }
+
+    // Créations concernées : identifiants valides, en nombre borné
+    const isId = (id: unknown) => typeof id === "string" && mongoose.isObjectIdOrHexString(id);
+    if (
+      (creationId != null && creationId !== "" && !isId(creationId)) ||
+      (creationIds != null &&
+        (!Array.isArray(creationIds) || creationIds.length > MAX_CREATIONS || !creationIds.every(isId)))
+    ) {
+      return NextResponse.json({ error: "Création invalide." }, { status: 400 });
+    }
+    let finalCreationIds: string[] = [];
+    if (Array.isArray(creationIds) && creationIds.length > 0) {
+      finalCreationIds = [...new Set<string>(creationIds)];
+    } else if (creationId) {
+      finalCreationIds = [creationId];
+    }
+
+    // Rate limiting par IP, partagé entre instances
+    if ((await hitRateLimit(`contact:ip:${clientIp(req.headers)}`, CONTACT_WINDOW_MS)) > CONTACT_MAX_PER_IP) {
       return NextResponse.json(
         { error: "Trop de messages envoyés. Veuillez réessayer dans quelques minutes." },
         { status: 429 }
       );
+    }
+
+    // Honeypot (champ caché du formulaire) rempli : robot. On fait comme si de rien n'était.
+    if (website) {
+      return NextResponse.json({ ok: true }, { status: 201 });
     }
 
     // Détection de spam
@@ -114,14 +125,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Déterminer les IDs de créations à utiliser
-    let finalCreationIds: string[] = [];
-    if (creationIds && Array.isArray(creationIds) && creationIds.length > 0) {
-      finalCreationIds = creationIds;
-    } else if (creationId) {
-      finalCreationIds = [creationId];
-    }
-
     // Créer le message de contact
     const contact = await Contact.create({
       name,
@@ -138,6 +141,8 @@ export async function POST(req: NextRequest) {
     const safeName = escapeHtml(name);
     const safeEmail = escapeHtml(email);
     const safeSubject = escapeHtml(subject);
+    // Objet du mail : une seule ligne, sans caractères de contrôle
+    const subjectLine = subject.replace(/[\p{Cc}\p{Cf}\u2028\u2029]+/gu, " ").trim();
     const safeMessage = escapeHtml(message);
 
     const emails: Promise<unknown>[] = [];
@@ -160,10 +165,10 @@ export async function POST(req: NextRequest) {
 
               return `
                 <div style="margin:12px 0;padding:12px;background:#fef9c3;border-radius:8px;border:1px solid #fde68a;">
-                  ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(creation.title)}" style="width:100%;max-width:200px;height:auto;border-radius:8px;margin-bottom:8px;"/>` : ''}
+                  ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(creation.title)}" style="width:100%;max-width:200px;height:auto;border-radius:8px;margin-bottom:8px;"/>` : ''}
                   <p style="margin:0 0 6px 0;font-size:14px;font-weight:600;">${escapeHtml(creation.title)}</p>
-                  ${creation.price ? `<p style="margin:0 0 6px 0;font-size:13px;">Prix : ${creation.price}€</p>` : ''}
-                  ${creation.color ? `<p style="margin:0 0 6px 0;font-size:13px;">Couleur : ${creation.color}</p>` : ''}
+                  ${creation.price ? `<p style="margin:0 0 6px 0;font-size:13px;">Prix : ${escapeHtml(creation.price)}€</p>` : ''}
+                  ${creation.color ? `<p style="margin:0 0 6px 0;font-size:13px;">Couleur : ${escapeHtml(creation.color)}</p>` : ''}
                   <p style="margin:6px 0 0 0;">${statusBadge}</p>
                 </div>
               `;
@@ -183,7 +188,7 @@ export async function POST(req: NextRequest) {
 
       emails.push(sendEmail({
         to: process.env.SELLER_EMAIL,
-        subject: `📧 Nouveau message : ${subject}`,
+        subject: `📧 Nouveau message : ${subjectLine}`,
         html: emailTemplate(`
             <h1 style="font-size:18px;margin:0 0 12px 0;">📧 Nouveau message de contact</h1>
 
@@ -207,16 +212,19 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    // Envoyer un email de confirmation à l'utilisateur
+    // Accusé de réception : l'adresse n'est pas vérifiée, donc aucun texte saisi par
+    // l'expéditeur (nom, sujet) n'y figure — sinon le formulaire servirait à envoyer des
+    // messages arbitraires à n'importe qui depuis l'adresse de la boutique.
     emails.push(sendEmail({
       to: email,
       subject: "✅ Votre message a bien été reçu",
       html: emailTemplate(`
           <h1 style="font-size:18px;margin:0 0 12px 0;">Merci pour votre message !</h1>
           <p style="font-size:14px;margin:0 0 16px 0;">
-            Bonjour <strong>${safeName}</strong>,<br/><br/>
-            Nous avons bien reçu votre message concernant "<strong>${safeSubject}</strong>". Nous vous répondrons dans les plus brefs délais.
+            Bonjour,<br/><br/>
+            Nous avons bien reçu votre message. Nous vous répondrons dans les plus brefs délais.
           </p>
+          <p style="font-size:13px;margin:0;color:#6b7280;">Si vous n'êtes pas à l'origine de ce message, ignorez cet email.</p>
       `),
     }));
 
@@ -225,7 +233,7 @@ export async function POST(req: NextRequest) {
       if (r.status === "rejected") console.error("[contact] Email non envoyé:", r.reason);
     }
 
-    return NextResponse.json(contact, { status: 201 });
+    return NextResponse.json({ ok: true, id: contact._id.toString() }, { status: 201 });
   } catch (err) {
     console.error(err);
     return NextResponse.json(

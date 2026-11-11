@@ -20,6 +20,8 @@ export type Creation = {
   color?: string;
   type?: "bonnet" | "tour de cou" | "bandeau";
   sold?: boolean;
+  /** Verrouillée par un paiement en cours (ou réservée par l'admin) : pas achetable pour l'instant */
+  reserved?: boolean;
   showAsNew?: boolean;
   createdAt?: string;
   visibleAt?: string; // Date de première mise en ligne (décompte "nouveau" à partir de là)
@@ -301,7 +303,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   function scrollThumbnailsUp() { setThumbnailScroll((prev) => Math.max(0, prev - 1)); }
   function scrollThumbnailsDown() { setThumbnailScroll((prev) => Math.min(images.length - 4, prev + 1)); }
   
-  function handleAddToCart() { if (creation.sold || isInCart) return; addItem({ creationId: creation._id, slug: creation.slug, title: creation.title, imageUrl: creation.images && creation.images.length > 0 ? creation.images[0] : creation.imageUrl, price: creation.price }); setJustAddedToCart(true); setTimeout(() => setJustAddedToCart(false), 2000); if (typeof window !== "undefined" && window.innerWidth < 768) setShowToast(true); }
+  function handleAddToCart() { if (creation.sold || creation.reserved || isInCart) return; addItem({ creationId: creation._id, slug: creation.slug, title: creation.title, imageUrl: creation.images && creation.images.length > 0 ? creation.images[0] : creation.imageUrl, price: creation.price }); setJustAddedToCart(true); setTimeout(() => setJustAddedToCart(false), 2000); if (typeof window !== "undefined" && window.innerWidth < 768) setShowToast(true); }
 
   const checkScrollButtons = () => { if (!relatedCreationsScrollRef.current) return; const { scrollLeft, scrollWidth, clientWidth } = relatedCreationsScrollRef.current; setCanScrollLeft(scrollLeft > 0); setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1); };
   const scrollRelatedCreations = (direction: 'left' | 'right') => { if (!relatedCreationsScrollRef.current) return; const scrollAmount = 300; const currentScroll = relatedCreationsScrollRef.current.scrollLeft; relatedCreationsScrollRef.current.scrollTo({ left: direction === 'left' ? currentScroll - scrollAmount : currentScroll + scrollAmount, behavior: 'smooth' }); };
@@ -401,8 +403,8 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
         {/* Informations (inchangé) */}
         <div className="space-y-6 md:sticky md:top-8 md:self-start">
-            <div><h1 className="text-3xl font-bold text-slate-900">{creation.title}</h1>{creation.price && <div className="mt-3 flex items-center gap-3 flex-wrap"><span className="text-3xl font-bold text-slate-900">{Number.isInteger(creation.price) ? creation.price : creation.price.toFixed(2)} €</span>{creation.sold ? <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">Vendu</span> : isNewArticle ? <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">Nouveau</span> : null}</div>}</div>
-            <div className="space-y-3">{!creation.sold ? <Button onClick={handleAddToCart} disabled={isInCart || justAddedToCart} className={`w-full cursor-pointer transition-all duration-300 ${justAddedToCart ? "bg-green-500 hover:bg-green-500 scale-105" : ""}`} size="lg">{justAddedToCart ? "✓ Ajouté !" : isInCart ? "Déjà dans le panier" : "Ajouter au panier"}</Button> : <><div className="rounded-lg p-3 text-center bg-gray-100"><p className="font-medium text-gray-900">Article vendu</p><p className="mt-1 text-sm text-gray-600">Cet article n'est plus disponible</p></div><Button onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)} className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white" size="lg">Commander un article identique</Button></>}</div>
+            <div><h1 className="text-3xl font-bold text-slate-900">{creation.title}</h1>{creation.price && <div className="mt-3 flex items-center gap-3 flex-wrap"><span className="text-3xl font-bold text-slate-900">{Number.isInteger(creation.price) ? creation.price : creation.price.toFixed(2)} €</span>{creation.sold ? <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">Vendu</span> : creation.reserved ? <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white">Réservé</span> : isNewArticle ? <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">Nouveau</span> : null}</div>}</div>
+            <div className="space-y-3">{creation.reserved && !creation.sold ? <div className="rounded-lg p-3 text-center bg-amber-50"><p className="font-medium text-amber-900">Article réservé</p><p className="mt-1 text-sm text-amber-800">Un paiement est en cours pour cet article. S&apos;il n&apos;aboutit pas, il sera de nouveau disponible d&apos;ici une demi-heure.</p><Button disabled className="mt-3 w-full" size="lg">Ajouter au panier</Button></div> : !creation.sold ? <Button onClick={handleAddToCart} disabled={isInCart || justAddedToCart} className={`w-full cursor-pointer transition-all duration-300 ${justAddedToCart ? "bg-green-500 hover:bg-green-500 scale-105" : ""}`} size="lg">{justAddedToCart ? "✓ Ajouté !" : isInCart ? "Déjà dans le panier" : "Ajouter au panier"}</Button> : <><div className="rounded-lg p-3 text-center bg-gray-100"><p className="font-medium text-gray-900">Article vendu</p><p className="mt-1 text-sm text-gray-600">Cet article n'est plus disponible</p></div><Button onClick={() => router.push(`/contact?subject=commande&creation=${creation._id}`)} className="w-full cursor-pointer bg-slate-900 hover:bg-slate-800 text-white" size="lg">Commander un article identique</Button></>}</div>
         </div>
       </div>
 

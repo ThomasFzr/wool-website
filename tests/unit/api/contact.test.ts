@@ -13,9 +13,9 @@ vi.mock("next-auth", async (orig) => ({ ...(await orig<object>()), getServerSess
 vi.mock("@/lib/sendEmail", () => ({ sendEmail: vi.fn() }));
 
 const send = vi.mocked(sendEmail);
-const post = (body: unknown) => POST(makeRequest("/api/contact", { method: "POST", body }));
+const post = (body: unknown, ip = "203.0.113.7") =>
+  POST(makeRequest("/api/contact", { method: "POST", body, headers: { "x-real-ip": ip } }));
 
-// Le rate limiting est un état de module partagé par tout le fichier : un email distinct par test
 let n = 0;
 const uniqueEmail = () => `visiteur${++n}@example.com`;
 const message = (overrides: Record<string, unknown> = {}) => ({
@@ -56,10 +56,45 @@ describe("POST /api/contact — validation", () => {
   });
 
   it.each([
+    ["nom", "name", 42],
+    ["email", "email", 123],
+    ["sujet", "subject", ["Question"]],
+    ["message", "message", { texte: "Bonjour" }],
+    ["message blanc", "message", "   "],
+  ])("répond 400 si le %s n'est pas une chaîne non vide", async (_label, field, value) => {
+    const { status, body } = await readJson(await post(message({ [field]: value })));
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/requis/);
+  });
+
+  it("répond 400 sur un corps qui n'est pas un objet", async () => {
+    expect((await post("null")).status).toBe(400);
+  });
+
+  it.each(["pas-un-email", "a@b", "deux mots@example.com"])("répond 400 pour un email mal formé : %s", async (email) => {
+    const { status, body } = await readJson(await post(message({ email })));
+    expect(status).toBe(400);
+    expect(body.error).toBe("Adresse email invalide.");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["creationId mal formé", { creationId: "pas-un-id" }],
+    ["creationId non chaîne", { creationId: 42 }],
+    ["creationIds non tableau", { creationIds: "65a000000000000000000001" }],
+    ["creationIds avec un id mal formé", { creationIds: ["65a000000000000000000001", "x"] }],
+    ["creationIds trop nombreux", { creationIds: Array.from({ length: 21 }, () => new mongoose.Types.ObjectId().toString()) }],
+  ])("répond 400 pour des créations invalides (%s)", async (_label, extra) => {
+    const { status, body } = await readJson(await post(message(extra)));
+    expect(status).toBe(400);
+    expect(body.error).toBe("Création invalide.");
+    expect(await Contact.countDocuments()).toBe(0);
+  });
+
+  it.each([
     ["mot-clé", "Gagnez au casino"],
     ["domaine suspect", "Voir http://promo.ru/x"],
     ["lien HTML", '<a href="x">ici</a>'],
-    ["longue suite de chiffres", "Appelez le 06123456789"],
   ])("rejette un spam (%s)", async (_label, text) => {
     const { status, body } = await readJson(await post(message({ message: text })));
     expect(status).toBe(400);
@@ -75,37 +110,50 @@ describe("POST /api/contact — validation", () => {
       expect(body.error).toMatch(/inapproprié/);
     }
   );
+
+  it.each([
+    "Avez-vous des fils de laine mérinos ?",
+    "Ce bonnet est-il conçu pour un enfant ?",
+    "Vous pouvez me rappeler au 0612345678",
+    "Pouvez-vous me contacter ? Je suis à Concarneau.",
+    "Je cherche un cadeau, mon budget est de 30 €",
+  ])("accepte un message légitime : %s", async (text) => {
+    expect((await post(message({ message: text }))).status).toBe(201);
+  });
 });
 
-describe("POST /api/contact — rate limiting", () => {
-  it("bloque le 4e message d'un même email dans la minute, quelle que soit la casse", async () => {
-    const email = uniqueEmail();
-    for (let i = 0; i < 3; i++) {
-      expect((await post(message({ email: i === 1 ? email.toUpperCase() : email }))).status).toBe(201);
-    }
-    const { status, body } = await readJson(await post(message({ email })));
-    expect(status).toBe(429);
-    expect(body.error).toMatch(/Trop de messages/);
-  });
-
-  it("compte par utilisateur connecté plutôt que par email", async () => {
-    const userId = new mongoose.Types.ObjectId().toString();
-    asUser("client@example.com", { id: userId });
-    for (let i = 0; i < 3; i++) {
+describe("POST /api/contact — rate limiting et robots", () => {
+  it("bloque le 6e message d'une même IP en 10 minutes, quels que soient l'email ou le compte", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(3_000_000 * 600_000 + 1_000);
+    for (let i = 0; i < 5; i++) {
+      if (i === 2) asUser("client@example.com", { id: new mongoose.Types.ObjectId().toString() });
       expect((await post(message())).status).toBe(201);
     }
-    expect((await post(message())).status).toBe(429);
+    const { status, body } = await readJson(await post(message()));
+    expect(status).toBe(429);
+    expect(body.error).toMatch(/Trop de messages/);
+    expect(await Contact.countDocuments()).toBe(5);
+
+    // Une autre IP n'est pas concernée
+    expect((await post(message(), "198.51.100.1")).status).toBe(201);
   });
 
-  it("réautorise l'envoi une fois la fenêtre d'une minute écoulée", async () => {
-    const email = uniqueEmail();
-    const start = Date.now();
+  it("réautorise l'envoi à la fenêtre suivante", async () => {
+    const start = 3_000_000 * 600_000 + 1_000;
     const now = vi.spyOn(Date, "now").mockReturnValue(start);
-    for (let i = 0; i < 3; i++) await post(message({ email }));
-    expect((await post(message({ email }))).status).toBe(429);
+    for (let i = 0; i < 5; i++) await post(message());
+    expect((await post(message())).status).toBe(429);
 
-    now.mockReturnValue(start + 60_001);
-    expect((await post(message({ email }))).status).toBe(201);
+    now.mockReturnValue(start + 600_000);
+    expect((await post(message())).status).toBe(201);
+  });
+
+  it("fait comme si tout allait bien quand le honeypot est rempli, sans rien enregistrer ni envoyer", async () => {
+    const { status, body } = await readJson(await post(message({ website: "https://spam.example" })));
+    expect(status).toBe(201);
+    expect(body).toEqual({ ok: true });
+    expect(await Contact.countDocuments()).toBe(0);
+    expect(send).not.toHaveBeenCalled();
   });
 });
 
@@ -117,8 +165,10 @@ describe("POST /api/contact — enregistrement et emails", () => {
     );
 
     expect(status).toBe(201);
-    expect(body).toMatchObject({ email, status: "new", creationId: null, userId: null });
-    expect(await Contact.countDocuments({ email })).toBe(1);
+    // Seul l'identifiant revient, pas le document enregistré
+    const saved = await Contact.findOne({ email }).lean();
+    expect(body).toEqual({ ok: true, id: saved!._id.toString() });
+    expect(saved).toMatchObject({ status: "new", creationId: null, userId: null });
 
     expect(send).toHaveBeenCalledTimes(2);
     const seller = sellerMail()!;
@@ -128,16 +178,23 @@ describe("POST /api/contact — enregistrement et emails", () => {
     expect(seller.html).toContain("https://boutique.example/admin/contact");
     expect(seller.html).not.toContain("concernée");
 
+    // L'accusé de réception part vers une adresse non vérifiée : aucun texte de l'expéditeur
     const confirmation = send.mock.calls.find((c) => c[0].to === email)![0];
-    expect(confirmation.subject).toMatch(/bien été reçu/);
-    expect(confirmation.html).toContain("Sujet &amp; co");
+    expect(confirmation.subject).toBe("✅ Votre message a bien été reçu");
+    expect(confirmation.html).not.toContain("Alice");
+    expect(confirmation.html).not.toContain("Sujet");
+  });
+
+  it("met le sujet sur une seule ligne dans l'objet du mail vendeuse", async () => {
+    await post(message({ subject: "Question\r\nBcc: victime@example.com\u2028suite" }));
+    expect(sellerMail()!.subject).toBe("📧 Nouveau message : Question Bcc: victime@example.com suite");
   });
 
   it("rattache le message à l'utilisateur connecté", async () => {
     const userId = new mongoose.Types.ObjectId().toString();
     asUser("client@example.com", { id: userId });
-    const { body } = await readJson(await post(message()));
-    expect(body.userId).toBe(userId);
+    await post(message());
+    expect((await Contact.findOne().lean())!.userId!.toString()).toBe(userId);
   });
 
   it("n'écrit qu'à l'expéditeur sans SELLER_EMAIL", async () => {
@@ -151,20 +208,21 @@ describe("POST /api/contact — enregistrement et emails", () => {
   it("décrit la création concernée (creationId) dans l'email vendeuse", async () => {
     const c = await createCreation({
       title: "Bonnet <rose>",
-      imageUrl: "https://img/bonnet.jpg",
+      imageUrl: 'https://img/bonnet.jpg"onerror="x',
       price: 25,
-      color: "Rose",
+      color: "Rose <i>",
     });
-    const { body } = await readJson(await post(message({ creationId: c._id.toString() })));
+    await post(message({ creationId: c._id.toString() }));
 
-    expect(body.creationId).toBe(c._id.toString());
-    expect(body.creationIds).toEqual([c._id.toString()]);
+    const saved = (await Contact.findOne().lean())!;
+    expect(saved.creationId!.toString()).toBe(c._id.toString());
+    expect(saved.creationIds!.map(String)).toEqual([c._id.toString()]);
     const html = sellerMail()!.html;
     expect(html).toContain("Création concernée :");
-    expect(html).toContain('src="https://img/bonnet.jpg"');
+    expect(html).toContain('src="https://img/bonnet.jpg&quot;onerror=&quot;x"');
     expect(html).toContain("Bonnet &lt;rose&gt;");
     expect(html).toContain("Prix : 25€");
-    expect(html).toContain("Couleur : Rose");
+    expect(html).toContain("Couleur : Rose &lt;i&gt;");
     expect(html).toContain("Disponible");
   });
 
@@ -174,9 +232,10 @@ describe("POST /api/contact — enregistrement et emails", () => {
     const sansCouleur = await insertRawCreation({ title: "Sans couleur", price: 3, type: "bonnet" });
     const ids = [vendue._id.toString(), reservee._id.toString(), sansCouleur.toString()];
 
-    const { body } = await readJson(await post(message({ creationIds: ids, creationId: ids[0] })));
+    await post(message({ creationIds: [...ids, ids[1]], creationId: ids[0] }));
 
-    expect(body.creationIds).toEqual(ids);
+    // Doublons retirés
+    expect((await Contact.findOne().lean())!.creationIds!.map(String)).toEqual(ids);
     const html = sellerMail()!.html;
     expect(html).toContain("Créations concernées :");
     expect(html).toContain('src="https://img/galerie.jpg"');
@@ -187,8 +246,8 @@ describe("POST /api/contact — enregistrement et emails", () => {
   });
 
   it("ignore un tableau creationIds vide", async () => {
-    const { body } = await readJson(await post(message({ creationIds: [] })));
-    expect(body.creationIds).toEqual([]);
+    await post(message({ creationIds: [], creationId: "" }));
+    expect((await Contact.findOne().lean())!.creationIds).toEqual([]);
     expect(sellerMail()!.html).not.toContain("concernée");
   });
 
@@ -214,15 +273,6 @@ describe("POST /api/contact — enregistrement et emails", () => {
     expect((await post(message({ email }))).status).toBe(201);
     expect(await Contact.countDocuments({ email })).toBe(1);
     expect(err).toHaveBeenCalledWith("[contact] Email non envoyé:", expect.any(Error));
-  });
-
-  it("répond 500 pour un identifiant de création mal formé", async () => {
-    // BUG: creationId n'est pas validé : un identifiant invalide fait échouer Contact.create (500)
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const { status, body } = await readJson(await post(message({ creationId: "pas-un-id" })));
-    expect(status).toBe(500);
-    expect(body.error).toMatch(/Erreur lors de l'envoi/);
-    expect(send).not.toHaveBeenCalled();
   });
 
   it("répond 500 sur un corps JSON invalide", async () => {

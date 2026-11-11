@@ -1,17 +1,29 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, act, renderHook } from "@testing-library/react";
+import { cleanup, act, renderHook, waitFor } from "@testing-library/react";
 import type React from "react";
 import type { ChangeEvent } from "react";
 
-// Les variables Cloudinary sont lues au chargement du module : on le recharge par test
-async function loadHook(env: { cloud?: string; preset?: string } = { cloud: "demo", preset: "preset" }) {
-  vi.stubEnv("NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME", env.cloud ?? "");
-  vi.stubEnv("NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET", env.preset ?? "");
-  vi.resetModules();
+async function loadHook() {
   const { useImageUpload } = await import("@/hooks/useImageUpload");
   return renderHook(() => useImageUpload());
 }
+
+const SIGNATURE = { cloudName: "demo", apiKey: "key-1", signature: "sig", timestamp: 1700000000 };
+
+/** Route de signature puis Cloudinary : `upload` répond pour chaque fichier. */
+function mockUpload(
+  upload: (init: RequestInit) => unknown,
+  signature: { ok: boolean; body?: unknown } = { ok: true, body: SIGNATURE }
+) {
+  fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+    if (url === "/api/admin/cloudinary-signature") {
+      return { ok: signature.ok, json: async () => signature.body };
+    }
+    return upload(init);
+  });
+}
+const uploadCalls = () => fetchMock.mock.calls.filter(([url]) => url !== "/api/admin/cloudinary-signature");
 
 const fetchMock = vi.fn();
 const elementFromPoint = vi.fn();
@@ -37,8 +49,8 @@ function changeEvent(files: File[] | null) {
 const file = (name: string) => new File(["x"], name, { type: "image/jpeg" });
 
 describe("useImageUpload — envoi des images", () => {
-  it("envoie chaque fichier à Cloudinary et renvoie urls et publicIds dans l'ordre", async () => {
-    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+  it("envoie chaque fichier à Cloudinary avec une signature du serveur et renvoie urls et publicIds dans l'ordre", async () => {
+    mockUpload((init) => {
       const name = ((init.body as FormData).get("file") as File).name;
       return { ok: true, json: async () => ({ secure_url: `https://cdn/${name}`, public_id: `id-${name}` }) };
     });
@@ -48,22 +60,39 @@ describe("useImageUpload — envoi des images", () => {
 
     await act(() => result.current.handleImageChange(e, onDone));
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const [url, init] = fetchMock.mock.calls[0];
+    // Une seule signature pour tout le lot
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/cloudinary-signature", { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const [url, init] = uploadCalls()[0];
     expect(url).toBe("https://api.cloudinary.com/v1_1/demo/image/upload");
     expect(init.method).toBe("POST");
-    expect((init.body as FormData).get("upload_preset")).toBe("preset");
+    const body = init.body as FormData;
+    expect(body.get("api_key")).toBe("key-1");
+    expect(body.get("timestamp")).toBe("1700000000");
+    expect(body.get("signature")).toBe("sig");
+    expect(body.has("upload_preset")).toBe(false);
     expect(onDone).toHaveBeenCalledWith(["https://cdn/1.jpg", "https://cdn/2.jpg"], ["id-1.jpg", "id-2.jpg"]);
     expect(e.target.value).toBe("");
     expect(result.current.uploading).toBe(false);
   });
 
+  it("transmet le preset signé par le serveur", async () => {
+    mockUpload(() => ({ ok: true, json: async () => ({ secure_url: "u", public_id: "p" }) }), {
+      ok: true,
+      body: { ...SIGNATURE, upload_preset: "signed-preset" },
+    });
+    const { result } = await loadHook();
+    await act(() => result.current.handleImageChange(changeEvent([file("1.jpg")]), vi.fn()));
+    expect((uploadCalls()[0][1].body as FormData).get("upload_preset")).toBe("signed-preset");
+  });
+
   it("indique l'envoi en cours pendant l'upload", async () => {
     let finish!: () => void;
-    fetchMock.mockReturnValue(
-      new Promise((res) => {
-        finish = () => res({ ok: true, json: async () => ({ secure_url: "u", public_id: "p" }) });
-      })
+    mockUpload(
+      () =>
+        new Promise((res) => {
+          finish = () => res({ ok: true, json: async () => ({ secure_url: "u", public_id: "p" }) });
+        })
     );
     const { result } = await loadHook();
     let pending!: Promise<void>;
@@ -71,6 +100,7 @@ describe("useImageUpload — envoi des images", () => {
       pending = result.current.handleImageChange(changeEvent([file("1.jpg")]), vi.fn());
     });
     expect(result.current.uploading).toBe(true);
+    await waitFor(() => expect(finish).toBeDefined());
     await act(async () => {
       finish();
       await pending;
@@ -89,20 +119,25 @@ describe("useImageUpload — envoi des images", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["sans cloud name", { preset: "preset" }],
-    ["sans upload preset", { cloud: "demo" }],
-  ])("refuse l'envoi si Cloudinary n'est pas configuré (%s)", async (_label, env) => {
-    const { result } = await loadHook(env);
-    await expect(result.current.handleImageChange(changeEvent([file("1.jpg")]), vi.fn())).rejects.toThrow(
-      "Cloudinary n'est pas configuré."
-    );
-    expect(fetchMock).not.toHaveBeenCalled();
+  it("n'envoie rien à Cloudinary si le serveur refuse la signature (non admin, Cloudinary non configuré)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockUpload(() => ({ ok: true, json: async () => ({}) }), { ok: false, body: { error: "Non autorisé" } });
+    const { result } = await loadHook();
+    const onDone = vi.fn();
+    await act(async () => {
+      await expect(result.current.handleImageChange(changeEvent([file("1.jpg")]), onDone)).rejects.toThrow(
+        "Erreur lors de l'upload des images."
+      );
+    });
+    expect(uploadCalls()).toHaveLength(0);
+    expect(onDone).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
+    expect(result.current.uploading).toBe(false);
   });
 
   it("lève une erreur générique si Cloudinary refuse un fichier, sans appeler le callback", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    fetchMock.mockResolvedValue({ ok: false, json: async () => ({}) });
+    mockUpload(() => ({ ok: false, json: async () => ({}) }));
     const { result } = await loadHook();
     const onDone = vi.fn();
     const e = changeEvent([file("1.jpg")]);

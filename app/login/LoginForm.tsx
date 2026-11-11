@@ -4,6 +4,7 @@
 import { FormEvent, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeCallbackPath } from "@/lib/safe-redirect";
 
 export default function LoginForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -14,7 +15,7 @@ export default function LoginForm() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = safeCallbackPath(searchParams.get("callbackUrl"));
 
   // On affiche un message si NextAuth renvoie ?error=...
   useEffect(() => {

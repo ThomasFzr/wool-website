@@ -3,16 +3,22 @@ import { Suspense } from "react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { safeCallbackPath } from "@/lib/safe-redirect";
 import LoginForm from "./LoginForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string | string[] }>;
+}) {
   const session = await getServerSession(authOptions);
 
-  // Si l'utilisateur est déjà connecté, rediriger vers la home
+  // Utilisateur déjà connecté : l'envoyer directement là où il allait
   if (session?.user) {
-    redirect("/");
+    const { callbackUrl } = await searchParams;
+    redirect(safeCallbackPath(typeof callbackUrl === "string" ? callbackUrl : null));
   }
 
   return (

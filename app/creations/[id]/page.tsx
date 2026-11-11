@@ -80,11 +80,11 @@ const getCreation = cache(async (slug: string) => {
   // Essayer d'abord par slug, sinon par ID (rétrocompatibilité)
   // Exclure les créations cachées pour les utilisateurs publics
   let creation = await CreationModel.findOne({ slug, hidden: { $ne: true } })
-    .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
+    .populate('relatedCreations', 'title imageUrl images price color type slug sold reserved hidden')
     .lean();
   if (!creation && mongoose.Types.ObjectId.isValid(slug)) {
     creation = await CreationModel.findOne({ _id: slug, hidden: { $ne: true } })
-      .populate('relatedCreations', 'title imageUrl images price color type slug sold hidden')
+      .populate('relatedCreations', 'title imageUrl images price color type slug sold reserved hidden')
       .lean();
   }
   
@@ -96,7 +96,7 @@ const getCreation = cache(async (slug: string) => {
   // Formater les articles liés (exclure les créations cachées et vendues)
   let relatedCreations = Array.isArray(creationData.relatedCreations)
     ? creationData.relatedCreations
-        .filter((item: any) => item && !item.sold && !item.hidden && item._id.toString() !== creationId)
+        .filter((item: any) => item && !item.sold && !item.reserved && !item.hidden && item._id.toString() !== creationId)
         .map((item: any) => ({
           _id: item._id.toString(),
           title: item.title,
@@ -119,6 +119,7 @@ const getCreation = cache(async (slug: string) => {
       const byColor = await CreationModel.find({
         _id: { $ne: currentId },
         sold: { $ne: true },
+        reserved: { $ne: true },
         hidden: { $ne: true },
         color: creationData.color,
       })
@@ -154,6 +155,7 @@ const getCreation = cache(async (slug: string) => {
     color: creationData.color,
     type: creationData.type,
     sold: creationData.sold,
+    reserved: creationData.reserved,
     showAsNew: creationData.showAsNew,
     createdAt: creationData.createdAt ? creationData.createdAt.toString() : undefined,
     visibleAt: creationData.visibleAt ? creationData.visibleAt.toString() : undefined,
