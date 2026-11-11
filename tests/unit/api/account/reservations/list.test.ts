@@ -95,11 +95,29 @@ describe("GET /api/account/reservations", () => {
     expect(body).toEqual({ reservations: [], page: 1, total: 0, totalPages: 0 });
   });
 
-  it("répond 500 sur une page négative", async () => {
-    // Pas de validation de page/limit : un skip négatif fait échouer la requête Mongo.
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("ramène page et limit invalides aux valeurs par défaut", async () => {
+    await createSeries([1, 2, 3].map((i) => ({ message: `c${i}` })));
     asUser();
-    const { status, body } = await get("?page=-1");
+    for (const query of ["?page=-1&limit=0", "?page=abc&limit=abc", "?page=1.5&limit=-3"]) {
+      const { status, body } = await get(query);
+      expect(status).toBe(200);
+      expect(body).toMatchObject({ page: 1, total: 3, totalPages: 1 });
+      expect(body.reservations).toHaveLength(3);
+    }
+  });
+
+  it("borne limit à 100", async () => {
+    await createSeries([{ message: "a" }]);
+    asUser();
+    const { body } = await get("?limit=100000");
+    expect(body).toMatchObject({ total: 1, totalPages: 1 });
+  });
+
+  it("répond 500 si la base échoue", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(Reservation, "countDocuments").mockRejectedValueOnce(new Error("db down"));
+    asUser();
+    const { status, body } = await get();
     expect(status).toBe(500);
     expect(body.error).toBe("Server error");
   });

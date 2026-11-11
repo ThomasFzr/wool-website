@@ -125,8 +125,9 @@ export async function POST(req: NextRequest) {
       { new: true, upsert: true }
     );
 
-    // La home (ISR) affiche titre/sous-titre/couleurs : invalider son cache
-    revalidatePath("/");
+    // Le layout racine lit les réglages (frais de port, retrait sur place transmis au panier)
+    // et la home affiche titre/sous-titre/couleurs : invalider toutes les pages en cache.
+    revalidatePath("/", "layout");
 
     return NextResponse.json(updated);
   } catch (err) {

@@ -30,6 +30,8 @@ function setPickupConditions(conditions: Record<string, unknown>, shippingCost =
   return Settings.create({ _id: "main", shippingCost, pickupConditions: { enabled: true, ...conditions } });
 }
 
+const GENERIC_ERROR = "Le paiement n'a pas pu être préparé. Réessayez dans quelques instants.";
+
 describe("POST /api/stripe/create-checkout-session", () => {
   beforeEach(async () => {
     await connectToDatabase();
@@ -46,7 +48,8 @@ describe("POST /api/stripe/create-checkout-session", () => {
       });
       const res = await checkout({ items: [] });
       expect(res.status).toBe(500);
-      expect(await res.text()).toBe("STRIPE_SECRET_KEY n'est pas définie");
+      // Le détail technique n'est pas renvoyé au client
+      expect(await res.text()).toBe(GENERIC_ERROR);
     });
 
     it("refuse un visiteur non connecté", async () => {
@@ -144,6 +147,8 @@ describe("POST /api/stripe/create-checkout-session", () => {
       expect(reservation.status).toBe("preparing");
       expect(reservation.deliveryMode).toBe("pickup");
       expect(reservation.shippingCost).toBe(0);
+      // Prix figé au moment de la commande (stats)
+      expect(reservation.price).toBe(40);
       expect(reservation.userId!.toString()).toBe(USER_ID);
       expect(reservation.name).toBe("Alice");
       expect(args.metadata).toEqual({
@@ -238,13 +243,30 @@ describe("POST /api/stripe/create-checkout-session", () => {
     it.each([
       ["correspondance exacte", " 69001 ", ["69001"]],
       ["préfixe autorisé", "69001", [" 69 "]],
-      ["code utilisateur préfixe du code autorisé", "69", ["69001"]],
-      ["insensible à la casse", "l-1234", ["L-1234"]],
+      ["insensible à la casse et aux espaces", "sw1a 1aa", ["SW1A"]],
     ])("accepte un code postal autorisé (%s)", async (_label, userCode, allowed) => {
       await setPickupConditions({ allowedPostalCodes: allowed });
       await User.create({ email: "client@example.com", postalCode: userCode });
       const creation = await createCreation();
       expect((await checkout({ items: itemsOf(creation) })).status).toBe(200);
+    });
+
+    it("refuse un code partiel qui n'est que le début d'un code autorisé", async () => {
+      await setPickupConditions({ allowedPostalCodes: ["69001"] });
+      await User.create({ email: "client@example.com", postalCode: "69" });
+      const creation = await createCreation();
+      const res = await checkout({ items: itemsOf(creation) });
+      expect(res.status).toBe(400);
+      expect(await res.text()).toMatch(/pas disponible pour le code postal 69\./);
+    });
+
+    it("traite un code postal fait d'espaces comme absent", async () => {
+      await setPickupConditions({ allowedPostalCodes: ["69"] });
+      await User.create({ email: "client@example.com", postalCode: "   " });
+      const creation = await createCreation();
+      const res = await checkout({ items: itemsOf(creation) });
+      expect(res.status).toBe(400);
+      expect(await res.text()).toMatch(/renseigner votre code postal/);
     });
   });
 
@@ -482,12 +504,12 @@ describe("POST /api/stripe/create-checkout-session", () => {
       const res = await checkout({ items: itemsOf(creation) });
 
       expect(res.status).toBe(500);
-      expect(await res.text()).toBe("Stripe indisponible");
+      expect(await res.text()).toBe(GENERIC_ERROR);
       expect((await Creation.findById(creation._id))!.reserved).toBe(false);
       expect(await Reservation.countDocuments()).toBe(0);
     });
 
-    it("répond « Server error » sur une erreur sans message, même si la libération échoue", async () => {
+    it("répond le message générique même si la libération échoue", async () => {
       const creation = await createCreation();
       stripe.checkout.sessions.create.mockRejectedValue({});
       vi.spyOn(Creation, "updateOne").mockRejectedValueOnce(new Error("db down"));
@@ -495,7 +517,7 @@ describe("POST /api/stripe/create-checkout-session", () => {
       const res = await checkout({ items: itemsOf(creation) });
 
       expect(res.status).toBe(500);
-      expect(await res.text()).toBe("Server error");
+      expect(await res.text()).toBe(GENERIC_ERROR);
       expect(console.error).toHaveBeenCalledWith(
         "[CHECKOUT] Échec de la libération des créations réservées:",
         expect.any(Error)

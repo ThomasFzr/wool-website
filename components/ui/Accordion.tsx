@@ -2,40 +2,12 @@
 
 import { useState } from "react";
 
-/**
- * Sanitisation défensive du HTML venant de la base de données avant injection :
- * - retire les balises script/style/iframe/object/embed (et leur contenu)
- * - retire les attributs de gestion d'événements (onclick, onerror, ...)
- * - retire les href/src en javascript:
- */
-function sanitizeHtml(html: string): string {
-  let cleaned = html;
-
-  // Retirer les balises dangereuses et leur contenu
-  cleaned = cleaned.replace(
-    /<(script|style|iframe|object|embed)\b[^>]*>[\s\S]*?<\/\1>/gi,
-    ""
-  );
-  // Retirer les balises dangereuses auto-fermantes ou non fermées
-  cleaned = cleaned.replace(/<\/?(script|style|iframe|object|embed)\b[^>]*>/gi, "");
-
-  // Retirer les attributs on* (onclick, onerror, onload, ...)
-  cleaned = cleaned.replace(/\son\w+\s*=\s*"[^"]*"/gi, "");
-  cleaned = cleaned.replace(/\son\w+\s*=\s*'[^']*'/gi, "");
-  cleaned = cleaned.replace(/\son\w+\s*=\s*[^\s>]+/gi, "");
-
-  // Retirer les href/src en javascript:
-  cleaned = cleaned.replace(/\s(href|src)\s*=\s*"\s*javascript:[^"]*"/gi, "");
-  cleaned = cleaned.replace(/\s(href|src)\s*=\s*'\s*javascript:[^']*'/gi, "");
-  cleaned = cleaned.replace(/\s(href|src)\s*=\s*javascript:[^\s>]+/gi, "");
-
-  return cleaned;
-}
-
 interface AccordionItem {
   title: string;
   content: string | React.ReactNode;
-  renderAsHtml?: boolean; // Si true, le contenu string sera rendu comme HTML
+  // Si true, le contenu string est rendu comme HTML : il DOIT avoir été nettoyé par
+  // l'appelant (lib/sanitize.ts, fait côté serveur pour les descriptions)
+  renderAsHtml?: boolean;
 }
 
 interface AccordionProps {
@@ -94,7 +66,7 @@ export function Accordion({ items, defaultOpen = -1 }: AccordionProps) {
                   item.renderAsHtml ? (
                     <div 
                       className="[&_p]:mb-3 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_strong]:text-slate-900"
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.content) }}
+                      dangerouslySetInnerHTML={{ __html: item.content }}
                     />
                   ) : (
                     <p className="whitespace-pre-wrap">{item.content}</p>

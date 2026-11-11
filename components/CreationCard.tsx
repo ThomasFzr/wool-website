@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { Badge } from "./ui";
 import { optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 import Link from "next/link";
+import { useIsNewArticle } from "@/hooks/useIsNewArticle";
 
 export type Creation = {
   _id: string;
@@ -45,9 +46,7 @@ export function CreationCard({ creation, priority = false }: CreationCardProps) 
 
   // Vérifier si l'article est nouveau (moins de 7 jours depuis visibleAt ou createdAt)
   const refDate = creation.visibleAt || creation.createdAt;
-  const isNewArticle = creation.showAsNew && refDate
-    ? (new Date().getTime() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24) < 7
-    : creation.showAsNew;
+  const isNewArticle = useIsNewArticle(creation.showAsNew, refDate);
 
   // Précharger toutes les images au survol avec les mêmes optimisations que la modale
   // (une seule fois : le flag évite de recréer des <img> à chaque mouseenter)

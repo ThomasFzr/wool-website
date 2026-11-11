@@ -4,7 +4,7 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { sendEmail } from "@/lib/sendEmail";
 import { emailTemplate } from "@/lib/emailTemplate";
-import { getAppUrl } from "@/lib/url";
+import { getEmailBaseUrl } from "@/lib/url";
 import { clientIp, hitRateLimit } from "@/lib/rate-limit";
 import crypto from "crypto";
 
@@ -61,25 +61,30 @@ export async function POST(req: NextRequest) {
     await user.save();
 
     // Créer le lien de réinitialisation (le token en clair ne part que dans l'email)
-    const resetUrl = `${getAppUrl(req.headers)}/reset-password?token=${resetToken}`;
+    const resetUrl = `${getEmailBaseUrl(req.headers)}/reset-password?token=${resetToken}`;
 
-    // Envoyer l'email
-    await sendEmail({
-      to: user.email,
-      subject: "Réinitialisation de votre mot de passe",
-      html: emailTemplate(`
-        <h2 style="font-size:18px;margin:0 0 12px 0;">Réinitialisation de mot de passe</h2>
-        <p style="font-size:14px;margin:0 0 12px 0;">Vous avez demandé à réinitialiser votre mot de passe.</p>
-        <p style="font-size:14px;margin:0 0 16px 0;">Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe :</p>
-        <p style="text-align:center;margin:24px 0;">
-          <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background-color:#0f172a;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
-            Réinitialiser mon mot de passe
-          </a>
-        </p>
-        <p style="font-size:13px;margin:16px 0 8px 0;color:#6b7280;">Ce lien expirera dans 1 heure.</p>
-        <p style="font-size:13px;margin:0;color:#6b7280;">Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
-      `),
-    });
+    // Envoyer l'email. Un échec n'est que journalisé : une erreur ici, et pas pour une
+    // adresse inconnue, révélerait l'existence du compte.
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "Réinitialisation de votre mot de passe",
+        html: emailTemplate(`
+          <h2 style="font-size:18px;margin:0 0 12px 0;">Réinitialisation de mot de passe</h2>
+          <p style="font-size:14px;margin:0 0 12px 0;">Vous avez demandé à réinitialiser votre mot de passe.</p>
+          <p style="font-size:14px;margin:0 0 16px 0;">Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe :</p>
+          <p style="text-align:center;margin:24px 0;">
+            <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background-color:#0f172a;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
+              Réinitialiser mon mot de passe
+            </a>
+          </p>
+          <p style="font-size:13px;margin:16px 0 8px 0;color:#6b7280;">Ce lien expirera dans 1 heure.</p>
+          <p style="font-size:13px;margin:0;color:#6b7280;">Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+        `),
+      });
+    } catch (error) {
+      console.error("[forgot-password] Envoi de l'email impossible:", error);
+    }
 
     return neutralResponse();
   } catch (error) {

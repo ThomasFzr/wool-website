@@ -12,6 +12,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -28,31 +29,40 @@ export default function LoginForm() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
+    setLoading(true);
 
-    if (mode === "register") {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+    try {
+      if (mode === "register") {
+        const res = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
+        });
+        if (!res.ok) {
+          // L'API renvoie un message adapté (email déjà utilisé, invalide, trop d'essais…)
+          const data = await res.json().catch(() => null);
+          setMessage(data?.error || "Inscription impossible, réessayez plus tard.");
+          return;
+        }
+      }
+
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
       });
-      if (!res.ok) {
-        setMessage("Inscription impossible (email déjà utilisé ?)");
+
+      if (res?.error) {
+        setMessage("Connexion impossible.");
         return;
       }
+
+      router.push(callbackUrl);
+    } catch {
+      setMessage("Erreur réseau, réessayez.");
+    } finally {
+      setLoading(false);
     }
-
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-
-    if (res?.error) {
-      setMessage("Connexion impossible.");
-      return;
-    }
-
-    router.push(callbackUrl);
   }
 
   return (
@@ -68,24 +78,29 @@ export default function LoginForm() {
               placeholder="Nom"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+              className="w-full rounded-lg border px-3 py-2 text-base"
             />
           )}
 
           <input
             type="email"
             placeholder="Email"
+            required
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+            className="w-full rounded-lg border px-3 py-2 text-base"
           />
 
           <input
             type="password"
             placeholder="Mot de passe"
+            required
+            minLength={6}
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+            className="w-full rounded-lg border px-3 py-2 text-base"
           />
 
           {mode === "login" && (
@@ -101,9 +116,14 @@ export default function LoginForm() {
 
           <button
             type="submit"
-            className="w-full rounded-full bg-slate-900 px-3 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-slate-800"
+            disabled={loading}
+            className="w-full rounded-full bg-slate-900 px-3 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
           >
-            {mode === "login" ? "Se connecter" : "Créer le compte"}
+            {loading
+              ? "Patientez…"
+              : mode === "login"
+                ? "Se connecter"
+                : "Créer le compte"}
           </button>
         </form>
 

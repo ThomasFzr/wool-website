@@ -58,6 +58,7 @@ afterEach(() => {
 
 describe("GET /api/version — contrôle d'accès", () => {
   it("refuse un visiteur en production Vercel", async () => {
+    vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VERCEL_ENV", "production");
     const { status, body } = await get();
     expect(status).toBe(403);
@@ -71,6 +72,7 @@ describe("GET /api/version — contrôle d'accès", () => {
   });
 
   it("répond à l'admin en production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "1234567890abcdef");
     vi.stubEnv("VERCEL_GIT_COMMIT_DATE", "2026-01-02T03:04:05Z");
@@ -81,10 +83,17 @@ describe("GET /api/version — contrôle d'accès", () => {
     expect(body.nodeEnv).toBe("production");
   });
 
-  it("ne contrôle pas l'accès en preview Vercel même si NODE_ENV vaut production", async () => {
+  it("refuse aussi un visiteur sur une preview Vercel", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect((await get()).status).toBe(403);
+  });
+
+  it("répond à l'admin sur une preview", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VERCEL_ENV", "preview");
     fakeGit(LOCAL_GIT);
+    asAdmin();
     const { status, body } = await get();
     expect(status).toBe(200);
     expect(body.nodeEnv).toBe("staging");

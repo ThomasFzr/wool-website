@@ -4,6 +4,7 @@ import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
+import { sanitizeDescriptionHtml } from "@/lib/sanitize";
 
 // Désactiver le cache pour cette route API pour éviter les problèmes de synchronisation
 export const dynamic = 'force-dynamic';
@@ -111,7 +112,8 @@ export async function POST(req: NextRequest) {
       title: body.title.trim(),
       slug,
       description: body.description,
-      seoDescription: body.seoDescription,
+      // Rendue en HTML sur la fiche produit : nettoyée à l'enregistrement (XSS)
+      seoDescription: body.seoDescription === undefined ? undefined : sanitizeDescriptionHtml(body.seoDescription),
       imageUrl: body.imageUrl ?? images[0] ?? undefined,
       images,
       imagePublicIds,

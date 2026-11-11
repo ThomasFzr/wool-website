@@ -235,6 +235,88 @@ describe("POST /api/stripe/webhook", () => {
     });
   });
 
+  describe("charge.refunded", () => {
+    /** Commande payée (deux pièces vendues) par le PaymentIntent pi_test. */
+    async function seedPaidOrder() {
+      const creations = [];
+      for (const title of ["A", "B"]) {
+        const creation = await createCreation({ title, sold: true, reserved: false });
+        await Reservation.create({
+          creationId: creation._id,
+          contact: "client@example.com",
+          paymentStatus: "paid",
+          status: "validated",
+          stripeCheckoutSessionId: "cs_test_1",
+          stripePaymentIntentId: "pi_test",
+        });
+        creations.push(creation);
+      }
+      return creations;
+    }
+    const charge = (overrides: Record<string, unknown> = {}) => ({
+      id: "ch_1",
+      payment_intent: "pi_test",
+      refunded: true,
+      amount_refunded: 9000,
+      ...overrides,
+    });
+
+    it("passe la commande remboursée et annulée, et remet les pièces en vente", async () => {
+      const creations = await seedPaidOrder();
+      nextEvent("charge.refunded", charge());
+
+      expect((await sendWebhook()).status).toBe(200);
+      for (const r of await Reservation.find()) {
+        expect(r).toMatchObject({ paymentStatus: "refunded", status: "cancelled", cancelReason: "Commande remboursée" });
+      }
+      for (const c of creations) expect((await Creation.findById(c._id))!.sold).toBe(false);
+
+      // Événement rejoué : rien de plus
+      await sendWebhook();
+      expect(await Reservation.countDocuments({ paymentStatus: "refunded" })).toBe(2);
+    });
+
+    it("accepte un PaymentIntent développé en objet", async () => {
+      await seedPaidOrder();
+      nextEvent("charge.refunded", charge({ payment_intent: { id: "pi_test" } }));
+      await sendWebhook();
+      expect(await Reservation.countDocuments({ paymentStatus: "refunded" })).toBe(2);
+    });
+
+    it("ne remet pas en vente une pièce revendue depuis", async () => {
+      const [a] = await seedPaidOrder();
+      await Reservation.create({ creationId: a._id, contact: "autre@example.com", paymentStatus: "paid", status: "preparing" });
+      nextEvent("charge.refunded", charge());
+      await sendWebhook();
+      expect((await Creation.findById(a._id))!.sold).toBe(true);
+    });
+
+    it("ne touche à rien sur un remboursement partiel ou sans paiement lié", async () => {
+      await seedPaidOrder();
+      nextEvent("charge.refunded", charge({ refunded: false, amount_refunded: 500 }));
+      await sendWebhook();
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Remboursement partiel du paiement pi_test (5 €)"));
+      nextEvent("charge.refunded", charge({ payment_intent: null }));
+      await sendWebhook();
+      expect(await Reservation.countDocuments({ paymentStatus: "paid" })).toBe(2);
+    });
+
+    it("ignore une réservation sans création liée", async () => {
+      await Reservation.create({ contact: "client@example.com", paymentStatus: "paid", stripePaymentIntentId: "pi_test" });
+      nextEvent("charge.refunded", charge());
+      await sendWebhook();
+      expect((await Reservation.findOne())!.paymentStatus).toBe("refunded");
+    });
+
+    it("ne compte pas une réservation remboursée entre-temps par un autre traitement", async () => {
+      await seedPaidOrder();
+      vi.spyOn(Reservation, "findOneAndUpdate").mockResolvedValue(null as any);
+      nextEvent("charge.refunded", charge());
+      await sendWebhook();
+      expect(console.log).toHaveBeenCalledWith("[WEBHOOK] Remboursement ch_1: 0 réservation(s) remboursée(s)");
+    });
+  });
+
   it("ignore les autres événements", async () => {
     await seedPendingOrder();
     nextEvent("payment_intent.created", {});

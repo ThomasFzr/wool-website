@@ -62,3 +62,13 @@ test("le bouton de compte renvoie sur la page courante après connexion", async 
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/creations/${E2E_CREATIONS.rose.slug}$`));
 });
+
+test("inscription avec un email déjà utilisé : le message de l'API est affiché", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Pas encore de compte ? Créer un compte" }).click();
+  await page.getByPlaceholder("Email").fill(E2E_CLIENT.email);
+  await page.getByPlaceholder("Mot de passe").fill("Nouveau-123");
+  await page.getByRole("button", { name: "Créer le compte" }).click();
+  await expect(page.getByText("Un compte existe déjà avec cet email")).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+});

@@ -68,6 +68,18 @@ describe("sendEmail", () => {
       vi.stubEnv("EMAIL_TRANSPORT", "resend");
     });
 
+    it("n'instancie Resend qu'au premier envoi réel (module chargeable sans clé)", async () => {
+      vi.resetModules();
+      const { Resend } = await import("resend");
+      vi.mocked(Resend).mockClear();
+      const fresh = await import("@/lib/sendEmail");
+      expect(Resend).not.toHaveBeenCalled();
+      resend.send.mockResolvedValue({ data: { id: "re_1" }, error: null });
+      await fresh.sendEmail(email);
+      await fresh.sendEmail(email);
+      expect(Resend).toHaveBeenCalledTimes(1);
+    });
+
     it("envoie l'email et renvoie la réponse de Resend", async () => {
       resend.send.mockResolvedValue({ data: { id: "re_1" }, error: null });
       expect(await sendEmail(email)).toEqual({ data: { id: "re_1" }, error: null });

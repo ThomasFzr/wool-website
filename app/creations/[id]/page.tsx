@@ -1,9 +1,11 @@
 import { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
+import { findRenamedSlug } from "@/lib/slug";
+import { sanitizeDescriptionHtml } from "@/lib/sanitize";
 import { Header } from "@/components/Header";
 import { CreationDetail } from "./CreationDetail";
 
@@ -148,7 +150,8 @@ const getCreation = cache(async (slug: string) => {
     slug: creationData.slug,
     title: creationData.title,
     description: creationData.description,
-    seoDescription: creationData.seoDescription,
+    // Rendue en HTML : renettoyée pour les descriptions enregistrées avant le nettoyage serveur
+    seoDescription: creationData.seoDescription ? sanitizeDescriptionHtml(creationData.seoDescription) : creationData.seoDescription,
     imageUrl: creationData.imageUrl,
     images: creationData.images,
     price: creationData.price,
@@ -236,6 +239,9 @@ export default async function CreationPage({ params }: Props) {
   const creation = await getCreation(id);
   
   if (!creation) {
+    // Création renommée : l'ancienne adresse redirige vers la nouvelle
+    const currentSlug = await findRenamedSlug(id);
+    if (currentSlug) permanentRedirect(`/creations/${currentSlug}`);
     notFound();
   }
 

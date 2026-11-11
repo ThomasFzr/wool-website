@@ -41,6 +41,15 @@ describe("PATCH /api/account/password", () => {
     expect(body.error).toMatch(/6 caractères/);
   });
 
+  it("refuse des mots de passe qui ne sont pas des chaînes", async () => {
+    asUser();
+    for (const body of [{ currentPassword: 123456, newPassword: "nouveau1" }, { ...valid, newPassword: 1234567 }]) {
+      const { status, body: res } = await readJson(await patch(body));
+      expect(status).toBe(400);
+      expect(res.error).toBe("Mots de passe requis");
+    }
+  });
+
   it("répond 404 si l'utilisateur n'existe plus", async () => {
     asUser("fantome@example.com");
     expect((await patch(valid)).status).toBe(404);
@@ -86,6 +95,9 @@ describe("PATCH /api/account/password", () => {
       const stored = await storedPassword();
       expect(stored).not.toBe("nouveau1");
       expect(await bcrypt.compare("nouveau1", stored)).toBe(true);
+      // Les autres sessions sont révoquées (callback jwt)
+      const user = await User.findOne({ email: "client@example.com" });
+      expect(user!.passwordChangedAt).toBeInstanceOf(Date);
     });
 
     it("ne modifie que le compte de la session", async () => {

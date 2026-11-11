@@ -6,7 +6,9 @@ import {
   openInBrowser,
 } from "@/lib/emailOutbox";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Créé au premier envoi réel : instancier Resend au chargement du module plante sans
+// RESEND_API_KEY (développement, tests, aperçu local des emails).
+let resend: Resend | null = null;
 
 export async function sendEmail({
   to,
@@ -51,6 +53,7 @@ export async function sendEmail({
   }
 
   try {
+    resend ??= new Resend(process.env.RESEND_API_KEY);
     const result = await resend.emails.send({
       from,
       to,

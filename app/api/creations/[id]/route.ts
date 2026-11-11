@@ -5,8 +5,10 @@ import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
+import { destroyUnusedImages } from "@/lib/cloudinary-images";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
+import { sanitizeDescriptionHtml } from "@/lib/sanitize";
 
 async function checkAuth(req: NextRequest) {
   const session = await checkAdminAuth();
@@ -79,6 +81,7 @@ export async function PATCH(
     if (!ok) return new NextResponse("Unauthorized", { status: 401 });
 
     const { id } = await params;
+    if (!mongoose.isValidObjectId(id)) return new NextResponse("Not found", { status: 404 });
     await connectToDatabase();
     const body = await req.json();
 
@@ -122,15 +125,24 @@ export async function PATCH(
     // Construire l'objet de mise à jour avec les opérateurs MongoDB
     const setData: any = {};
     const unsetData: any = {};
-    const incData: any = {};
 
     if (body.title !== undefined) {
       setData.title = body.title.trim();
-      // Régénérer le slug si le titre change
-      setData.slug = await generateUniqueSlug(body.title, id);
+      // Régénérer le slug si le titre change ; l'ancien reste une adresse valide
+      // (redirection 301 depuis la fiche) pour ne pas casser les liens partagés.
+      const slug = await generateUniqueSlug(body.title, id);
+      if (slug !== existingCreation.slug) {
+        setData.slug = slug;
+        const previous: string[] = existingCreation.previousSlugs ?? [];
+        setData.previousSlugs = [
+          ...previous.filter((s) => s !== slug && s !== existingCreation.slug),
+          ...(existingCreation.slug ? [existingCreation.slug] : []),
+        ];
+      }
     }
     if (body.description !== undefined) setData.description = body.description;
-    if (body.seoDescription !== undefined) setData.seoDescription = body.seoDescription;
+    // Rendue en HTML sur la fiche produit : nettoyée à l'enregistrement (XSS)
+    if (body.seoDescription !== undefined) setData.seoDescription = sanitizeDescriptionHtml(body.seoDescription);
     if (body.imageUrl !== undefined) setData.imageUrl = body.imageUrl;
     if (body.images !== undefined) {
       setData.images = body.images;
@@ -163,13 +175,10 @@ export async function PATCH(
     // Gérer le changement de statut "vendu"
     if (body.sold !== undefined) {
       setData.sold = body.sold;
+      // salesCount n'est pas touché : une vente est comptée par une commande (paiement Stripe
+      // ou commande saisie par l'admin). Compter ici gonflait le total à chaque bascule
+      // vendu → disponible → vendu.
 
-      // Si on marque comme vendu et que ce n'était pas déjà vendu, incrémenter salesCount
-      // (existingCreation est déjà chargé plus haut, pas besoin de re-requêter)
-      if (body.sold === true && !existingCreation.sold) {
-        incData.salesCount = 1;
-      }
-      
       // Si on remet disponible (sold: false), nettoyer aussi les champs reserved
       if (body.sold === false) {
         setData.reserved = false;
@@ -204,9 +213,6 @@ export async function PATCH(
     if (Object.keys(unsetData).length > 0) {
       update.$unset = unsetData;
     }
-    if (Object.keys(incData).length > 0) {
-      update.$inc = incData;
-    }
 
     // Vérifier qu'il y a au moins une opération à effectuer
     if (Object.keys(update).length === 0) {
@@ -231,6 +237,14 @@ export async function PATCH(
       return new NextResponse("Not found", { status: 404 });
     }
 
+    // Images retirées de la création : supprimées de Cloudinary (sinon elles s'accumulent)
+    if (Array.isArray(body.imagePublicIds)) {
+      const kept = new Set(body.imagePublicIds);
+      // Tableau toujours présent sur un document Mongoose (vide par défaut)
+      const removed = existingCreation.imagePublicIds.filter((pid: string) => !kept.has(pid));
+      await destroyUnusedImages(removed);
+    }
+
     // 🔄 Invalider le cache après modification
     revalidateCatalog();
 
@@ -250,6 +264,7 @@ export async function DELETE(
     if (!session) return new NextResponse("Unauthorized", { status: 401 });
 
     const { id } = await params;
+    if (!mongoose.isValidObjectId(id)) return new NextResponse("Not found", { status: 404 });
     await connectToDatabase();
 
     const creation = await Creation.findById(id);

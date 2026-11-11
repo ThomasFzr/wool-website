@@ -23,11 +23,9 @@ let cachedVersionInfo: { version: string; git: any; nodeEnv: string } | null = n
 
 export async function GET() {
   try {
-    // Vérifier que l'utilisateur est admin en production
-    const isProduction = process.env.VERCEL_ENV === "production" ||
-                         (process.env.NODE_ENV === "production" && !process.env.VERCEL_ENV);
-
-    if (isProduction) {
+    // Réservé à l'admin partout sauf en développement local : les previews Vercel
+    // (NODE_ENV=production) exposeraient sinon commit, branche et auteur.
+    if (process.env.NODE_ENV === "production") {
       const session = await checkAdminAuth();
       if (!session) {
         return NextResponse.json(

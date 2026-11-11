@@ -23,7 +23,8 @@ export type SiteSettings = {
 export async function getSettings(): Promise<SiteSettings | null> {
   try {
     await connectToDatabase();
-    const settings = await Settings.findOne().lean();
+    // Même document que /api/settings et lib/gemini (le seul que l'admin modifie)
+    const settings = await Settings.findById("main").lean();
     if (!settings) return null;
 
     const data = settings as any;

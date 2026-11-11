@@ -22,7 +22,12 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { currentPassword, newPassword } = body;
 
-    if (!currentPassword || !newPassword) {
+    if (
+      typeof currentPassword !== "string" ||
+      typeof newPassword !== "string" ||
+      !currentPassword ||
+      !newPassword
+    ) {
       return NextResponse.json(
         { error: "Mots de passe requis" },
         { status: 400 }
@@ -73,6 +78,9 @@ export async function PATCH(req: NextRequest) {
 
     // Hasher et enregistrer le nouveau mot de passe
     user.password = await bcrypt.hash(newPassword, 10);
+    // Révoque les autres sessions ouvertes (cf. callback jwt) ; le formulaire reconnecte
+    // l'utilisateur avec le nouveau mot de passe pour garder la session courante.
+    user.passwordChangedAt = new Date();
     await user.save();
 
     return NextResponse.json({

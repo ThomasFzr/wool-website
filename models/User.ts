@@ -18,6 +18,8 @@ export interface IUser {
   emailNotifications?: boolean;
   /** Date à laquelle la possession de l'email a été prouvée (connexion Google, lien de réinitialisation). */
   emailVerifiedAt?: Date | null;
+  /** Dernier changement ou retrait du mot de passe : les sessions ouvertes avant sont révoquées. */
+  passwordChangedAt?: Date | null;
 }
 
 //
@@ -47,6 +49,7 @@ const userSchema = new Schema<IUserDocument>(
     postalCode: { type: String },
     emailNotifications: { type: Boolean, default: true },
     emailVerifiedAt: { type: Date },
+    passwordChangedAt: { type: Date },
   },
   { timestamps: true }
 );

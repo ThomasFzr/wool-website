@@ -192,6 +192,16 @@ describe("POST /api/creations", () => {
     });
   });
 
+  it("nettoie la description SEO (rendue en HTML) à l'enregistrement", async () => {
+    asAdmin();
+    const { body } = await readJson(
+      await post({ ...valid, seoDescription: '<p>Doux<img src=x onerror="alert(1)"></p><script>alert(2)</script>' })
+    );
+    expect(body.seoDescription).toBe("<p>Doux</p>");
+    const { body: sans } = await readJson(await post(valid));
+    expect(sans.seoDescription).toBeUndefined();
+  });
+
   it("construit la galerie à partir de imageUrl seule", async () => {
     asAdmin();
     const { body } = await readJson(await post({ ...valid, imageUrl: "https://img/seule.jpg", images: [] }));

@@ -91,12 +91,18 @@ export default function OrdersPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/account/reservations");
-      if (!res.ok) {
-        throw new Error("Erreur chargement");
+      // L'API pagine par article : on charge toutes les pages pour regrouper les commandes
+      const all: Reservation[] = [];
+      for (let page = 1, totalPages = 1; page <= totalPages; page++) {
+        const res = await fetch(`/api/account/reservations?limit=100&page=${page}`);
+        if (!res.ok) {
+          throw new Error("Erreur chargement");
+        }
+        const data = await res.json();
+        all.push(...(data.reservations ?? []));
+        totalPages = data.totalPages ?? 1;
       }
-      const data = await res.json();
-      setReservations(data.reservations ?? []);
+      setReservations(all);
     } catch (e) {
       console.error(e);
       setError("Impossible de charger vos commandes.");

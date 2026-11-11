@@ -120,17 +120,15 @@ describe("POST /api/auth/forgot-password", () => {
     expect(sendEmail).toHaveBeenCalledTimes(6);
   });
 
-  it("répond 500 si l'envoi de l'email échoue", async () => {
-    // BUG: le 500 n'arrive que pour un compte credentials existant, ce qui révèle
-    // l'existence du compte malgré la réponse neutre voulue (anti énumération).
+  it("garde la réponse neutre si l'envoi de l'email échoue (pas d'énumération)", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(sendEmail).mockRejectedValueOnce(new Error("resend down"));
     const email = uniqueEmail();
     await User.create({ email, provider: "credentials" });
     const { status, body } = await readJson(await post({ email }));
-    expect(status).toBe(500);
-    expect(body.error).toBe("Erreur lors de l'envoi de l'email");
-    expect(spy).toHaveBeenCalled();
+    expect(status).toBe(200);
+    expect(body).toEqual(NEUTRAL);
+    expect(spy).toHaveBeenCalledWith("[forgot-password] Envoi de l'email impossible:", expect.any(Error));
   });
 
   it("répond 500 sur un corps JSON invalide", async () => {

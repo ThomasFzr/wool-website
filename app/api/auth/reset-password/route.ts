@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   try {
     const { token, password } = await req.json();
 
-    if (!token || !password) {
+    if (typeof token !== "string" || typeof password !== "string" || !token || !password) {
       return NextResponse.json(
         { error: "Token et mot de passe requis" },
         { status: 400 }
@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
     user.password = hashedPassword;
     user.resetToken = null;
     user.resetTokenExpiry = null;
+    // Révoque les sessions ouvertes avant (cf. callback jwt)
+    user.passwordChangedAt = new Date();
     // Le lien a été reçu dans la boîte mail : l'adresse est prouvée
     user.emailVerifiedAt ??= new Date();
     await user.save();

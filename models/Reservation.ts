@@ -45,6 +45,10 @@ const schema = new Schema(
       default: "pickup",
     },
     
+    // 💰 Prix de l'article au moment de la commande (en euros), figé pour les stats :
+    // le prix de la création peut changer ensuite. Absent des commandes antérieures.
+    price: Number,
+
     // 💰 Frais de livraison (en euros)
     shippingCost: {
       type: Number,

@@ -3,8 +3,22 @@
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui";
 import Link from "next/link";
+import { useEffect } from "react";
+import { useCart } from "@/contexts/CartContext";
 
 export default function CheckoutCancelPage() {
+  const { refreshAvailability } = useCart();
+
+  // Le paiement abandonné libère tout de suite les pièces bloquées pour la session Stripe
+  // (sinon elles restent indisponibles jusqu'à son expiration, 30 min plus tard).
+  useEffect(() => {
+    fetch("/api/stripe/cancel-session", { method: "POST" })
+      .then(() => refreshAvailability())
+      .catch((err) => console.error("Libération des articles impossible:", err));
+    // Une seule fois à l'arrivée sur la page
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
       <Header />

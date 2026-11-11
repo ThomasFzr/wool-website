@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { CreationCard, Creation } from "@/components/CreationCard";
 import { Filters } from "@/components/Filters";
 
@@ -19,8 +19,11 @@ export function HomeClient({ initialCreations, availableColors = [], availableTy
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
-  // Récupérer les filtres du sessionStorage au montage (côté client uniquement)
-  useEffect(() => {
+  // Récupérer les filtres du sessionStorage au montage (côté client uniquement), AVANT que
+  // le navigateur n'affiche la page : avec un useEffect, la liste complète s'affichait
+  // d'abord puis se réduisait, et la position de défilement restaurée au retour sur la
+  // page tombait au mauvais endroit.
+  useLayoutEffect(() => {
     try {
       const savedColors = sessionStorage.getItem("filters_colors");
       if (savedColors) setSelectedColors(JSON.parse(savedColors));

@@ -21,8 +21,8 @@ vi.mock("@/lib/sendEmail", () => ({ sendEmail: vi.fn() }));
 
 const patch = (id: string, body: unknown) =>
   PATCH(makeRequest(`/api/admin/reservations/${id}`, { method: "PATCH", body }), routeParams({ id }));
-const del = (id: string) =>
-  DELETE(makeRequest(`/api/admin/reservations/${id}`, { method: "DELETE" }), routeParams({ id }));
+const del = (id: string, query = "") =>
+  DELETE(makeRequest(`/api/admin/reservations/${id}${query}`, { method: "DELETE" }), routeParams({ id }));
 const unknownId = () => new mongoose.Types.ObjectId().toString();
 const emailsTo = (to: string) => vi.mocked(sendEmail).mock.calls.filter(([e]) => e.to === to).map(([e]) => e);
 
@@ -336,6 +336,80 @@ describe("PATCH /api/admin/reservations/[id]", () => {
     });
   });
 
+  describe("action sur toute la commande (wholeOrder)", () => {
+    /** Commande de trois articles : deux à traiter, un déjà annulé. */
+    async function threeItemOrder() {
+      const a = await orderFixture({ stripeCheckoutSessionId: "cs_1", status: "preparing" }, { title: "Bonnet" });
+      const b = await orderFixture({ stripeCheckoutSessionId: "cs_1", status: "preparing" }, { title: "Snood", images: [] });
+      const c = await orderFixture({ stripeCheckoutSessionId: "cs_1", status: "cancelled" }, { title: "Bandeau" });
+      const other = await orderFixture({ stripeCheckoutSessionId: "cs_2", status: "preparing" });
+      return { a, b, c, other };
+    }
+    const statusOf = async (id: unknown) => (await Reservation.findById(id).lean<any>()).status;
+
+    it("met à jour tous les articles et n'envoie qu'un email par destinataire", async () => {
+      const { a, b, c, other } = await threeItemOrder();
+      asAdmin();
+      const { status, body } = await readJson(
+        await patch(a.reservation.id, { status: "shipped", trackingNumber: "6A1", wholeOrder: true })
+      );
+      expect(status).toBe(200);
+      expect(body._id).toBe(a.reservation.id);
+      for (const r of [a, b]) {
+        expect(await Reservation.findById(r.reservation._id).lean<any>()).toMatchObject({ status: "shipped", trackingNumber: "6A1" });
+      }
+      // Un article déjà annulé n'est pas rouvert ; les autres commandes ne bougent pas
+      expect(await statusOf(c.reservation._id)).toBe("cancelled");
+      expect(await statusOf(other.reservation._id)).toBe("preparing");
+    });
+
+    it("valide la commande avec un seul email listant tous les articles", async () => {
+      const { a, b } = await threeItemOrder();
+      await Reservation.updateMany({ stripeCheckoutSessionId: "cs_1", status: "preparing" }, { status: "pending" });
+      asAdmin();
+      await patch(b.reservation.id, { status: "validated", wholeOrder: true });
+
+      const buyer = emailsTo("client@example.com");
+      expect(buyer).toHaveLength(1);
+      expect(buyer[0].html).toContain("Bonnet");
+      expect(buyer[0].html).toContain("Snood");
+      expect(buyer[0].html).not.toContain("Bandeau");
+      const seller = emailsTo("vendeuse@example.com");
+      expect(seller).toHaveLength(1);
+      expect(seller[0].subject).toBe("✅ Commande validée : Bonnet et 1 autre article");
+      for (const r of [a, b]) {
+        expect((await Creation.findById(r.creation._id).lean<any>()).sold).toBe(true);
+      }
+    });
+
+    it("annule la commande avec un seul email et remet chaque pièce en vente", async () => {
+      const a = await orderFixture({ stripeCheckoutSessionId: "cs_1", status: "validated" }, { title: "Bonnet", sold: true });
+      const b = await orderFixture({ stripeCheckoutSessionId: "cs_1", status: "validated" }, { title: "Snood", sold: true });
+      const d = await orderFixture({ stripeCheckoutSessionId: "cs_1", status: "validated" }, { title: "Mitaines", sold: true });
+      asAdmin();
+      await patch(a.reservation.id, { status: "cancelled", cancelReason: "Rupture", wholeOrder: true });
+
+      for (const r of [a, b, d]) {
+        expect(await Reservation.findById(r.reservation._id).lean<any>()).toMatchObject({ status: "cancelled", cancelledBy: "admin", cancelReason: "Rupture" });
+        expect((await Creation.findById(r.creation._id).lean<any>()).sold).toBe(false);
+      }
+      const [buyer] = emailsTo("client@example.com");
+      expect(buyer.html).toContain("les articles suivants");
+      expect(buyer.html).toContain("Rupture");
+      expect(emailsTo("vendeuse@example.com")[0].subject).toBe("❌ Commande annulée : Bonnet et 2 autres articles");
+      expect(sendEmail).toHaveBeenCalledTimes(2);
+    });
+
+    it("se limite à la réservation sans session de paiement", async () => {
+      const solo = await orderFixture({ status: "preparing" });
+      const other = await orderFixture({ status: "preparing" });
+      asAdmin();
+      await patch(solo.reservation.id, { status: "shipped", wholeOrder: true });
+      expect(await statusOf(solo.reservation._id)).toBe("shipped");
+      expect(await statusOf(other.reservation._id)).toBe("preparing");
+    });
+  });
+
   it("répond 500 pour un identifiant invalide", async () => {
     asAdmin();
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -379,6 +453,30 @@ describe("DELETE /api/admin/reservations/[id]", () => {
     asAdmin();
     expect((await del(reservation.id)).status).toBe(204);
     expect((await Creation.findById(creation._id).lean<any>()).sold).toBe(true);
+  });
+
+  it("supprime toute la commande avec wholeOrder=1, en ne rouvrant que les articles non annulés", async () => {
+    const a = await orderFixture({ stripeCheckoutSessionId: "cs_1" }, { sold: true });
+    const b = await orderFixture({ stripeCheckoutSessionId: "cs_1", status: "cancelled" }, { sold: true });
+    const other = await orderFixture({ stripeCheckoutSessionId: "cs_2" }, { sold: true });
+    asAdmin();
+    expect((await del(a.reservation.id, "?wholeOrder=1")).status).toBe(204);
+    expect(await Reservation.find().distinct("stripeCheckoutSessionId")).toEqual(["cs_2"]);
+    expect((await Creation.findById(a.creation._id).lean<any>()).sold).toBe(false);
+    expect((await Creation.findById(b.creation._id).lean<any>()).sold).toBe(true);
+    expect((await Creation.findById(other.creation._id).lean<any>()).sold).toBe(true);
+    expect(revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("sans wholeOrder, ne supprime que l'article ; sans session, ignore wholeOrder", async () => {
+    const a = await orderFixture({ stripeCheckoutSessionId: "cs_1" });
+    await orderFixture({ stripeCheckoutSessionId: "cs_1" });
+    const solo = await orderFixture({ status: "cancelled" });
+    asAdmin();
+    await del(a.reservation.id);
+    expect(await Reservation.countDocuments({ stripeCheckoutSessionId: "cs_1" })).toBe(1);
+    await del(solo.reservation.id, "?wholeOrder=1");
+    expect(await Reservation.countDocuments()).toBe(1);
   });
 
   it("supprime une réservation sans création liée", async () => {

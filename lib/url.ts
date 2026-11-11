@@ -8,24 +8,34 @@ function hostOf(url?: string): string | null {
 }
 
 function isLocalHost(host: string): boolean {
-  const hostname = host.split(":")[0];
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  let url: URL;
+  try {
+    url = new URL(`http://${host}`);
+  } catch {
+    return false;
+  }
+  // L'hôte doit être exactement « nom[:port] » (pas de chemin ni d'identifiants glissés)
+  if (url.host !== host) return false;
+  return url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
 }
 
 /**
  * Un en-tête `Host` est fourni par le client : on ne l'accepte que s'il
- * correspond à une origine légitime de l'application (domaine configuré,
- * déploiement Vercel, ou machine locale). Sinon on retombe sur l'environnement.
+ * correspond à une origine légitime de l'application (domaine configuré, URL de CE
+ * déploiement Vercel, ou machine locale hors production). Sinon on retombe sur
+ * l'environnement. N'importe quel *.vercel.app n'est pas accepté : un lien de
+ * réinitialisation pourrait sinon pointer vers le site d'un tiers.
  */
 function isAllowedHost(host: string): boolean {
-  if (isLocalHost(host)) return true;
-  if (host === hostOf(process.env.NEXT_PUBLIC_APP_URL)) return true;
-  if (host === hostOf(process.env.NEXTAUTH_URL)) return true;
-  if (host === process.env.VERCEL_PROJECT_PRODUCTION_URL) return true;
-  if (host === process.env.VERCEL_URL) return true;
-  // Déploiements de preview Vercel
-  if (host.endsWith(".vercel.app")) return true;
-  return false;
+  if (isLocalHost(host)) return process.env.VERCEL_ENV !== "production";
+  const allowed = [
+    hostOf(process.env.NEXT_PUBLIC_APP_URL),
+    hostOf(process.env.NEXTAUTH_URL),
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    process.env.VERCEL_URL,
+    process.env.VERCEL_BRANCH_URL,
+  ];
+  return allowed.some((h) => h && h === host);
 }
 
 /**
@@ -56,4 +66,15 @@ export function getAppUrl(headers?: Headers): string {
   if (envUrl) return envUrl;
 
   return "http://localhost:3000";
+}
+
+/**
+ * URL de base des liens envoyés par email (réinitialisation du mot de passe, commandes).
+ * En production, toujours le domaine officiel NEXT_PUBLIC_APP_URL, jamais un hôte tiré
+ * de la requête ; ailleurs (local, preview), l'origine de la requête pour pouvoir tester.
+ */
+export function getEmailBaseUrl(headers?: Headers): string {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (process.env.VERCEL_ENV === "production" && envUrl) return envUrl;
+  return getAppUrl(headers);
 }

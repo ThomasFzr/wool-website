@@ -382,10 +382,7 @@ describe("CartProvider — disponibilité des articles", () => {
     expect(availabilityCalls()).toHaveLength(1);
   });
 
-  it("retire aussi un article ajouté pendant une vérification en cours", async () => {
-    // BUG: la purge filtre l'état courant (prev) avec la liste des ids disponibles
-    // calculée AVANT l'ajout : un article ajouté pendant la requête est retiré
-    // silencieusement (il n'apparaît pas dans le message).
+  it("garde un article ajouté pendant une vérification en cours", async () => {
     storeCart([bonnet]);
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -401,10 +398,42 @@ describe("CartProvider — disponibilité des articles", () => {
     await act(async () => {
       release();
     });
-    await waitFor(() => expect(result.current.items).toEqual([]));
+    // Seul l'article vérifié et indisponible est retiré
+    await waitFor(() => expect(result.current.items).toEqual([echarpe]));
     expect(result.current.unavailableNotice).toBe(
       "« Bonnet » n'est plus disponible et a été retiré de votre panier."
     );
+  });
+});
+
+describe("CartProvider — synchronisation entre onglets", () => {
+  const fromOtherTab = (key: string, newValue: string | null) =>
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
+    });
+
+  it("reprend le panier et le mode de livraison modifiés dans un autre onglet", async () => {
+    const { result } = renderCart();
+    await flush();
+    fromOtherTab(STORAGE_KEY, JSON.stringify([bonnet]));
+    expect(result.current.items).toEqual([bonnet]);
+    fromOtherTab(DELIVERY_MODE_KEY, "shipping");
+    expect(result.current.deliveryMode).toBe("shipping");
+    fromOtherTab(STORAGE_KEY, null);
+    expect(result.current.items).toEqual([]);
+  });
+
+  it("ignore les autres clés, un mode inconnu et un contenu illisible", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    storeCart([bonnet]);
+    const { result } = renderCart();
+    await flush();
+    fromOtherTab("autre-cle", "[]");
+    fromOtherTab(DELIVERY_MODE_KEY, "teleportation");
+    fromOtherTab(STORAGE_KEY, "{pas du json");
+    expect(result.current.items).toEqual([bonnet]);
+    expect(result.current.deliveryMode).toBe("pickup");
+    expect(error).toHaveBeenCalledWith("Erreur lors de la synchronisation du panier:", expect.any(Error));
   });
 });
 
@@ -592,7 +621,6 @@ describe("CartProvider — remise en main propre", () => {
     ["correspondance exacte", ["75011"], "75011"],
     ["préfixe autorisé", [" 75 "], "75011"],
     ["insensible à la casse et aux espaces (codes étrangers)", ["sw1a"], " SW1A 1AA"],
-    ["code utilisateur préfixe du code autorisé", ["75011"], "750"],
   ])("est disponible : %s", async (_label, allowed, postalCode) => {
     const result = await pickupState({ ...base, allowedPostalCodes: allowed }, { postalCode });
     expect(result.current.isPickupAvailable).toBe(true);
@@ -606,18 +634,16 @@ describe("CartProvider — remise en main propre", () => {
     );
   });
 
-  it("accepte un code postal très court ou blanc comme préfixe de n'importe quel code autorisé", async () => {
-    // BUG: la correspondance « inverse » (allowedCode.startsWith(userCode)) accepte un
-    // code postal partiel : « 7 » ou « 9 » ouvre le retrait à tout le département, et un
-    // code composé d'espaces (normalisé en "") ouvre le retrait partout.
-    const r1 = await pickupState({ ...base, allowedPostalCodes: ["75011"] }, { postalCode: "7" });
-    expect(r1.current.isPickupAvailable).toBe(true);
+  it("refuse un code postal partiel, simple début d'un code autorisé", async () => {
+    const result = await pickupState({ ...base, allowedPostalCodes: ["75011"] }, { postalCode: "7" });
+    expect(result.current.isPickupAvailable).toBe(false);
+    expect(result.current.pickupUnavailableReason).toContain("pas disponible pour le code postal 7.");
   });
 
-  it("accepte un code postal composé uniquement d'espaces", async () => {
-    // BUG: voir ci-dessus — "   " est vrai (non vide) puis normalisé en "".
+  it("traite un code postal fait d'espaces comme absent", async () => {
     const result = await pickupState({ ...base, allowedPostalCodes: ["75011"] }, { postalCode: "   " });
-    expect(result.current.isPickupAvailable).toBe(true);
+    expect(result.current.isPickupAvailable).toBe(false);
+    expect(result.current.pickupUnavailableReason).toContain("Veuillez renseigner votre code postal");
   });
 
   it("garde le retrait choisi pendant le chargement du profil quand le code postal est autorisé", async () => {

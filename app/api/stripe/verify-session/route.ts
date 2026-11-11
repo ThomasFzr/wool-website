@@ -4,7 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import Stripe from "stripe";
 import { connectToDatabase } from "@/lib/db";
 import { getStripeInstance } from "@/lib/stripe";
-import { getAppUrl } from "@/lib/url";
+import { getEmailBaseUrl } from "@/lib/url";
 import { fulfillCheckoutSession } from "@/lib/checkout-fulfillment";
 
 /**
@@ -58,14 +58,14 @@ export async function GET(req: NextRequest) {
     // et créations, envoie les emails si ce n'est pas déjà fait.
     // Retenté si Stripe n'a pas encore finalisé la session.
     let result = await fulfillCheckoutSession(checkoutSession, {
-      appUrl: getAppUrl(req.headers),
+      appUrl: getEmailBaseUrl(req.headers),
     });
 
     for (let attempt = 2; attempt <= MAX_ATTEMPTS && !result.paid && result.pending; attempt++) {
       await wait(RETRY_DELAY_MS);
       checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
       result = await fulfillCheckoutSession(checkoutSession, {
-        appUrl: getAppUrl(req.headers),
+        appUrl: getEmailBaseUrl(req.headers),
       });
     }
 
