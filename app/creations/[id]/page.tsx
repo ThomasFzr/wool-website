@@ -6,7 +6,7 @@ import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
 import { findRenamedSlug } from "@/lib/slug";
 import { sanitizeDescriptionHtml } from "@/lib/sanitize";
-import { cloudinaryOgImageUrl } from "@/lib/imageOptimizer";
+import { cloudinaryOgImageUrl, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH } from "@/lib/imageOptimizer";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { Header } from "@/components/Header";
 import { CreationDetail } from "./CreationDetail";
@@ -185,11 +185,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? [creation.imageUrl] 
       : [];
 
-  // Photo entière (Cloudinary, 1200 px au plus, dimensions variables donc non annoncées) ;
-  // sans photo, l'image par défaut du site (1200×630).
-  const ogImage: { url: string; width?: number; height?: number } = images[0]
-    ? { url: cloudinaryOgImageUrl(images[0]) ?? images[0] }
-    : { url: '/images/og-image.jpg', width: 1200, height: 630 };
+  // Photo entière sur fond flouté, en 1200×630 (Cloudinary) ; sinon l'image par défaut du site
+  // (même format). Une photo hors Cloudinary garde ses dimensions, inconnues : non annoncées.
+  const sharePhoto = images[0] ? cloudinaryOgImageUrl(images[0]) : null;
+  const ogImage: { url: string; width?: number; height?: number } =
+    sharePhoto || !images[0]
+      ? { url: sharePhoto ?? '/images/og-image.jpg', width: OG_IMAGE_WIDTH, height: OG_IMAGE_HEIGHT }
+      : { url: images[0] };
 
   // Utiliser seoDescription si disponible, sinon description, sinon description par défaut
   const rawDescription = creation.seoDescription || creation.description;

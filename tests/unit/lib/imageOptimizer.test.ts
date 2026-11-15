@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloudinaryOgImageUrl, OG_PHOTO_MAX, optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
+import { cloudinaryOgImageUrl, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH, optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 const BASE = "https://res.cloudinary.com/demo/image/upload";
 
@@ -38,11 +38,22 @@ describe("optimizeCloudinaryUrl", () => {
 });
 
 describe("cloudinaryOgImageUrl", () => {
-  it("garde la photo Cloudinary entière, réduite à 1200 px au plus, en JPEG", () => {
-    expect(cloudinaryOgImageUrl(`${BASE}/f_auto,q_75,w_600/v1/creations/bonnet.jpg`)).toBe(
-      `${BASE}/c_limit,w_1200,h_1200,f_jpg,q_80/v1/creations/bonnet.jpg`
+  const og = (layer: string) =>
+    `c_fill,g_auto,w_1200,h_630/e_blur:2000/e_brightness:-15/l_${layer}/c_fit,w_1200,h_630/fl_layer_apply,g_center/f_jpg,q_80`;
+
+  it("pose la photo entière sur son propre fond flouté, en 1200×630 JPEG", () => {
+    expect(cloudinaryOgImageUrl(`${BASE}/v1773661469/ykr2etdnf3mjbd8i7dik.jpg`)).toBe(
+      `${BASE}/${og("ykr2etdnf3mjbd8i7dik")}/v1773661469/ykr2etdnf3mjbd8i7dik.jpg`
     );
-    expect(OG_PHOTO_MAX).toBe(1200);
+    expect(OG_IMAGE_WIDTH).toBe(1200);
+    expect(OG_IMAGE_HEIGHT).toBe(630);
+  });
+
+  it("gère dossiers, absence de version et transformations existantes", () => {
+    expect(cloudinaryOgImageUrl(`${BASE}/f_auto,q_75,w_600/v1/creations/hiver/bonnet.v2.png`)).toBe(
+      `${BASE}/${og("creations:hiver:bonnet.v2")}/v1/creations/hiver/bonnet.v2.png`
+    );
+    expect(cloudinaryOgImageUrl(`${BASE}/creations/bonnet`)).toBe(`${BASE}/${og("creations:bonnet")}/creations/bonnet`);
   });
 
   it("renvoie null hors Cloudinary ou pour une URL inattendue", () => {
