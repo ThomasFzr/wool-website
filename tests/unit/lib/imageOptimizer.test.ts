@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloudinaryOgImageUrl, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH, optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
+import { cloudinaryOgImageUrl, OG_PHOTO_MAX, optimizeCloudinaryUrl } from "@/lib/imageOptimizer";
 
 const BASE = "https://res.cloudinary.com/demo/image/upload";
 
@@ -38,15 +38,14 @@ describe("optimizeCloudinaryUrl", () => {
 });
 
 describe("cloudinaryOgImageUrl", () => {
-  it("recadre une photo Cloudinary au format Open Graph annoncé, en JPEG", () => {
+  it("garde la photo Cloudinary entière, réduite à 1200 px au plus, en JPEG", () => {
     expect(cloudinaryOgImageUrl(`${BASE}/f_auto,q_75,w_600/v1/creations/bonnet.jpg`)).toBe(
-      `${BASE}/c_fill,g_auto,w_1200,h_630,f_jpg,q_80/v1/creations/bonnet.jpg`
+      `${BASE}/c_limit,w_1200,h_1200,f_jpg,q_80/v1/creations/bonnet.jpg`
     );
-    expect(OG_IMAGE_WIDTH).toBe(1200);
-    expect(OG_IMAGE_HEIGHT).toBe(630);
+    expect(OG_PHOTO_MAX).toBe(1200);
   });
 
-  it("renvoie null hors Cloudinary ou pour une URL inattendue (dimensions inconnues)", () => {
+  it("renvoie null hors Cloudinary ou pour une URL inattendue", () => {
     expect(cloudinaryOgImageUrl("")).toBeNull();
     expect(cloudinaryOgImageUrl("https://exemple.fr/photo.jpg")).toBeNull();
     expect(cloudinaryOgImageUrl("https://res.cloudinary.com/demo/image/fetch/x.jpg")).toBeNull();
