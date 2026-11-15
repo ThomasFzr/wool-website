@@ -1,6 +1,7 @@
 import { expect, test, type Browser } from "@playwright/test";
 import { E2E_CLIENT, E2E_CREATIONS, TEST_CARDS } from "./data";
 import {
+  checkoutForm,
   addToCart,
   complete3DSecure,
   dbCreation,
@@ -118,7 +119,8 @@ test("carte refusée puis abandon : rien n'est débité, la pièce est libérée
   await addToCart(page, rose.slug);
   await goToStripe(page, "shipping");
   await payOnStripe(page, { card: TEST_CARDS.declined });
-  await expect(page.getByText(/refusée|declined/i).first()).toBeVisible();
+  // Message d'erreur affiché dans le formulaire (iframe Stripe)
+  await expect((await checkoutForm(page)).getByText(/refusée|declined/i).first()).toBeVisible();
 
   // Bouton retour de Stripe → /checkout/cancel
   await page.getByTestId("business-link").or(page.locator('a[href*="/checkout/cancel"]')).first().click();
@@ -184,7 +186,8 @@ test("remise en main propre : pas de frais de port ni d'adresse demandée", asyn
   await goToStripe(page, "pickup");
 
   await expect(page.getByText("40,00 €").first()).toBeVisible();
-  await expect(page.locator("#shippingAddressLine1")).toHaveCount(0);
+  // Formulaire dans une iframe : aucune rubrique « Livraison » demandée
+  await expect((await checkoutForm(page)).getByRole("group", { name: "Livraison" })).toHaveCount(0);
   await payOnStripe(page, { shipping: false });
 
   await page.waitForURL(/\/checkout\/success/);

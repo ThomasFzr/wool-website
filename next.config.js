@@ -55,6 +55,12 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Fichiers de polices servis depuis public/ : à ne pas indexer. Posé ici car le proxy
+        // (proxy.ts) exclut les fichiers .ttf/.woff… de son matcher et ne le voyait jamais.
+        source: '/fonts/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+      {
         source: '/(.*)',
         headers: [
           {

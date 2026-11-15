@@ -1,9 +1,13 @@
 import { MetadataRoute } from 'next';
 import { connectToDatabase } from '@/lib/db';
 import CreationModel from '@/models/Creation';
+import { SITE_URL } from '@/lib/site';
+
+// Régénéré toutes les heures (sinon figé au build : les nouvelles créations n'y figuraient pas)
+export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.maillemum.fr';
+  const baseUrl = SITE_URL;
 
   // Pages statiques
   const staticPages = [

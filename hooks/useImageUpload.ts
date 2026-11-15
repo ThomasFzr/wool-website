@@ -110,7 +110,8 @@ export function useImageUpload() {
 
     const targetIndex = Number(imageContainer.getAttribute("data-image-index"));
 
-    if (targetIndex !== touchStartIndex && targetIndex >= 0) {
+    // Index lu dans le DOM : borné à la liste (comme useDragAndDrop)
+    if (Number.isInteger(targetIndex) && targetIndex !== touchStartIndex && targetIndex >= 0 && targetIndex < images.length) {
       const imagesArr = [...images];
       const publicIdsArr = [...publicIds];
       const [movedImage] = imagesArr.splice(touchStartIndex, 1);

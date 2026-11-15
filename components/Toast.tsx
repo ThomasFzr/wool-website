@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 interface ToastProps {
@@ -19,12 +19,18 @@ export function Toast({
   cartUrl,
 }: ToastProps) {
   const [shouldRender, setShouldRender] = useState(false);
+  // onClose est souvent une fonction recréée à chaque rendu du parent : en dépendre
+  // relançait le minuteur à chaque rendu (le toast restait ~6 s au lieu de 4).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (isVisible) {
       setShouldRender(true);
       const timer = setTimeout(() => {
-        onClose();
+        onCloseRef.current();
       }, duration);
 
       return () => clearTimeout(timer);
@@ -35,7 +41,7 @@ export function Toast({
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isVisible, duration, onClose]);
+  }, [isVisible, duration]);
 
   if (!shouldRender) return null;
 

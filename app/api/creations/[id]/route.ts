@@ -9,6 +9,7 @@ import { destroyUnusedImages } from "@/lib/cloudinary-images";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
 import { sanitizeDescriptionHtml } from "@/lib/sanitize";
+import { isInvalidInput } from "@/lib/validation-error";
 
 async function checkAuth(req: NextRequest) {
   const session = await checkAdminAuth();
@@ -224,7 +225,8 @@ export async function PATCH(
     const updateResult = await Creation.updateOne(
       { _id: id },
       update,
-      { runValidators: false }
+      // Validateurs du schéma actifs (prix, poids, prix du fil ≥ 0…)
+      { runValidators: true }
     );
 
     if (updateResult.matchedCount === 0) {
@@ -250,6 +252,9 @@ export async function PATCH(
 
     return NextResponse.json(creation);
   } catch (err) {
+    if (isInvalidInput(err)) {
+      return NextResponse.json({ error: "Données invalides" }, { status: 400 });
+    }
     console.error("❌ PATCH error:", err);
     return new NextResponse("Server error", { status: 500 });
   }

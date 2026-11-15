@@ -165,6 +165,47 @@ async function sendCancellationEmails(items: any[]) {
 }
 
 /**
+ * Email à l'acheteur quand sa commande part (un seul pour tous les articles expédiés),
+ * avec le numéro de suivi s'il a été saisi. La vendeuse vient de faire l'action : pas d'email.
+ */
+async function sendShippingEmail(items: any[]) {
+  const { name, contact } = items[0];
+  const user = await User.findOne({ email: contact });
+  if (user?.emailNotifications === false) return;
+
+  const creations: ItemCreation[] = items.map((r) => r.creationId);
+  const tracking = items.find((r) => r.trackingNumber)?.trackingNumber;
+  const cards = creations.map((c) => itemCard(c, { border: "#e5e7eb" })).join("");
+  const trackingBlock = tracking
+    ? `
+    <div style="margin-top:16px;padding:12px;border-radius:12px;background:#eff6ff;">
+      <p style="margin:0 0 4px 0;font-size:12px;font-weight:600;">Numéro de suivi</p>
+      <p style="margin:0;font-size:14px;font-family:monospace;">${escapeHtml(tracking)}</p>
+    </div>`
+    : "";
+
+  await sendAll([
+    sendEmail({
+      to: contact,
+      subject: "📦 Votre commande a été expédiée",
+      html: emailTemplate(`
+        <h1 style="font-size:20px;margin:0 0 12px 0;">Votre commande est en route 📦</h1>
+        <p style="font-size:14px;margin:0 0 16px 0;">
+          Bonjour <strong>${escapeHtml(name)}</strong>,<br/>
+          Votre commande vient d'être <strong>expédiée</strong>.
+        </p>
+        ${cards}
+        ${trackingBlock}
+        <p style="font-size:12px;margin-top:20px;color:#6b7280;">
+          Vous pouvez suivre cette commande dans :<br/>
+          <a href="${process.env.NEXT_PUBLIC_APP_URL}/account/orders" style="color:#0f172a;font-weight:600;">Mes commandes</a>
+        </p>
+      `),
+    }),
+  ]);
+}
+
+/**
  * Réservations visées : la réservation seule, ou avec `wholeOrder` tous les articles de sa
  * commande (même session de paiement). Une action groupée ne rouvre pas un article déjà
  * annulé de la commande.
@@ -213,6 +254,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
     let updated: any = null;
     const validatedItems: any[] = [];
     const cancelledItems: any[] = [];
+    const shippedItems: any[] = [];
 
     for (const target of targets) {
       // Les effets de bord (vente, emails) n'ont lieu que lors d'un vrai changement de
@@ -240,6 +282,12 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
         validatedItems.push(reservation);
       }
 
+      // Première expédition seulement : un retour « en cours de livraison » → « expédiée »
+      // (shippedAt déjà posé) ne renvoie pas l'email
+      if (body.status === "shipped" && !target.shippedAt) {
+        shippedItems.push(reservation);
+      }
+
       if (cancelling) {
         // L'article redevient disponible, sauf s'il a été revendu depuis
         // (ou si son verrou appartient à une autre réservation)
@@ -261,6 +309,9 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
     }
     if (cancelledItems.length > 0) {
       await sendCancellationEmails(cancelledItems);
+    }
+    if (shippedItems.length > 0) {
+      await sendShippingEmail(shippedItems);
     }
 
     return NextResponse.json(updated);

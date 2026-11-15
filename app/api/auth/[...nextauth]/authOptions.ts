@@ -7,10 +7,11 @@ import bcrypt from "bcryptjs";
 import User, { IUserDocument } from "@/models/User";
 import { connectToDatabase } from "@/lib/db";
 import { clientIp, hitRateLimit, rateLimitCount } from "@/lib/rate-limit";
+import { ACCOUNT_CHECK_TTL, lookupAccount, type AccountState } from "@/lib/account-check";
 
 // Le rôle stocké dans le JWT est revérifié en DB au plus toutes les ROLE_REFRESH_INTERVAL ms
 // (sinon un admin révoqué garderait son rôle jusqu'à expiration du token).
-const ROLE_REFRESH_INTERVAL = 5 * 60 * 1000;
+const ROLE_REFRESH_INTERVAL = ACCOUNT_CHECK_TTL;
 
 // Anti force brute : au-delà de LOGIN_MAX_FAILURES échecs depuis une même IP dans la fenêtre,
 // toute tentative est refusée (même avec le bon mot de passe) jusqu'à la fenêtre suivante.
@@ -159,24 +160,26 @@ export const authOptions: NextAuthOptions = {
       // Revérifier périodiquement le compte en DB (révocation admin, compte supprimé, mot de
       // passe changé) : effectif sans reconnexion, au plus ROLE_REFRESH_INTERVAL après.
       const stale = !token.roleCheckedAt || Date.now() - token.roleCheckedAt > ROLE_REFRESH_INTERVAL;
+      // Lecture partagée entre les rendus de l'instance (cf. lib/account-check), sauf sur
+      // trigger "update" (changement demandé par l'utilisateur) où elle est forcée.
       if ((trigger === "update" || stale) && token.email) {
-        let dbUser: IUserDocument | null;
+        let checkedAt: number;
+        let account: AccountState;
         try {
-          await connectToDatabase();
-          dbUser = await User.findOne({ email: token.email }).lean<IUserDocument | null>();
+          ({ checkedAt, state: account } = await lookupAccount(token.email, { fresh: trigger === "update" }));
         } catch (error) {
           // Base indisponible : on garde le token plutôt que de déconnecter tout le monde
           console.error("[JWT] Role refresh error:", error);
           return token;
         }
         // Lever une erreur fait vider le cookie de session par next-auth (session révoquée).
-        if (!dbUser) throw new Error("Session révoquée : compte supprimé");
-        if (dbUser.passwordChangedAt && (token.authAt ?? 0) < new Date(dbUser.passwordChangedAt).getTime()) {
+        if (!account) throw new Error("Session révoquée : compte supprimé");
+        if (account.passwordChangedAt && (token.authAt ?? 0) < account.passwordChangedAt) {
           throw new Error("Session révoquée : mot de passe changé");
         }
-        token.role = dbUser.role;
-        token.userId = dbUser._id.toString();
-        token.roleCheckedAt = Date.now();
+        token.role = account.role;
+        token.userId = account.userId;
+        token.roleCheckedAt = checkedAt;
       }
 
       return token;

@@ -53,9 +53,37 @@ describe("POST /api/stripe/cancel-session", () => {
     expect((await Creation.findById(other.creation._id))!.reserved).toBe(true);
   });
 
+  it("libère quand même les pièces d'une session que Stripe a déjà expirée", async () => {
+    const { creation, reservation } = await pendingOrder("cs_gone");
+    stripe.checkout.sessions.expire.mockRejectedValueOnce(new Error("Only open sessions can be expired"));
+    stripe.checkout.sessions.retrieve.mockResolvedValueOnce({ id: "cs_gone", status: "expired", metadata: {} });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    asUser();
+
+    const { body } = await readJson(await POST());
+    expect(body).toEqual({ released: 1 });
+    expect(stripe.checkout.sessions.retrieve).toHaveBeenCalledWith("cs_gone");
+    expect((await Creation.findById(creation._id))!.reserved).toBe(false);
+    expect((await Reservation.findById(reservation._id))!.paymentStatus).toBe("failed");
+  });
+
+  it("ne libère rien si la session est introuvable chez Stripe", async () => {
+    const { creation } = await pendingOrder("cs_unknown");
+    stripe.checkout.sessions.expire.mockRejectedValueOnce(new Error("No such session"));
+    stripe.checkout.sessions.retrieve.mockRejectedValueOnce("introuvable");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    asUser();
+
+    const { body } = await readJson(await POST());
+    expect(body).toEqual({ released: 0 });
+    expect((await Creation.findById(creation._id))!.reserved).toBe(true);
+    expect(warn).toHaveBeenCalledWith("[CANCEL-SESSION] Session cs_unknown introuvable :", "introuvable");
+  });
+
   it("laisse suivre son cours une session que Stripe refuse d'expirer (déjà payée)", async () => {
     const { creation } = await pendingOrder("cs_paid");
     stripe.checkout.sessions.expire.mockRejectedValueOnce(new Error("Only open sessions can be expired"));
+    stripe.checkout.sessions.retrieve.mockResolvedValueOnce({ id: "cs_paid", status: "complete", metadata: {} });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     asUser();
 

@@ -7,6 +7,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { getSettings } from "@/lib/getSettings";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 const clashDisplay = localFont({
   src: "../public/fonts/ClashDisplay-Variable.ttf",
@@ -23,11 +24,11 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.maillemum.fr'),
+  metadataBase: new URL(SITE_URL),
   alternates: {
     canonical: './',
   },
-  authors: [{ name: 'MailleMum', url: 'https://www.maillemum.fr' }],
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
   creator: 'MailleMum',
   publisher: 'MailleMum',
   title: {
@@ -50,8 +51,8 @@ export const metadata: Metadata = {
   openGraph: {
     title: "MailleMum - Créations tricotées à la main",
     description: "Découvrez nos créations tricotées à la main : tours de cou, bandeaux et bonnets faits main avec passion.",
-    url: 'https://www.maillemum.fr',
-    siteName: 'MailleMum',
+    url: SITE_URL,
+    siteName: SITE_NAME,
     images: [
       {
         url: '/images/og-image.jpg',

@@ -9,13 +9,6 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // Bloquer l'indexation des fichiers de polices avec un en-tête HTTP
-  if (pathname.startsWith('/fonts/')) {
-    const response = NextResponse.next();
-    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
-    return response;
-  }
-
   return NextResponse.next();
 }
 

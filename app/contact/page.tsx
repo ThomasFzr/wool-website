@@ -40,6 +40,9 @@ function ContactForm() {
   const [loadingCreations, setLoadingCreations] = useState(false);
   const [showCreationsSelector, setShowCreationsSelector] = useState(false);
   const [creationsLoaded, setCreationsLoaded] = useState(false);
+  // Échec du chargement : le message peut partir sans création choisie (sinon bloqué)
+  const [creationsError, setCreationsError] = useState(false);
+  const [creationsAttempt, setCreationsAttempt] = useState(0);
 
   // Pré-remplir nom/email quand la session arrive, sans écraser une saisie manuelle
   useEffect(() => {
@@ -57,21 +60,26 @@ function ContactForm() {
 
     const loadCreations = async () => {
       setLoadingCreations(true);
+      setCreationsError(false);
       try {
         const res = await fetch("/api/creations");
-        if (res.ok) {
-          const data = await res.json();
-          setCreations(data);
-          setCreationsLoaded(true);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error("Réponse inattendue");
+        setCreations(data);
+        setCreationsLoaded(true);
       } catch (error) {
         console.error("Erreur lors du chargement des créations:", error);
+        setCreationsError(true);
       } finally {
         setLoadingCreations(false);
       }
     };
     loadCreations();
-  }, [showCreationsSelector, creationsLoaded]);
+  }, [showCreationsSelector, creationsLoaded, creationsAttempt]);
+
+  // Choisir une création n'est exigé que si la liste a pu être affichée
+  const creationRequired = showCreationsSelector && creations.length > 0;
 
   // Initialiser la sélection si creationId est présent dans l'URL
   useEffect(() => {
@@ -131,7 +139,8 @@ function ContactForm() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        // Réponse d'erreur pas forcément en JSON (page d'erreur de la plateforme)
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Erreur lors de l'envoi");
       }
 
@@ -224,11 +233,23 @@ function ContactForm() {
               <div className="space-y-2">
                 <label className="text-xs font-medium text-slate-700">
                   {form.subject === "Commander un article identique" || form.subject === "Question sur une création"
-                    ? "Sélectionnez une création *"
-                    : "Sélectionnez une ou plusieurs créations *"}
+                    ? "Sélectionnez une création"
+                    : "Sélectionnez une ou plusieurs créations"}
+                  {creationRequired && " *"}
                 </label>
                 {loadingCreations ? (
                   <p className="text-sm text-slate-500">Chargement des créations...</p>
+                ) : creationsError ? (
+                  <p className="text-sm text-slate-500">
+                    Impossible d&apos;afficher les créations pour le moment : précisez l&apos;article dans votre message.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setCreationsAttempt((n) => n + 1)}
+                      className="font-medium text-slate-700 underline cursor-pointer"
+                    >
+                      Réessayer
+                    </button>
+                  </p>
                 ) : creations.length === 0 ? (
                   <p className="text-sm text-slate-500">Aucune création disponible.</p>
                 ) : (
@@ -354,7 +375,7 @@ function ContactForm() {
             <div className="flex gap-2 pt-2">
               <Button 
                 type="submit" 
-                disabled={loading || (showCreationsSelector && selectedCreationIds.length === 0)} 
+                disabled={loading || (creationRequired && selectedCreationIds.length === 0)} 
                 className="cursor-pointer"
               >
                 {loading ? "Envoi..." : "📧 Envoyer le message"}

@@ -394,6 +394,17 @@ describe("PATCH /api/creations/[id]", () => {
     expect((await patch(c._id.toString(), { description: "x" })).status).toBe(404);
   });
 
+  it("applique les validateurs du schéma : valeur négative ou non convertible → 400", async () => {
+    const c = await createCreation({ weight: 80 });
+    asAdmin();
+    for (const body of [{ weight: -5 }, { yarnPrice: -1 }, { weight: "lourd" }]) {
+      const { status, body: res } = await readJson(await patch(c._id.toString(), body));
+      expect(status).toBe(400);
+      expect(res.error).toBe("Données invalides");
+    }
+    expect((await fresh(c._id)).weight).toBe(80);
+  });
+
   it("répond 500 sur un corps JSON invalide", async () => {
     const c = await createCreation();
     asAdmin();
