@@ -42,18 +42,18 @@ function withTransformations(url: string, transformations: string): string | nul
   return `${parts[0]}/upload/${transformations}/${segments.join('/')}`;
 }
 
-export const OG_IMAGE_WIDTH = 1200;
-export const OG_IMAGE_HEIGHT = 630;
+/** Plus grand côté de l'image de partage d'une fiche. */
+export const OG_PHOTO_MAX = 1200;
 
 /**
- * Image de partage (Open Graph) recadrée par Cloudinary au format 1200×630 annoncé, en JPEG
- * (les robots des réseaux sociaux ne lisent pas tous l'AVIF/WebP). null si l'image n'est
- * pas sur Cloudinary : ses dimensions réelles sont alors inconnues.
+ * Image de partage (Open Graph) d'une fiche : la photo entière, sans recadrage, réduite à
+ * 1200 px au plus et en JPEG (les robots des réseaux sociaux ne lisent pas tous
+ * l'AVIF/WebP). Comme Shopify ou Etsy : WhatsApp, Messenger et iMessage montrent l'article
+ * en entier, le fil Facebook recadre lui-même son grand aperçu. Un recadrage paysage
+ * (1200×630) ou carré coupait le bonnet, les photos étant en portrait. Dimensions propres
+ * à chaque photo, donc non annoncées. null si l'image n'est pas sur Cloudinary.
  */
 export function cloudinaryOgImageUrl(url: string): string | null {
   if (!url || !url.includes('cloudinary.com')) return null;
-  return withTransformations(
-    url,
-    `c_fill,g_auto,w_${OG_IMAGE_WIDTH},h_${OG_IMAGE_HEIGHT},f_jpg,q_80`
-  );
+  return withTransformations(url, `c_limit,w_${OG_PHOTO_MAX},h_${OG_PHOTO_MAX},f_jpg,q_80`);
 }
