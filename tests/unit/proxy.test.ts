@@ -12,12 +12,6 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBe("http://localhost:3000/");
   });
 
-  it("interdit l'indexation des polices", () => {
-    const res = run("/fonts/inter.css");
-    expect(passesThrough(res)).toBe(true);
-    expect(res.headers.get("x-robots-tag")).toBe("noindex, nofollow");
-  });
-
   it("laisse passer les autres pages sans en-tête particulier", () => {
     const res = run("/creations/bonnet-rouge");
     expect(passesThrough(res)).toBe(true);
@@ -30,5 +24,7 @@ describe("proxy", () => {
     expect(matcher.test("/_next/static/chunk.js")).toBe(false);
     expect(matcher.test("/images/logo.png")).toBe(false);
     expect(matcher.test("/favicon.ico")).toBe(false);
+    // D'où l'en-tête X-Robots-Tag des polices posé dans next.config.js
+    expect(matcher.test("/fonts/ClashDisplay-Variable.ttf")).toBe(false);
   });
 });

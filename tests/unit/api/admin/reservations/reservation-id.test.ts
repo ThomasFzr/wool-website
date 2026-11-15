@@ -97,7 +97,55 @@ describe("PATCH /api/admin/reservations/[id]", () => {
     const { body } = await readJson(await patch(reservation.id, { status: "shipped" }));
     expect(body.status).toBe("shipped");
     expect(new Date(body.shippedAt).getTime()).toBeGreaterThanOrEqual(before - 1000);
-    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  describe("expédition", () => {
+    it("prévient l'acheteur (et pas la vendeuse) avec le numéro de suivi échappé", async () => {
+      const { reservation } = await orderFixture({ status: "validated" });
+      asAdmin();
+      await patch(reservation.id, { status: "shipped", trackingNumber: "6A<b>12" });
+      const [email] = emailsTo("client@example.com");
+      expect(email.subject).toBe("📦 Votre commande a été expédiée");
+      expect(email.html).toContain("Numéro de suivi");
+      expect(email.html).toContain("6A&lt;b&gt;12");
+      expect(email.html).toContain("Alice &lt;script&gt;");
+      expect(email.html).toContain("Pull &lt;b&gt;");
+      expect(email.html).toContain("https://boutique.test/account/orders");
+      expect(emailsTo("vendeuse@example.com")).toHaveLength(0);
+    });
+
+    it("omet le bloc de suivi sans numéro", async () => {
+      const { reservation } = await orderFixture({ status: "validated" });
+      asAdmin();
+      await patch(reservation.id, { status: "shipped" });
+      const [email] = emailsTo("client@example.com");
+      expect(email.html).not.toContain("Numéro de suivi");
+    });
+
+    it("ne renvoie pas l'email au retour « en cours de livraison » → « expédiée » ni sans changement", async () => {
+      const back = await orderFixture({ status: "in_transit", shippedAt: new Date("2026-11-01") });
+      const same = await orderFixture({ status: "shipped" });
+      asAdmin();
+      await patch(back.reservation.id, { status: "shipped" });
+      await patch(same.reservation.id, { status: "shipped" });
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it("respecte la préférence de l'acheteur", async () => {
+      await createUser({ email: "client@example.com", emailNotifications: false });
+      const { reservation } = await orderFixture({ status: "validated" });
+      asAdmin();
+      await patch(reservation.id, { status: "shipped", trackingNumber: "6A1" });
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it("réussit même si l'envoi échoue", async () => {
+      const { reservation } = await orderFixture({ status: "validated" });
+      vi.mocked(sendEmail).mockRejectedValueOnce(new Error("resend down"));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      asAdmin();
+      expect((await patch(reservation.id, { status: "shipped" })).status).toBe(200);
+    });
   });
 
   it("conserve la date d'expédition fournie", async () => {
@@ -361,6 +409,13 @@ describe("PATCH /api/admin/reservations/[id]", () => {
       // Un article déjà annulé n'est pas rouvert ; les autres commandes ne bougent pas
       expect(await statusOf(c.reservation._id)).toBe("cancelled");
       expect(await statusOf(other.reservation._id)).toBe("preparing");
+      // Un seul email d'expédition listant les deux articles, avec le suivi
+      const emails = emailsTo("client@example.com");
+      expect(emails).toHaveLength(1);
+      expect(emails[0].html).toContain("Bonnet");
+      expect(emails[0].html).toContain("Snood");
+      expect(emails[0].html).not.toContain("Bandeau");
+      expect(emails[0].html).toContain("6A1");
     });
 
     it("valide la commande avec un seul email listant tous les articles", async () => {

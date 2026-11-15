@@ -1,8 +1,7 @@
 import { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/site';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://maillemum.fr';
-
   return {
     rules: [
       {
@@ -10,8 +9,11 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
         disallow: [
           '/api/',
-          '/admin/',
-          '/account/',
+          // Sans slash final : bloque aussi /admin, /account… eux-mêmes
+          '/admin',
+          '/account',
+          '/cart',
+          '/checkout',
           '/login',
           '/forgot-password',
           '/reset-password',
@@ -21,6 +23,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }

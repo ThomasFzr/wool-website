@@ -5,6 +5,7 @@ import type { JWT } from "next-auth/jwt";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
+import { resetAccountCheckCache } from "@/lib/account-check";
 
 // Les callbacks et authorize sont appelés directement : on teste notre logique, pas next-auth.
 const callbacks = authOptions.callbacks!;
@@ -26,6 +27,7 @@ const errorSpy = () => vi.spyOn(console, "error").mockImplementation(() => {});
 describe("authOptions", () => {
   beforeEach(async () => {
     await connectToDatabase();
+    resetAccountCheckCache();
   });
 
   it("déclare Google et Credentials, une session JWT et la page de login", () => {
@@ -299,6 +301,26 @@ describe("authOptions", () => {
       const token = await jwt({ token: { email: "client@example.com", authAt: Date.now() } });
       expect(token.userId).toBe(dbUser._id.toString());
       expect(token.roleCheckedAt).toBeTypeOf("number");
+    });
+
+    it("ne relit pas la base à chaque rendu serveur d'un token périmé (cookie non réécrit)", async () => {
+      await User.create({ email: "client@example.com", role: "user" });
+      const spy = vi.spyOn(User, "findOne");
+      const stale = { email: "client@example.com", role: "user" as const, roleCheckedAt: Date.now() - 6 * 60 * 1000 };
+      const first = await jwt({ token: { ...stale } });
+      const second = await jwt({ token: { ...stale } });
+      expect(spy).toHaveBeenCalledTimes(1);
+      // Date de la lecture réellement faite : le délai de prise en compte n'est pas prolongé
+      expect(second.roleCheckedAt).toBe(first.roleCheckedAt);
+    });
+
+    it("relit la base sur trigger update malgré une vérification récente en cache", async () => {
+      await User.create({ email: "promu@example.com", role: "user" });
+      const stale = { email: "promu@example.com", role: "user" as const, roleCheckedAt: 0 };
+      await jwt({ token: { ...stale } });
+      await User.updateOne({ email: "promu@example.com" }, { role: "admin" });
+      expect((await jwt({ token: { ...stale } })).role).toBe("user");
+      expect((await jwt({ token: { ...stale }, trigger: "update" })).role).toBe("admin");
     });
 
     it("ne revérifie pas sans email dans le token", async () => {

@@ -1,6 +1,10 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { Metadata } from "next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { NOINDEX } from "@/lib/site";
+
+export const metadata: Metadata = { robots: NOINDEX };
 
 export default async function AdminLayout({
   children,

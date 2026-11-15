@@ -153,7 +153,9 @@ export function CreationDetail({ creation }: CreationDetailProps) {
     return () => { document.body.style.overflow = "unset"; };
   }, [isModalOpen]);
 
-  // Gestion Clavier
+  // Gestion Clavier. Dépend aussi de isModalOpen : sinon, juste après l'ouverture, le
+  // gestionnaire gardait l'ancien changeImage (visionneuse « fermée ») et la première flèche
+  // changeait l'index sans faire défiler la visionneuse.
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "ArrowRight") changeImage(currentIndex + 1);
@@ -162,7 +164,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [currentIndex]);
+  }, [currentIndex, isModalOpen, images]);
 
   // Scroll Sync Mobile
   useEffect(() => {
@@ -319,6 +321,11 @@ export function CreationDetail({ creation }: CreationDetailProps) {
   const scrollRelatedCreations = (direction: 'left' | 'right') => { if (!relatedCreationsScrollRef.current) return; const scrollAmount = 300; const currentScroll = relatedCreationsScrollRef.current.scrollLeft; relatedCreationsScrollRef.current.scrollTo({ left: direction === 'left' ? currentScroll - scrollAmount : currentScroll + scrollAmount, behavior: 'smooth' }); };
   useEffect(() => { const scrollContainer = relatedCreationsScrollRef.current; if (scrollContainer) { checkScrollButtons(); scrollContainer.addEventListener('scroll', checkScrollButtons); window.addEventListener('resize', checkScrollButtons); return () => { scrollContainer.removeEventListener('scroll', checkScrollButtons); window.removeEventListener('resize', checkScrollButtons); }; } }, [creation.relatedCreations]);
 
+  // Flèches du carrousel « Vous pourriez aussi aimer » : visibles au survol (souris), sinon
+  // ni visibles ni cliquables (on faisait défiler en touchant une zone vide). Au clavier,
+  // focus-visible les réaffiche.
+  const relatedArrowsVisibility = isHoveringRelated ? "opacity-100" : "opacity-0 pointer-events-none";
+
   const currentImageUrl = images[currentIndex]
     ? optimizeCloudinaryUrl(images[currentIndex], { width: 800, quality: 80, format: 'auto' })
     : undefined;
@@ -336,9 +343,9 @@ export function CreationDetail({ creation }: CreationDetailProps) {
           {/* Miniatures Desktop */}
           {images.length > 1 && (
             <div className="hidden md:flex md:flex-col md:w-24 relative items-center justify-center">
-               {images.length > 4 && <button onClick={scrollThumbnailsUp} disabled={thumbnailScroll === 0} className="mb-1 rounded-full bg-white/90 p-1.5 shadow-lg hover:bg-white cursor-pointer disabled:opacity-50"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg></button>}
-              <div className="flex flex-col gap-1.5 overflow-hidden px-1 py-1" style={{ height: '318px' }}><div className="flex flex-col gap-1.5 transition-transform duration-300" style={{ transform: `translateY(-${thumbnailScroll * 77.5}px)` }}>{images.map((img, idx) => (<button key={idx} onClick={() => { interactionSourceRef.current = 'select'; setCurrentIndex(idx); }} className={`aspect-square overflow-hidden rounded-lg cursor-pointer transition-all ${idx === currentIndex ? "ring-2 ring-slate-900 opacity-100" : "ring-1 ring-slate-300 opacity-60 hover:opacity-100"}`} style={{ width: '76px', height: '76px', flexShrink: 0 }}><img src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })} alt={`Miniature ${idx + 1}`} title={`${creation.title} - Miniature ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" /></button>))}</div></div>
-              {images.length > 4 && <button onClick={scrollThumbnailsDown} disabled={thumbnailScroll >= images.length - 4} className="mt-1 rounded-full bg-white/90 p-1.5 shadow-lg hover:bg-white cursor-pointer disabled:opacity-50"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></button>}
+               {images.length > 4 && <button type="button" aria-label="Miniatures précédentes" onClick={scrollThumbnailsUp} disabled={thumbnailScroll === 0} className="mb-1 rounded-full bg-white/90 p-1.5 shadow-lg hover:bg-white cursor-pointer disabled:opacity-50"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg></button>}
+              <div className="flex flex-col gap-1.5 overflow-hidden px-1 py-1" style={{ height: '318px' }}><div className="flex flex-col gap-1.5 transition-transform duration-300" style={{ transform: `translateY(-${thumbnailScroll * 77.5}px)` }}>{images.map((img, idx) => (<button key={idx} type="button" aria-label={`Afficher la photo ${idx + 1}`} aria-current={idx === currentIndex} onClick={() => { interactionSourceRef.current = 'select'; setCurrentIndex(idx); }} className={`aspect-square overflow-hidden rounded-lg cursor-pointer transition-all ${idx === currentIndex ? "ring-2 ring-slate-900 opacity-100" : "ring-1 ring-slate-300 opacity-60 hover:opacity-100"}`} style={{ width: '76px', height: '76px', flexShrink: 0 }}><img src={optimizeCloudinaryUrl(img, { width: 200, quality: 70, format: 'auto' })} alt={`Miniature ${idx + 1}`} title={`${creation.title} - Miniature ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" /></button>))}</div></div>
+              {images.length > 4 && <button type="button" aria-label="Miniatures suivantes" onClick={scrollThumbnailsDown} disabled={thumbnailScroll >= images.length - 4} className="mt-1 rounded-full bg-white/90 p-1.5 shadow-lg hover:bg-white cursor-pointer disabled:opacity-50"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></button>}
             </div>
           )}
 
@@ -352,6 +359,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 className="md:hidden flex h-full w-full overflow-x-auto scrollbar-hide snap-x snap-mandatory"
                 style={{ touchAction: 'pan-x pan-y' }}
               >
+                {images.length === 0 && <div className="flex h-full w-full items-center justify-center text-slate-400">Pas d&apos;image</div>}
                 {images.map((img, idx) => (
                     <div key={idx} className="relative h-full w-full shrink-0 snap-center flex items-center justify-center cursor-pointer" onClick={openModal}>
                       <img src={optimizeCloudinaryUrl(img, { width: 800, quality: 80, format: 'auto' })} alt={`Image ${idx + 1}`} title={`${creation.title} - Image ${idx + 1}`} className="h-full w-full object-contain" draggable={false} loading={idx === 0 ? "eager" : "lazy"} />
@@ -391,9 +399,9 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
             </div>
 
-            {/* LOUPE FIXE */}
+            {/* LOUPE FIXE (rien à agrandir sans photo) */}
             {/* z-20 pour être au-dessus des zones de navigation */}
-            <button 
+            {images.length > 0 && <button 
                 onClick={(e) => { e.stopPropagation(); openModal(); }} 
                 className="absolute bottom-12 right-4 md:bottom-4 md:right-4 z-20 cursor-pointer transition-transform hover:scale-110 active:scale-95"
                 aria-label="Ouvrir le zoom"
@@ -401,7 +409,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
                 <div className="bg-black/50 hover:bg-black/70 p-2.5 rounded-full text-white backdrop-blur-sm shadow-sm transition-colors">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
                 </div>
-            </button>
+            </button>}
 
             {/* Indicateurs Mobile */}
              {images.length > 1 && (
@@ -421,7 +429,7 @@ export function CreationDetail({ creation }: CreationDetailProps) {
 
       <div className="mt-8 md:mt-12 max-w-4xl"><Accordion items={[{ title: "Description", content: creation.seoDescription || creation.description || "Aucune description disponible.", renderAsHtml: !!creation.seoDescription }, ...(creation.description && creation.description !== creation.seoDescription ? [{ title: "Composition", content: creation.description, renderAsHtml: false }] : [])]} defaultOpen={0} /></div>
 
-      {creation.relatedCreations && creation.relatedCreations.length > 0 && <div className="mt-12 md:mt-16 relative" onMouseEnter={() => setIsHoveringRelated(true)} onMouseLeave={() => setIsHoveringRelated(false)}><h2 className="text-2xl font-bold text-slate-900 mb-6">Vous pourriez aussi aimer</h2><div className="relative -mx-4 px-4">{canScrollLeft && <button onClick={() => scrollRelatedCreations('left')} className={`absolute left-6 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white transition-opacity duration-200 ${isHoveringRelated ? 'opacity-100' : 'opacity-0'}`}><svg className="h-5 w-5 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>}{canScrollRight && <button onClick={() => scrollRelatedCreations('right')} className={`absolute right-6 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white transition-opacity duration-200 ${isHoveringRelated ? 'opacity-100' : 'opacity-0'}`}><svg className="h-5 w-5 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>}<div ref={relatedCreationsScrollRef} className="overflow-x-auto scrollbar-hide"><div className="flex gap-6 pb-2">{creation.relatedCreations.map((relatedCreation) => (<div key={relatedCreation._id} className="shrink-0 w-64 md:w-72"><CreationCard creation={{ ...relatedCreation, type: relatedCreation.type as "bonnet" | "tour de cou" | "bandeau" | undefined }} priority={false} /></div>))}</div></div></div></div>}
+      {creation.relatedCreations && creation.relatedCreations.length > 0 && <div className="mt-12 md:mt-16 relative" onMouseEnter={() => setIsHoveringRelated(true)} onMouseLeave={() => setIsHoveringRelated(false)}><h2 className="text-2xl font-bold text-slate-900 mb-6">Vous pourriez aussi aimer</h2><div className="relative -mx-4 px-4">{canScrollLeft && <button type="button" aria-label="Créations précédentes" onClick={() => scrollRelatedCreations('left')} className={`absolute left-6 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white transition-opacity duration-200 focus-visible:opacity-100 focus-visible:pointer-events-auto ${relatedArrowsVisibility}`}><svg className="h-5 w-5 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>}{canScrollRight && <button type="button" aria-label="Créations suivantes" onClick={() => scrollRelatedCreations('right')} className={`absolute right-6 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 p-2 shadow-lg hover:bg-white transition-opacity duration-200 focus-visible:opacity-100 focus-visible:pointer-events-auto ${relatedArrowsVisibility}`}><svg className="h-5 w-5 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>}<div ref={relatedCreationsScrollRef} className="overflow-x-auto scrollbar-hide"><div className="flex gap-6 pb-2">{creation.relatedCreations.map((relatedCreation) => (<div key={relatedCreation._id} className="shrink-0 w-64 md:w-72"><CreationCard creation={{ ...relatedCreation, type: relatedCreation.type as "bonnet" | "tour de cou" | "bandeau" | undefined }} priority={false} /></div>))}</div></div></div></div>}
 
       {/* --- MODALE FULLSCREEN --- */}
       {isModalOpen && (

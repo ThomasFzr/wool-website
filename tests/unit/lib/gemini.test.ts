@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { generateProductDescription } from "@/lib/gemini";
+import { GEMINI_MAX_OUTPUT_TOKENS, GEMINI_TIMEOUT_MS, generateProductDescription } from "@/lib/gemini";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/prompts";
 import { connectToDatabase } from "@/lib/db";
 import Settings from "@/models/Settings";
 
 const gemini = vi.hoisted(() => ({
   generateContent: vi.fn(),
+  getGenerativeModel: vi.fn(),
   GoogleGenerativeAI: vi.fn(),
 }));
 
@@ -18,7 +19,8 @@ describe("generateProductDescription", () => {
     await connectToDatabase();
     vi.stubEnv("GEMINI_API_KEY", "gemini-key");
     gemini.GoogleGenerativeAI.mockImplementation(function () {
-      return { getGenerativeModel: () => ({ generateContent: gemini.generateContent }) };
+      gemini.getGenerativeModel.mockReturnValue({ generateContent: gemini.generateContent });
+      return { getGenerativeModel: gemini.getGenerativeModel };
     });
     gemini.generateContent.mockResolvedValue({ response: { text: () => "<p>Un joli bonnet</p>" } });
   });
@@ -39,6 +41,15 @@ describe("generateProductDescription", () => {
     expect(sentPrompt()).toContain("- Matière : laine");
     expect(sentPrompt()).toContain("- Prix : 35€");
     expect(sentPrompt()).toContain(DEFAULT_SYSTEM_PROMPT);
+  });
+
+  it("borne la durée de l'appel et la longueur de la réponse", async () => {
+    await generateProductDescription(product);
+    expect(gemini.getGenerativeModel).toHaveBeenCalledWith(
+      { model: "gemini-2.5-flash", generationConfig: { maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS } },
+      { timeout: GEMINI_TIMEOUT_MS }
+    );
+    expect(GEMINI_TIMEOUT_MS).toBe(30_000);
   });
 
   it("signale les caractéristiques manquantes", async () => {

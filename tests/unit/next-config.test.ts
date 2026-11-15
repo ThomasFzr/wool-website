@@ -9,7 +9,8 @@ async function cspFor(env: Record<string, string>) {
   const path = require.resolve("../../next.config.js");
   delete require.cache[path];
   const config = require(path);
-  const [{ headers }] = await config.headers();
+  const rules = await config.headers();
+  const { headers } = rules.find((r: { source: string }) => r.source === "/(.*)");
   return headers.find((h: { key: string }) => h.key === "Content-Security-Policy").value as string;
 }
 
@@ -37,5 +38,15 @@ describe("Content-Security-Policy (next.config.js)", () => {
     const csp = await cspFor({ NODE_ENV: "production", VERCEL_ENV: "preview" });
     expect(csp).toContain("script-src 'self' 'unsafe-inline' https://vercel.live");
     expect(csp).toContain("frame-src https://vercel.live");
+  });
+});
+
+describe("en-têtes (next.config.js)", () => {
+  it("interdit l'indexation des fichiers de polices", async () => {
+    const path = require.resolve("../../next.config.js");
+    delete require.cache[path];
+    const rules = await require(path).headers();
+    const fonts = rules.find((r: { source: string }) => r.source === "/fonts/:path*");
+    expect(fonts.headers).toEqual([{ key: "X-Robots-Tag", value: "noindex, nofollow" }]);
   });
 });

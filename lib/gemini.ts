@@ -3,6 +3,9 @@ import { connectToDatabase } from "@/lib/db";
 import Settings from "@/models/Settings";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/prompts";
 
+export const GEMINI_TIMEOUT_MS = 30_000;
+export const GEMINI_MAX_OUTPUT_TOKENS = 4096;
+
 async function getSystemPrompt(): Promise<string> {
   try {
     await connectToDatabase();
@@ -28,7 +31,16 @@ export async function generateProductDescription(data: {
 
   const systemPrompt = await getSystemPrompt();
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel(
+    {
+      model: "gemini-2.5-flash",
+      // Borne la longueur (et le coût) de la réponse. Sur gemini-2.5 la réflexion du modèle
+      // compte dans cette limite : large marge pour une description de quelques paragraphes.
+      generationConfig: { maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS },
+    },
+    // Sans délai, un appel bloqué occupait la fonction jusqu'à sa limite d'exécution
+    { timeout: GEMINI_TIMEOUT_MS }
+  );
 
   const userPrompt = `Génère une description pour un produit avec les caractéristiques suivantes :
 - Type : ${data.type || "non spécifié"}

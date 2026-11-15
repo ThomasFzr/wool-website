@@ -6,6 +6,8 @@ import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
 import { findRenamedSlug } from "@/lib/slug";
 import { sanitizeDescriptionHtml } from "@/lib/sanitize";
+import { cloudinaryOgImageUrl, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH } from "@/lib/imageOptimizer";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { Header } from "@/components/Header";
 import { CreationDetail } from "./CreationDetail";
 
@@ -183,8 +185,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? [creation.imageUrl] 
       : [];
 
-  const imageUrl = images[0] || '/images/og-image.jpg';
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://maillemum.fr';
+  // Photo recadrée à 1200×630 par Cloudinary ; sinon l'image par défaut du site (même format).
+  // Une photo hors Cloudinary garde ses dimensions réelles, inconnues : on ne les annonce pas.
+  const croppedPhoto = images[0] ? cloudinaryOgImageUrl(images[0]) : null;
+  const ogImage: { url: string; width?: number; height?: number } =
+    croppedPhoto || !images[0]
+      ? { url: croppedPhoto ?? '/images/og-image.jpg', width: OG_IMAGE_WIDTH, height: OG_IMAGE_HEIGHT }
+      : { url: images[0] };
 
   // Utiliser seoDescription si disponible, sinon description, sinon description par défaut
   const rawDescription = creation.seoDescription || creation.description;
@@ -211,21 +218,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: metaDescription,
       type: "website",
       locale: "fr_FR",
-      url: `${baseUrl}/creations/${creation.slug || id}`,
-      images: [
-        {
-          url: imageUrl,
-          width: 1200,
-          height: 630,
-          alt: creation.title,
-        },
-      ],
+      siteName: SITE_NAME,
+      url: `${SITE_URL}/creations/${creation.slug || id}`,
+      images: [{ ...ogImage, alt: creation.title }],
     },
     twitter: {
       card: "summary_large_image",
       title: pageTitle,
       description: metaDescription,
-      images: [imageUrl],
+      images: [ogImage.url],
     },
     robots: {
       index: true,

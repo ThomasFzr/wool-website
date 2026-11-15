@@ -153,12 +153,19 @@ describe("PATCH /api/admin/users/[id]", () => {
     expect(body.error).toBe("Cet email est déjà utilisé");
   });
 
-  it("refuse son propre email écrit avec une autre casse", async () => {
-    // BUG: la comparaison `email !== user.email` est sensible à la casse alors que la
-    // recherche Mongo (schéma lowercase) ne l'est pas : l'utilisateur se trouve lui-même.
+  it("accepte son propre email écrit avec une autre casse", async () => {
     const user = await createUser();
     asAdmin();
     const { status, body } = await readJson(await patch(user.id, { email: "Client@Example.com" }));
+    expect(status).toBe(200);
+    expect(body.email).toBe("client@example.com");
+  });
+
+  it("refuse l'email d'un autre compte écrit avec une autre casse", async () => {
+    const user = await createUser();
+    await createUser({ email: "autre@example.com" });
+    asAdmin();
+    const { status, body } = await readJson(await patch(user.id, { email: " Autre@Example.com" }));
     expect(status).toBe(400);
     expect(body.error).toBe("Cet email est déjà utilisé");
   });
@@ -209,12 +216,13 @@ describe("PATCH /api/admin/users/[id]", () => {
     expect(body).toMatchObject({ name: "Inchangé", role: "user", emailNotifications: true });
   });
 
-  it("accepte un rôle hors liste car les validateurs sont désactivés", async () => {
-    // BUG: runValidators: false et aucun contrôle du rôle : un rôle invalide est enregistré.
+  it("refuse un rôle hors liste (validateurs du schéma actifs)", async () => {
     const user = await createUser();
     asAdmin();
-    const { body } = await readJson(await patch(user.id, { role: "superadmin" }));
-    expect(body.role).toBe("superadmin");
+    const { status, body } = await readJson(await patch(user.id, { role: "superadmin" }));
+    expect(status).toBe(400);
+    expect(body.error).toBe("Données invalides");
+    expect((await User.findById(user.id))!.role).toBe("user");
   });
 
   it("refuse un nouveau mot de passe trop court", async () => {
@@ -241,10 +249,17 @@ describe("PATCH /api/admin/users/[id]", () => {
     expect(await bcrypt.compare("nouveau-secret", stored!.password!)).toBe(true);
   });
 
-  it("répond 500 pour un identifiant invalide", async () => {
+  it("répond 404 pour un identifiant mal formé", async () => {
+    asAdmin();
+    expect((await patch("pas-un-id", { name: "X" })).status).toBe(404);
+  });
+
+  it("répond 500 si la base échoue", async () => {
+    const user = await createUser();
     asAdmin();
     vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await patch("pas-un-id", { name: "X" })).status).toBe(500);
+    vi.spyOn(User, "findByIdAndUpdate").mockRejectedValueOnce(new Error("db down"));
+    expect((await patch(user.id, { name: "X" })).status).toBe(500);
   });
 });
 

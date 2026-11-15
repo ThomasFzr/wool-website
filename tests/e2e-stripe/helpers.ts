@@ -1,4 +1,4 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Frame, type Locator, type Page } from "@playwright/test";
 import Stripe from "stripe";
 import { STRIPE_E2E_CONTROL_URL, TEST_CARDS } from "./data";
 import { readStripeTestKey } from "./stripe-key";
@@ -63,9 +63,27 @@ export async function goToStripe(page: Page, mode: "shipping" | "pickup" = "ship
   await page.waitForURL(/checkout\.stripe\.com/);
 }
 
-async function fillIfVisible(page: Page, selector: string, value: string) {
-  const field = page.locator(selector);
+async function fillIfVisible(field: Locator, value: string) {
   if (await field.isVisible().catch(() => false)) await field.fill(value);
+}
+
+/**
+ * Frame qui contient le formulaire de paiement. Depuis novembre 2026, Stripe Checkout
+ * l'affiche dans une iframe (`__privateStripeFrame…`) et non plus dans la page : les champs
+ * sont repérés par leur libellé (page en français), plus par leurs anciens identifiants.
+ */
+export async function checkoutForm(page: Page): Promise<Frame> {
+  let found: Frame | undefined;
+  await expect(async () => {
+    for (const frame of page.frames()) {
+      if (await frame.getByRole("textbox", { name: "Numéro de carte" }).isVisible().catch(() => false)) {
+        found = frame;
+        return;
+      }
+    }
+    throw new Error("Formulaire Stripe pas encore affiché");
+  }).toPass({ timeout: 60_000 });
+  return found!;
 }
 
 /** Remplit la vraie page Stripe Checkout (mode test) et valide le paiement. */
@@ -73,25 +91,32 @@ export async function payOnStripe(
   page: Page,
   { card = TEST_CARDS.success, shipping = true }: { card?: string; shipping?: boolean } = {}
 ) {
-  await page.locator("#cardNumber").waitFor();
+  const form = await checkoutForm(page);
   if (shipping) {
-    await fillIfVisible(page, "#shippingName", "Camille Client");
-    const country = page.locator("#shippingCountry");
+    const address = form.getByRole("group", { name: "Livraison" });
+    await fillIfVisible(address.getByRole("textbox", { name: "Nom complet" }), "Camille Client");
+    const country = address.getByRole("combobox", { name: "Pays ou région" });
     if (await country.isVisible().catch(() => false)) await country.selectOption("FR");
-    await fillIfVisible(page, "#shippingAddressLine1", "12 rue des Lilas");
-    // L'autocomplétion d'adresse peut ouvrir une liste : on la referme
-    await page.keyboard.press("Escape");
-    await fillIfVisible(page, "#shippingPostalCode", "75011");
-    await fillIfVisible(page, "#shippingLocality", "Paris");
+    await fillIfVisible(address.getByRole("combobox", { name: "Adresse" }), "12 rue des Lilas");
+    // Selon le moment, Stripe ouvre une liste de suggestions (on prend celle de Paris) ou
+    // affiche directement code postal et ville
+    const postalCode = address.getByRole("textbox", { name: "Code postal" });
+    await expect(async () => {
+      const suggestion = address.getByRole("option", { name: /Lilas, Paris/ });
+      if (await suggestion.isVisible().catch(() => false)) await suggestion.click();
+      await expect(postalCode).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 30_000 });
+    await postalCode.fill("75011");
+    await address.getByRole("textbox", { name: "Ville" }).fill("Paris");
   }
-  await page.locator("#cardNumber").fill(card);
-  await page.locator("#cardExpiry").fill("12 / 34");
-  await page.locator("#cardCvc").fill("123");
-  await fillIfVisible(page, "#billingName", "Camille Client");
+  await form.getByRole("textbox", { name: "Numéro de carte" }).fill(card);
+  await form.getByRole("textbox", { name: /expiration/i }).fill("12 / 34");
+  await form.getByRole("textbox", { name: /CVC|cryptogramme|sécurité/i }).fill("123");
+  await fillIfVisible(form.getByRole("textbox", { name: /titulaire/i }), "Camille Client");
   // Pas d'inscription à Link (case parfois cochée par défaut)
-  const link = page.locator("#enableStripePass");
+  const link = form.getByRole("checkbox", { name: /enregistrer mes informations/i });
   if (await link.isChecked().catch(() => false)) await link.uncheck();
-  await page.getByTestId("hosted-payment-submit-button").click();
+  await form.getByRole("button", { name: "Payer", exact: true }).click();
 }
 
 /** Valide le défi 3D Secure de la carte de test 4000 0025 0000 3155. */

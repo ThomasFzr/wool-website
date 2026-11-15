@@ -224,6 +224,8 @@ describe("useImageUpload — réordonnancement tactile", () => {
     ["élément hors d'un conteneur", () => container(null)],
     ["même index", () => container("0")],
     ["index négatif", () => container("-1")],
+    ["index au-delà de la liste", () => container("10")],
+    ["index non numérique", () => container("abc")],
   ])("ne réordonne pas : %s", async (_label, target) => {
     const { result } = await loadHook();
     const onReorder = vi.fn();
@@ -231,18 +233,6 @@ describe("useImageUpload — réordonnancement tactile", () => {
     act(() => result.current.handleTouchStart(0));
     act(() => result.current.handleTouchMove(touch(), onReorder, images, ids));
     expect(onReorder).not.toHaveBeenCalled();
-  });
-
-  it("accepte un index au-delà de la liste (pas de borne supérieure)", async () => {
-    // BUG: contrairement à useDragAndDrop, aucun contrôle targetIndex < images.length :
-    // un data-image-index hors liste déplace l'image en dernière position.
-    const { result } = await loadHook();
-    const onReorder = vi.fn();
-    elementFromPoint.mockReturnValue(container("10"));
-    act(() => result.current.handleTouchStart(0));
-    act(() => result.current.handleTouchMove(touch(), onReorder, images, ids));
-    expect(onReorder).toHaveBeenCalledWith(["i1", "i2", "i0"], ["p1", "p2", "p0"]);
-    expect(result.current.dragIndex).toBe(10);
   });
 
   it("réinitialise l'index à la fin du toucher", async () => {

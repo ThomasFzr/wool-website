@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { checkAdminAuth } from "@/lib/auth";
+import { isInvalidInput } from "@/lib/validation-error";
 
 /**
  * PATCH /api/admin/users/[id]
@@ -27,7 +29,7 @@ export async function PATCH(
     await connectToDatabase();
 
     const { id } = await params;
-    const user = await User.findById(id);
+    const user = mongoose.isValidObjectId(id) ? await User.findById(id) : null;
     if (!user) {
       return NextResponse.json(
         { error: "Utilisateur non trouvé" },
@@ -35,9 +37,10 @@ export async function PATCH(
       );
     }
 
-    // Vérifier si l'email est déjà utilisé par un autre utilisateur
-    if (email && email !== user.email) {
-      const existingUser = await User.findOne({ email });
+    // Vérifier si l'email est déjà utilisé par un autre utilisateur (le schéma met les
+    // emails en minuscules : on compare de même, et on ignore le compte lui-même)
+    if (email && String(email).trim().toLowerCase() !== user.email) {
+      const existingUser = await User.findOne({ email: String(email).trim().toLowerCase(), _id: { $ne: user._id } });
       if (existingUser) {
         return NextResponse.json(
           { error: "Cet email est déjà utilisé" },
@@ -71,7 +74,8 @@ export async function PATCH(
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { $set: updateData },
-      { new: true, runValidators: false }
+      // Validateurs du schéma actifs : un rôle hors liste ("superadmin"…) est refusé
+      { new: true, runValidators: true }
     );
 
     const userResponse = {
@@ -91,6 +95,9 @@ export async function PATCH(
 
     return NextResponse.json(userResponse);
   } catch (error) {
+    if (isInvalidInput(error)) {
+      return NextResponse.json({ error: "Données invalides" }, { status: 400 });
+    }
     console.error("Erreur PATCH /api/admin/users/[id]:", error);
     return NextResponse.json(
       { error: "Erreur serveur" },

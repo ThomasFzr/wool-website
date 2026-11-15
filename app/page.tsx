@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
 import Settings from "@/models/Settings";
 import { Metadata } from "next";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "MailleMum - Créations tricotées à la main",
@@ -13,6 +14,9 @@ export const metadata: Metadata = {
   openGraph: {
     title: "MailleMum - Créations tricotées à la main",
     description: "Découvrez nos créations tricotées à la main : tours de cou, bandeaux et bonnets faits main avec passion.",
+    // Remplace l'openGraph du layout en entier : siteName et url sont à redonner
+    url: SITE_URL,
+    siteName: SITE_NAME,
     type: "website",
     locale: "fr_FR",
     images: [
