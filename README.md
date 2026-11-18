@@ -183,6 +183,11 @@ Stripe de test et une base MongoDB locale.
 - **Paiement réel (Playwright + Stripe test)** — `tests/e2e-stripe/` : vraie page Stripe
   Checkout, webhooks relayés par la CLI Stripe. Prérequis : `stripe` installée et
   `.env.stripe-test.local` contenant `STRIPE_SECRET_KEY=sk_test_…`.
+- **Bundler des tests e2e** — les deux suites lancent `next dev --webpack` au lieu de Turbopack :
+  contournement temporaire d'un défaut de Next.js 16.4.6 (boucle de rechargements au démarrage à
+  froid), décrit dans la [fiche d'anomalie](docs/anomalies/2026-11-login-csrf.md) et suivi dans le
+  [backlog](docs/BACKLOG.md). Le développement (`npm run dev`) et le build de production
+  restent sur Turbopack.
 - **Intégration continue** — `.github/workflows/tests.yml` lance lint, typecheck, tests unitaires
   et e2e à chaque push et pull request ; le hook `pre-push` lance les mêmes contrôles en local.
   Dependabot surveille les dépendances.

@@ -49,5 +49,18 @@ issue GitHub (le lien sera ajouté ici).
 ## Boucle de rechargements en développement (Turbopack, Next 16.4.6)
 
 - Anomalie ANO-2026-11-02, décrite dans la [fiche d'anomalie](anomalies/2026-11-login-csrf.md#9-anomalie-liée--ano-2026-11-02--boucle-de-rechargements-en-développement).
-- Suivre les versions suivantes de Next.js et retirer le contournement retenu dès qu'une version
-  corrige le défaut.
+- Contournement en place : les serveurs e2e lancent `next dev --webpack`
+  (`tests/e2e/server/start.ts`, `tests/e2e-stripe/server/start.ts`).
+- **À faire :** suivre l'issue ouverte chez Next.js ; dès qu'une version corrige le défaut, la
+  mettre à jour, retirer `--webpack` des deux fichiers, puis relancer `test:e2e` et
+  `test:e2e:stripe` plusieurs fois à froid pour vérifier l'absence de boucle.
+
+## Tests e2e sur build de production (piste)
+
+- **Pourquoi :** tester ce qui est réellement déployé (`next build` + `next start`, Turbopack),
+  sans rechargement à chaud ni double exécution des effets du mode strict.
+- **Obstacle :** deux garde-fous sont volontairement inactifs en production et servent aux tests :
+  la redirection vers le faux Stripe (`lib/stripe.ts`, `STRIPE_API_BASE_URL`) et la capture des
+  emails (`lib/emailOutbox.ts`). Il faudrait les activer par une variable dédiée aux tests, sans
+  risque de l'activer en production (refus si `VERCEL_ENV=production`, par exemple).
+- **Coût :** un build par suite (les variables `NEXT_PUBLIC_*` sont figées au build).

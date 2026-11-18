@@ -8,7 +8,7 @@
 | Composant | Authentification — formulaire de connexion (`app/login/LoginForm.tsx`), next-auth 4 |
 | Gravité | Moyenne : faux message de succès, pas de fuite de données ni d'accès indu |
 | Priorité | Haute : bloque la fusion de la mise à jour de sécurité |
-| Statut | Corrigée (correctif applicatif et tests) — anomalie liée ANO-2026-11-02 en cours (voir § 9) |
+| Statut | Corrigée (correctif applicatif et tests) — anomalie liée ANO-2026-11-02 contournée côté tests (voir § 9) |
 | Branche / commit | `chore/preparation-publication`, commit « fix(login): ne jamais annoncer une connexion sans session réelle » |
 
 ## 1. Contexte
@@ -162,7 +162,14 @@ Pendant l'analyse, une seconde anomalie, indépendante de la connexion, a été 
 - **Cause :** régression de Turbopack dans Next.js 16.4.6, sans correctif disponible à la date de
   la fiche (16.4.6 est la dernière version). Impact limité au développement et aux tests e2e ;
   la production n'utilise pas le rechargement à chaud.
-- **Statut :** analysée ; choix du contournement en attente (voir le compte rendu de la session).
+- **Statut :** contournée côté tests. Les serveurs e2e (`tests/e2e/server/start.ts`,
+  `tests/e2e-stripe/server/start.ts`) lancent `next dev --webpack`. Le développement et le build
+  de production restent sur Turbopack (`npm run build` vérifié). Défaut signalé à l'équipe
+  Next.js ; contournement à retirer dès qu'une version le corrige (`docs/BACKLOG.md`).
+- **Options écartées :** revenir à Next 16.0.7 (failles critiques) ; relancer automatiquement
+  le serveur quand la boucle est détectée (contournement fragile) ; tests sur build de
+  production (piste retenue au backlog, demande d'adapter le faux Stripe et la capture des
+  emails, désactivés en production).
 
 ## 10. Leçons retenues
 
