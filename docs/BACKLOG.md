@@ -55,6 +55,36 @@ issue GitHub (le lien sera ajouté ici).
   mettre à jour, retirer `--webpack` des deux fichiers, puis relancer `test:e2e` et
   `test:e2e:stripe` plusieurs fois à froid pour vérifier l'absence de boucle.
 
+## Fiabiliser test:e2e:stripe
+
+- **Symptômes :** la suite sur le vrai Stripe (`npm run test:e2e:stripe`, mode test) échoue de
+  façon intermittente, sur 1 à 3 tests différents à chaque fois :
+  - après le clic sur « Payer », le retour vers `/checkout/success` n'arrive jamais
+    (`page.waitForURL` dépasse 60 s). Sur la capture, le formulaire Stripe est entièrement
+    rempli, le bouton « Payer » est visible, mais le focus est resté dans le champ « Nom
+    complet » : le clic n'a pas été pris en compte ;
+  - le message « carte refusée » ou le défi 3D Secure n'apparaissent pas (même cause probable) ;
+  - après un remboursement fait depuis Stripe, la pièce n'est pas encore remise en vente quand
+    le test vérifie (webhook `charge.refunded` plus lent que l'attente du test).
+- **Preuve que l'instabilité est antérieure :** mesures du 18/11/2026, chaque exécution sur un
+  serveur démarré à froid :
+
+  | Code testé | Résultats |
+  |---|---|
+  | Branche `chore/preparation-publication` | 7/7, 7/7, 4/7, 5/7 |
+  | `main` (avant la branche) | 5/7 (un échec au retour de paiement, un sur le remboursement) |
+
+  `test:e2e` (faux Stripe) reste stable : 39/39 sur 3 exécutions.
+- **Pistes :**
+  - `payOnStripe` (`tests/e2e-stripe/helpers.ts`) : attendre que le formulaire soit stable
+    (suggestions d'adresse fermées, aucun champ en cours de validation) avant de cliquer sur
+    « Payer » ; vérifier que le paiement démarre (bouton en traitement ou navigation) et
+    recliquer une seule fois sinon ;
+  - remboursement : allonger l'attente sur la base (`waitForDb`) du passage à « remboursée » et
+    de la remise en vente, le webhook `charge.refunded` arrivant parfois plusieurs secondes après.
+- **Critère d'acceptation :** 5 exécutions consécutives à 7/7.
+- **Hors CI :** la suite demande la CLI Stripe et une clé de test ; elle se lance à la main.
+
 ## Tests e2e sur build de production (piste)
 
 - **Pourquoi :** tester ce qui est réellement déployé (`next build` + `next start`, Turbopack),
