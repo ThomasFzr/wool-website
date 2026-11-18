@@ -1,0 +1,36 @@
+# Mises à jour automatiques des dépendances (A06 — composants vulnérables).
+# Les alertes de sécurité sont traitées dès leur publication ; les mises à jour de
+# routine sont regroupées une fois par semaine pour limiter le nombre de pull requests.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+    groups:
+      # Correctifs et mineures de production : une seule PR
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      # Outillage (tests, lint, types) : une seule PR
+      developpement:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # Les montées de version majeure se font à la main (migration à vérifier)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

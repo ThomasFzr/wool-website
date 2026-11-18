@@ -1,12 +1,18 @@
-# Désactivé côté GitHub (gh workflow disable Tests) : Actions est bloqué par le budget à 0 $
-# du compte sur ce dépôt privé. Le hook .githooks/pre-push le remplace en local.
-# Réactiver : gh workflow enable Tests
+# Intégration continue : lint, typecheck, audit des dépendances de production,
+# tests unitaires (100 % de couverture exigée) et tests e2e.
+# Le workflow est désactivé côté GitHub tant que le dépôt est privé (budget Actions à 0).
+# Une fois le dépôt public (Actions gratuit) : gh workflow enable Tests
+# Le hook .githooks/pre-push lance les mêmes contrôles en local.
 name: Tests
 
 on:
   push:
     branches: [main]
   pull_request:
+
+# Lecture seule : le workflow n'a besoin d'écrire nulle part
+permissions:
+  contents: read
 
 jobs:
   unit:
@@ -20,6 +26,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      # Échoue sur une vulnérabilité haute ou critique d'une dépendance de production
+      - run: npm audit --omit=dev --audit-level=high
       # Échoue si la couverture de la logique descend sous 100 %
       - run: npm run test:coverage
 
