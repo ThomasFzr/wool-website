@@ -56,3 +56,6 @@ coverage/
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Généré et réécrit par `next dev` (consignes pour assistants de code)
+AGENTS.md

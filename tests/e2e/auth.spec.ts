@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { E2E_CLIENT, E2E_CREATIONS } from "./data";
-import { login, resetDatabase, submitLogin } from "./helpers";
+import { login, resetDatabase, submitLogin, waitForLoginPageReady } from "./helpers";
 
 test.beforeEach(async ({ request }) => {
   await resetDatabase(request);
@@ -15,6 +15,7 @@ test("connexion par email puis retour vers le callbackUrl", async ({ page }) => 
 test("une page protégée renvoie vers /login avec le callbackUrl", async ({ page }) => {
   await page.goto("/account");
   await expect(page).toHaveURL(/\/login\?callbackUrl=%2Faccount|\/login\?callbackUrl=\/account/);
+  await waitForLoginPageReady(page);
 
   await page.getByPlaceholder("Email").fill(E2E_CLIENT.email);
   await page.getByPlaceholder("Mot de passe").fill(E2E_CLIENT.password);
@@ -26,6 +27,26 @@ test("mauvais mot de passe : message d'erreur, pas de connexion", async ({ page 
   await submitLogin(page, { email: E2E_CLIENT.email, password: "pas-le-bon" });
   await expect(page.getByText("Connexion impossible.")).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
+});
+
+test("jeton CSRF refusé : message d'erreur, aucune session, jamais de faux succès", async ({ page, context }) => {
+  // Bons identifiants, mais le jeton CSRF envoyé est remplacé : next-auth répond 200 avec
+  // error: null et une URL « ?csrf=true », sans ouvrir de session (cf. docs/anomalies).
+  await page.route("**/api/auth/callback/credentials", async (route) => {
+    const body = new URLSearchParams(route.request().postData() ?? "");
+    body.set("csrfToken", "jeton-falsifie");
+    await route.continue({ postData: body.toString() });
+  });
+
+  await submitLogin(page, E2E_CLIENT, "/account");
+  await expect(page.getByText("La connexion n'a pas abouti (jeton de sécurité expiré). Veuillez réessayer.")).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+  expect((await context.cookies()).map((c) => c.name)).not.toContain("next-auth.session-token");
+
+  // Le formulaire reste utilisable : avec le vrai jeton, la connexion aboutit
+  await page.unroute("**/api/auth/callback/credentials");
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await expect(page).toHaveURL(/\/account$/);
 });
 
 test("un utilisateur connecté qui revient sur /login est redirigé", async ({ page }) => {
@@ -57,6 +78,7 @@ test("le bouton de compte renvoie sur la page courante après connexion", async 
     await expect(page).toHaveURL(/\/login/, { timeout: 1000 });
   }).toPass();
   await expect(page).toHaveURL(new RegExp(`/login\\?callbackUrl=${encodeURIComponent(`/creations/${E2E_CREATIONS.rose.slug}`)}`));
+  await waitForLoginPageReady(page);
   await page.getByPlaceholder("Email").fill(E2E_CLIENT.email);
   await page.getByPlaceholder("Mot de passe").fill(E2E_CLIENT.password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();

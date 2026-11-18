@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS } from "./data";
-import { login, resetDatabase } from "./helpers";
+import { login, resetDatabase, waitForLoginPageReady } from "./helpers";
 
 // Parcours corrigés en session 3 (docs/revue-2026-11.md) : compte, admin, front.
 
@@ -81,6 +81,7 @@ test.describe("compte", () => {
     // L'ancien mot de passe ne marche plus, le nouveau oui
     await page.context().clearCookies();
     await page.goto("/login");
+    await waitForLoginPageReady(page);
     await page.getByPlaceholder("Email").fill(E2E_CLIENT.email);
     await page.getByPlaceholder("Mot de passe").fill(E2E_CLIENT.password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
