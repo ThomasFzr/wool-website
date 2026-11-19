@@ -6,6 +6,9 @@ export const E2E_STRIPE_URL = `http://localhost:${E2E_STRIPE_PORT}`;
 export const E2E_HIBP_PORT = 3102;
 export const E2E_HIBP_URL = `http://localhost:${E2E_HIBP_PORT}`;
 
+/** Message neutre de tout échec de connexion (lib/sign-in-result.ts). */
+export const LOGIN_FAILED = "Connexion impossible : vérifiez vos identifiants ou réessayez dans quelques minutes.";
+
 export const E2E_CLIENT = {
   email: "client@maillemum.test",
   password: "Client-e2e-123",

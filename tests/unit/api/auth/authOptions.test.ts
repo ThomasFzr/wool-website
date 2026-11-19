@@ -5,6 +5,7 @@ import type { JWT } from "next-auth/jwt";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
+import RateLimit from "@/models/RateLimit";
 import { resetAccountCheckCache } from "@/lib/account-check";
 import { pwnedCount } from "@/lib/hibp";
 
@@ -84,14 +85,17 @@ describe("authOptions", () => {
       const ip = { "x-real-ip": "203.0.113.7" };
       await User.create({ email: "google@example.com", provider: "google" });
       // Tous les types d'échec comptent : compte inconnu, compte sans mot de passe, mauvais mot de passe
-      expect(await authorize({ email: "inconnu@example.com", password: "x" }, ip)).toBeNull();
+      // (répartis sur plusieurs comptes pour rester sous la limite par compte)
       expect(await authorize({ email: "google@example.com", password: "x" }, ip)).toBeNull();
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 4; i++) {
+        expect(await authorize({ email: `inconnu${i}@example.com`, password: "x" }, ip)).toBeNull();
+      }
+      for (let i = 0; i < 4; i++) {
         expect(await authorize({ email: "client@example.com", password: "mauvais" }, ip)).toBeNull();
       }
       // Une connexion réussie ne compte pas comme un échec
       expect(await authorize({ email: "client@example.com", password: "secret123" }, ip)).not.toBeNull();
-      expect(await authorize({ email: "client@example.com", password: "mauvais" }, ip)).toBeNull();
+      expect(await authorize({ email: "inconnu9@example.com", password: "x" }, ip)).toBeNull();
 
       expect(await authorize({ email: "client@example.com", password: "secret123" }, ip)).toBeNull();
       // Une autre IP n'est pas concernée
@@ -128,6 +132,53 @@ describe("authOptions", () => {
         await createWith("password123");
         expect(await authorize({ email: "faible@example.com", password: "mauvais-mdp" })).toBeNull();
         expect(pwnedCount).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("limite par compte (5 échecs en 15 minutes)", () => {
+      beforeEach(() => {
+        vi.spyOn(Date, "now").mockReturnValue(3_000_000 * 900_000 + 1_000);
+      });
+      // Une IP différente à chaque essai : attaque répartie, la limite par IP ne joue pas
+      const fromIp = (i: number) => ({ "x-real-ip": `198.51.100.${i}` });
+
+      it("bloque le compte après 5 échecs, même avec le bon mot de passe et depuis une autre IP", async () => {
+        for (let i = 0; i < 4; i++) {
+          expect(await authorize({ email: "client@example.com", password: "mauvais" }, fromIp(i))).toBeNull();
+        }
+        // 4 échecs : encore possible
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(10))).not.toBeNull();
+        expect(await authorize({ email: "client@example.com", password: "mauvais" }, fromIp(11))).toBeNull();
+        // 5 échecs : refusé, même réponse qu'un mauvais mot de passe
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(12))).toBeNull();
+        // Les autres comptes ne sont pas concernés
+        await User.create({ email: "autre@example.com", password: await bcrypt.hash("secret123", 4) });
+        expect(await authorize({ email: "autre@example.com", password: "secret123" }, fromIp(13))).not.toBeNull();
+      });
+
+      it("compte les échecs quelle que soit la casse de l'email, y compris pour un compte inconnu", async () => {
+        for (const email of ["Client@Example.com", " CLIENT@example.com", "client@example.com", "client@EXAMPLE.com", "client@example.COM"]) {
+          expect(await authorize({ email, password: "mauvais" }, fromIp(1))).toBeNull();
+        }
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(2))).toBeNull();
+
+        for (let i = 0; i < 5; i++) await authorize({ email: "fantome@example.com", password: "x" }, fromIp(i));
+        expect(await RateLimit.countDocuments({ _id: /^login:account:/ })).toBe(2);
+      });
+
+      it("ne stocke pas l'email en clair dans les compteurs", async () => {
+        await authorize({ email: "client@example.com", password: "mauvais" }, fromIp(1));
+        const ids = (await RateLimit.find().lean()).map((d) => String(d._id));
+        expect(ids).toHaveLength(2);
+        expect(ids.join(" ")).not.toContain("client@example.com");
+        expect(ids.some((id) => /^login:account:[0-9a-f]{64}:/.test(id))).toBe(true);
+      });
+
+      it("repart de zéro à la fenêtre suivante", async () => {
+        for (let i = 0; i < 5; i++) await authorize({ email: "client@example.com", password: "mauvais" }, fromIp(i));
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(9))).toBeNull();
+        vi.mocked(Date.now).mockReturnValue(3_000_001 * 900_000 + 1_000);
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(9))).not.toBeNull();
       });
     });
 

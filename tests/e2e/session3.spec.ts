@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS } from "./data";
+import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS, LOGIN_FAILED } from "./data";
 import { login, resetDatabase, waitForLoginPageReady } from "./helpers";
 
 // Parcours corrigés en session 3 (docs/revue-2026-11.md) : compte, admin, front.
@@ -85,7 +85,7 @@ test.describe("compte", () => {
     await page.getByPlaceholder("Email").fill(E2E_CLIENT.email);
     await page.getByPlaceholder("Mot de passe").fill(E2E_CLIENT.password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
-    await expect(page.getByText("Connexion impossible.")).toBeVisible();
+    await expect(page.getByText(LOGIN_FAILED)).toBeVisible();
     await login(page, { email: E2E_CLIENT.email, password: "Nouveau-pass-456" }, "/account");
     await expect(page).toHaveURL(/\/account$/);
   });

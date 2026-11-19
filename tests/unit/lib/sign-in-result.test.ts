@@ -42,8 +42,10 @@ describe("signInOutcome", () => {
     expect(signInOutcome(res)).toEqual({ ok: false, reason: "failed" });
   });
 
-  it("a un message pour chaque échec, celui des identifiants inchangé", () => {
-    expect(SIGN_IN_MESSAGES.credentials).toBe("Connexion impossible.");
+  it("a un message pour chaque échec, neutre pour les identifiants", () => {
+    expect(SIGN_IN_MESSAGES.credentials).toBe(
+      "Connexion impossible : vérifiez vos identifiants ou réessayez dans quelques minutes."
+    );
     expect(SIGN_IN_MESSAGES.csrf).toMatch(/réessayer/);
     expect(SIGN_IN_MESSAGES.failed).toMatch(/réessayer/);
   });
