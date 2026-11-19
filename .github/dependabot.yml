@@ -14,7 +14,26 @@ updates:
     commit-message:
       prefix: "deps"
       prefix-development: "deps-dev"
+    # Un paquet va dans le premier groupe qui le cite : les familles de paquets à monter
+    # ensemble viennent d'abord. Chaque famille a aussi un groupe pour les mises à jour de
+    # sécurité, sinon Dependabot ouvre une PR par alerte et casse les versions alignées
+    # (ex. vitest et @vitest/* à des versions différentes → npm install échoue).
     groups:
+      vitest:
+        patterns: ["vitest", "@vitest/*", "tinypool"]
+      vitest-securite:
+        applies-to: security-updates
+        patterns: ["vitest", "@vitest/*", "tinypool"]
+      typescript-eslint:
+        patterns: ["typescript-eslint", "@typescript-eslint/*"]
+      typescript-eslint-securite:
+        applies-to: security-updates
+        patterns: ["typescript-eslint", "@typescript-eslint/*"]
+      next:
+        patterns: ["next", "eslint-config-next", "@next/*"]
+      next-securite:
+        applies-to: security-updates
+        patterns: ["next", "eslint-config-next", "@next/*"]
       # Correctifs et mineures de production : une seule PR
       production:
         dependency-type: production
