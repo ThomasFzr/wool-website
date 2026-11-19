@@ -19,7 +19,7 @@ sessions, chacune avec ses tests de non-régression
 | A04 — Conception non sécurisée | ✅ Couvert |
 | A05 — Mauvaise configuration de sécurité | ✅ Couvert |
 | A06 — Composants vulnérables et obsolètes | ✅ Couvert — dépendances à jour, Dependabot, audit en CI |
-| A07 — Identification et authentification | ✅ Couvert — durcissements prévus |
+| A07 — Identification et authentification | ✅ Couvert — politique alignée sur le NIST SP 800-63B (écart sur la longueur minimale) |
 | A08 — Intégrité des logiciels et des données | ✅ Couvert |
 | A09 — Journalisation et surveillance | ⚠️ Partiel — journal d'audit prévu |
 | A10 — Falsification de requête côté serveur (SSRF) | ✅ Couvert |
@@ -32,21 +32,21 @@ sessions, chacune avec ses tests de non-régression
 |---|---|---|
 | Chaque route d'API admin vérifie la session **et** le rôle `admin` côté serveur, avant toute lecture | [`lib/auth.ts`](../lib/auth.ts#L8-L20), appelé dans toutes les routes de [`app/api/admin/`](../app/api/admin) et dans les écritures de [`app/api/creations/`](../app/api/creations) | « est réservé aux admins » dans chaque fichier de [`tests/unit/api/admin/`](../tests/unit/api/admin), [`lib/auth.test.ts`](../tests/unit/lib/auth.test.ts) |
 | Les pages `/admin/**` sont gardées côté serveur (redirection sans rendu) | [`app/admin/layout.tsx`](../app/admin/layout.tsx#L15-L18) | [`tests/e2e/admin.spec.ts`](../tests/e2e/admin.spec.ts#L9) « un client n'a pas accès à l'admin » |
-| Rôle revérifié en base toutes les 5 min : un admin révoqué ou un compte supprimé perd ses droits sans reconnexion | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L160-L183) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L258) (révocation admin), [L276](../tests/unit/api/auth/authOptions.test.ts#L276) (compte supprimé) |
+| Rôle revérifié en base toutes les 5 min : un admin révoqué ou un compte supprimé perd ses droits sans reconnexion | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L185-L213) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L384) (révocation admin), [L276](../tests/unit/api/auth/authOptions.test.ts#L422) (compte supprimé) |
 | Aucun compte admin par défaut : la promotion se fait à la main en base | [`README.md`](../README.md#installation) | — |
 | Accès aux données d'un autre client refusé (IDOR) : la session Stripe doit appartenir à l'utilisateur connecté | [`verify-session/route.ts`](../app/api/stripe/verify-session/route.ts#L49-L50) | [`verify-session.test.ts`](../tests/unit/api/stripe/verify-session.test.ts#L72) « refuse la session d'un autre client » |
 | Créations masquées invisibles et non achetables pour les visiteurs | [`create-checkout-session/route.ts`](../app/api/stripe/create-checkout-session/route.ts) | [`create-checkout-session.test.ts`](../tests/unit/api/stripe/create-checkout-session.test.ts#L79), [`creations/route.test.ts`](../tests/unit/api/creations/route.test.ts#L22) |
 | Outils de debug fermés en production | [`env-info`](../app/api/env-info/route.ts#L7-L12), [`version`](../app/api/version/route.ts), [`dev/emails`](../app/dev/emails/%5Bid%5D/raw/route.ts#L12-L14) | [`env-info.test.ts`](../tests/unit/api/env-info.test.ts#L19), [`version.test.ts`](../tests/unit/api/version.test.ts#L68), [`emailRaw.test.ts`](../tests/unit/dev/emailRaw.test.ts#L41) |
 | Cron protégé par secret, refus si le secret n'est pas configuré | [`cron/release-locks/route.ts`](../app/api/cron/release-locks/route.ts#L11-L14) | [`release-locks.test.ts`](../tests/unit/api/cron/release-locks.test.ts#L17-L23) |
-| Pas de redirection ouverte après connexion | [`lib/safe-redirect.ts`](../lib/safe-redirect.ts#L10) | [`safe-redirect.test.ts`](../tests/unit/lib/safe-redirect.test.ts), [`tests/e2e/auth.spec.ts`](../tests/e2e/auth.spec.ts#L38) |
+| Pas de redirection ouverte après connexion | [`lib/safe-redirect.ts`](../lib/safe-redirect.ts#L10) | [`safe-redirect.test.ts`](../tests/unit/lib/safe-redirect.test.ts), [`tests/e2e/auth.spec.ts`](../tests/e2e/auth.spec.ts#L74) |
 
 ## A02 — Défaillances cryptographiques
 
 | Mesure | Code | Tests |
 |---|---|---|
-| Mots de passe hachés avec bcrypt, jamais renvoyés (`select: false` sur le modèle) | [`register/route.ts`](../app/api/register/route.ts#L52), [`models/User.ts`](../models/User.ts) | [`register.test.ts`](../tests/unit/api/register.test.ts) |
-| Jeton de réinitialisation aléatoire (32 octets), stocké **haché** (SHA-256), valable 1 h, à usage unique | [`forgot-password/route.ts`](../app/api/auth/forgot-password/route.ts#L55-L60), [`reset-password/route.ts`](../app/api/auth/reset-password/route.ts#L28-L50) | [`forgot-password.test.ts`](../tests/unit/api/auth/forgot-password.test.ts#L52), [`reset-password.test.ts`](../tests/unit/api/auth/reset-password.test.ts#L43-L62) (jeton inconnu, hash présenté comme jeton, jeton expiré) |
-| Sessions JWT signées (`AUTH_SECRET`), cookies `HttpOnly`, `Secure`, `SameSite=Lax` (next-auth) | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L25-L28) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L33) |
+| Mots de passe hachés avec bcrypt, jamais renvoyés (`select: false` sur le modèle) | [`register/route.ts`](../app/api/register/route.ts#L51), [`models/User.ts`](../models/User.ts) | [`register.test.ts`](../tests/unit/api/register.test.ts) |
+| Jeton de réinitialisation aléatoire (32 octets), stocké **haché** (SHA-256), valable 1 h, à usage unique | [`forgot-password/route.ts`](../app/api/auth/forgot-password/route.ts#L55-L60), [`reset-password/route.ts`](../app/api/auth/reset-password/route.ts#L27-L49) | [`forgot-password.test.ts`](../tests/unit/api/auth/forgot-password.test.ts#L52), [`reset-password.test.ts`](../tests/unit/api/auth/reset-password.test.ts#L51-L70) (jeton inconnu, hash présenté comme jeton, jeton expiré) |
+| Sessions JWT signées (`AUTH_SECRET`), cookies `HttpOnly`, `Secure`, `SameSite=Lax` (next-auth) | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L34-L37) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L35) |
 | HTTPS imposé : HSTS 2 ans et `upgrade-insecure-requests` | [`next.config.js`](../next.config.js#L25) et [L79-L80](../next.config.js#L79-L80) | [`next-config.test.ts`](../tests/unit/next-config.test.ts) |
 | Aucun secret dans le dépôt ni dans son historique (vérifié avec gitleaks) ; secrets dans les variables Vercel | [`.env.example`](../.env.example), [`.gitignore`](../.gitignore) | — |
 
@@ -55,7 +55,7 @@ sessions, chacune avec ses tests de non-régression
 | Mesure | Code | Tests |
 |---|---|---|
 | Recherche texte : saisie échappée avant tout `$regex` MongoDB (injection regex, ReDoS) | [`lib/escape.ts`](../lib/escape.ts#L15), utilisé dans [`admin/reservations/route.ts`](../app/api/admin/reservations/route.ts#L69) et [`account/reservations/route.ts`](../app/api/account/reservations/route.ts#L48) | [`escape.test.ts`](../tests/unit/lib/escape.test.ts#L22) |
-| Types vérifiés sur les routes publiques (`typeof`, `isValidObjectId`) : pas d'objet `{"$ne": …}` injecté dans un filtre | [`register`](../app/api/register/route.ts#L30-L43), [`reset-password`](../app/api/auth/reset-password/route.ts#L12), [`availability`](../app/api/creations/availability/route.ts#L23) | [`reset-password.test.ts`](../tests/unit/api/auth/reset-password.test.ts#L89) |
+| Types vérifiés sur les routes publiques (`typeof`, `isValidObjectId`) : pas d'objet `{"$ne": …}` injecté dans un filtre | [`register`](../app/api/register/route.ts#L31-L42), [`reset-password`](../app/api/auth/reset-password/route.ts#L13), [`availability`](../app/api/creations/availability/route.ts#L23) | [`reset-password.test.ts`](../tests/unit/api/auth/reset-password.test.ts#L97) |
 | Mise à jour par liste blanche de champs + validateurs Mongoose (pas d'affectation de masse) | [`admin/reservations/[id]/route.ts`](../app/api/admin/reservations/%5Bid%5D/route.ts#L15) | [`reservation-id.test.ts`](../tests/unit/api/admin/reservations/reservation-id.test.ts) |
 | XSS stocké : HTML des descriptions filtré par liste blanche (`sanitize-html`) à l'enregistrement **et** à l'affichage | [`lib/sanitize.ts`](../lib/sanitize.ts#L9-L20), [`creations/route.ts`](../app/api/creations/route.ts#L116), [`creations/[id]/page.tsx`](../app/creations/%5Bid%5D/page.tsx#L156), seul `dangerouslySetInnerHTML` : [`Accordion.tsx`](../components/ui/Accordion.tsx#L69) | [`sanitize.test.ts`](../tests/unit/lib/sanitize.test.ts#L10-L21) (`<script>`, `onerror`, `javascript:`, `<iframe>`, `style`…) |
 | Données utilisateur échappées dans les emails HTML ; React échappe tout le reste | [`lib/escape.ts`](../lib/escape.ts#L3) | [`escape.test.ts`](../tests/unit/lib/escape.test.ts#L10) |
@@ -68,7 +68,7 @@ sessions, chacune avec ses tests de non-régression
 | Pièces uniques : verrou atomique (`findOneAndUpdate` conditionnel) pendant le paiement, libéré seulement par la réservation qui le détient | [`create-checkout-session/route.ts`](../app/api/stripe/create-checkout-session/route.ts#L189), [`lib/creation-lock.ts`](../lib/creation-lock.ts#L21) | [`creation-lock.test.ts`](../tests/unit/lib/creation-lock.test.ts#L27) « ne touche pas au verrou d'une autre réservation » |
 | Traitement du paiement idempotent (webhook et retour client concurrents), événements rejoués sans effet | [`lib/checkout-fulfillment.ts`](../lib/checkout-fulfillment.ts) | [`checkout-fulfillment.test.ts`](../tests/unit/lib/checkout-fulfillment.test.ts#L741) |
 | Double vente : remboursement automatique et alerte de la vendeuse | [`lib/checkout-fulfillment.ts`](../lib/checkout-fulfillment.ts) | [`checkout-fulfillment.test.ts`](../tests/unit/lib/checkout-fulfillment.test.ts) |
-| Pré-prise de contrôle de compte : un mot de passe posé sur une adresse jamais prouvée est supprimé à la première connexion Google, et les sessions ouvertes avec lui sont révoquées | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L98-L111) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L153) |
+| Pré-prise de contrôle de compte : un mot de passe posé sur une adresse jamais prouvée est supprimé à la première connexion Google, et les sessions ouvertes avec lui sont révoquées | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L121-L134) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L268) |
 | Formulaire de contact : honeypot, limite par IP, pas de relais de spam | [`contact/route.ts`](../app/api/contact/route.ts#L99-L107) | [`contact.test.ts`](../tests/unit/api/contact.test.ts#L126-L151) |
 
 ## A05 — Mauvaise configuration de sécurité
@@ -92,11 +92,43 @@ sessions, chacune avec ses tests de non-régression
 
 | Mesure | Code | Tests |
 |---|---|---|
-| Force brute : 10 échecs de connexion par IP et par 15 min, compteur partagé entre instances (MongoDB) | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L16-L19) et [L49-L54](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L49-L54), [`lib/rate-limit.ts`](../lib/rate-limit.ts) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L81), [`rate-limit.test.ts`](../tests/unit/lib/rate-limit.test.ts) |
-| Limites sur l'inscription (5 par heure et par IP) et sur « mot de passe oublié » (par IP et par adresse) | [`register/route.ts`](../app/api/register/route.ts#L10-L22), [`forgot-password/route.ts`](../app/api/auth/forgot-password/route.ts#L41-L43) | [`register.test.ts`](../tests/unit/api/register.test.ts#L78), [`forgot-password.test.ts`](../tests/unit/api/auth/forgot-password.test.ts#L83-L105) |
+| Politique de mot de passe unique (inscription, réinitialisation, changement, création ou modification par un admin) : 8 caractères minimum, **aucune règle de composition**, refus des mots de passe présents dans des fuites connues (voir ci-dessous) | [`lib/password-policy.ts`](../lib/password-policy.ts#L38-L43), [`lib/hibp.ts`](../lib/hibp.ts) | [`password-policy.test.ts`](../tests/unit/lib/password-policy.test.ts), [`hibp.test.ts`](../tests/unit/lib/hibp.test.ts), routes ([`register.test.ts`](../tests/unit/api/register.test.ts), [`reset-password.test.ts`](../tests/unit/api/auth/reset-password.test.ts), [`password.test.ts`](../tests/unit/api/account/password.test.ts), [`users.test.ts`](../tests/unit/api/admin/users/users.test.ts)), e2e [`password-policy.spec.ts`](../tests/e2e/password-policy.spec.ts) |
+| Fuites connues via Have I Been Pwned en *k-anonymity* : seuls les 5 premiers caractères du SHA-1 quittent le serveur, réponse avec padding ; API injoignable ou lente (2 s) : mot de passe accepté, l'inscription n'est jamais bloquée | [`lib/hibp.ts`](../lib/hibp.ts) | [`hibp.test.ts`](../tests/unit/lib/hibp.test.ts) ; en tests, faux HIBP ([`tests/setup.ts`](../tests/setup.ts), [`fake-hibp.ts`](../tests/e2e/server/fake-hibp.ts)) |
+| Mots de passe existants jamais invalidés : à la connexion, un mot de passe de moins de 8 caractères ou compromis laisse passer, mais un bandeau invite à le changer | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L87-L96), [`PasswordWarningBanner.tsx`](../components/PasswordWarningBanner.tsx) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L107), e2e [`password-warning.spec.ts`](../tests/e2e/password-warning.spec.ts) |
+| Force brute : 10 échecs par IP **et** 5 échecs par compte en 15 min (une attaque répartie sur plusieurs IP est bloquée), compteurs partagés entre instances (MongoDB), email haché dans la clé du compteur | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L18-L28) et [L57-L69](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L57-L69), [`lib/rate-limit.ts`](../lib/rate-limit.ts) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L83) (IP), [L138](../tests/unit/api/auth/authOptions.test.ts#L138) (compte), [`rate-limit.test.ts`](../tests/unit/lib/rate-limit.test.ts), e2e [`auth.spec.ts`](../tests/e2e/auth.spec.ts#L46) |
+| Message d'échec neutre et identique (mauvais identifiants, compte inconnu, trop de tentatives, admin) : rien n'indique si un compte existe ou est bloqué | [`lib/sign-in-result.ts`](../lib/sign-in-result.ts) | [`sign-in-result.test.ts`](../tests/unit/lib/sign-in-result.test.ts) |
+| Administrateurs : connexion **Google uniquement** (double authentification déléguée à Google). Le mot de passe d'un admin est refusé, même correct (contrôle après bcrypt : pas d'écart de temps révélant un admin) ; une session admin ouverte autrement que par Google est révoquée (promotion d'un compte connecté par mot de passe) | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L82-L85), [L205-L209](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L205-L209) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L195), [L402](../tests/unit/api/auth/authOptions.test.ts#L402), e2e [`auth.spec.ts`](../tests/e2e/auth.spec.ts#L32) |
+| Limites sur l'inscription (5 par heure et par IP) et sur « mot de passe oublié » (par IP et par adresse) | [`register/route.ts`](../app/api/register/route.ts#L11-L23), [`forgot-password/route.ts`](../app/api/auth/forgot-password/route.ts#L41-L43) | [`register.test.ts`](../tests/unit/api/register.test.ts#L99), [`forgot-password.test.ts`](../tests/unit/api/auth/forgot-password.test.ts#L83-L105) |
 | « Mot de passe oublié » ne révèle pas si un compte existe, même en cas d'erreur d'envoi | [`forgot-password/route.ts`](../app/api/auth/forgot-password/route.ts) | [`forgot-password.test.ts`](../tests/unit/api/auth/forgot-password.test.ts#L35-L123) |
-| Sessions révoquées après un changement ou une réinitialisation de mot de passe | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L177-L179), [`reset-password/route.ts`](../app/api/auth/reset-password/route.ts#L51-L52) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L288) |
-| Connexion Google (OAuth) en alternative au mot de passe | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L30-L37) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L121) |
+| Sessions révoquées après un changement ou une réinitialisation de mot de passe | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L202-L204), [`reset-password/route.ts`](../app/api/auth/reset-password/route.ts#L50-L51) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L434) |
+| Connexion Google (OAuth) en alternative au mot de passe | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L39-L46) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L236) |
+
+### Politique de mot de passe et NIST SP 800-63B
+
+La politique suit les recommandations du [NIST SP 800-63B](https://pages.nist.gov/800-63-4/sp800-63b/authenticators/)
+(révision 4, § 3.1.1.2 « Password Verifiers » et § 3.2.2 « Rate Limiting ») :
+
+| Exigence du NIST | Ici |
+|---|---|
+| Aucune règle de composition (mélange de types de caractères) : *SHALL NOT* | ✅ Aucune : une phrase en minuscules est acceptée |
+| Comparer le mot de passe **entier** à une liste de mots de passe compromis ou courants : *SHALL* | ✅ Have I Been Pwned (mots de passe issus de fuites réelles), mot de passe entier et non des sous-chaînes |
+| Donner la raison du refus et aider à choisir un bon mot de passe : *SHALL* | ✅ Message explicite, avec le conseil d'une phrase de plusieurs mots |
+| Compter chaque caractère Unicode pour un : *SHALL* | ✅ Longueur comptée en points de code (`passwordLength`) |
+| Normaliser l'Unicode (NFC) avant hachage : *SHOULD* | ❌ Non fait : un même mot de passe accentué saisi sur deux claviers différents peut ne pas correspondre. L'ajouter imposerait de gérer les hachages existants |
+| Pas de changement périodique imposé : *SHALL NOT* | ✅ Aucun ; changement proposé seulement si le mot de passe est court ou compromis |
+| Accepter au moins 64 caractères : *SHOULD* | ✅ Pas de maximum. Limite connue : bcrypt ne prend en compte que les 72 premiers octets |
+| Limiter les échecs consécutifs (au plus 100) : *SHALL* | ✅ 5 par compte et 10 par IP en 15 min |
+| Longueur minimale : **15 caractères** quand le mot de passe est le seul facteur, 8 quand il fait partie d'une authentification multifacteur : *SHALL* | ⚠️ **8 caractères**, alors que le mot de passe est ici le seul facteur des clients. Écart assumé : le seuil de 8 est celui de la révision précédente (2017), et le risque est réduit par le refus des mots de passe compromis, les limites de tentatives et la connexion Google imposée aux administrateurs. Relever le minimum ne demande que de changer `PASSWORD_MIN_LENGTH` ([`lib/password-policy.ts`](../lib/password-policy.ts#L12)). À réévaluer (passage à 15) si la boutique stocke des données plus sensibles ou si le volume de comptes augmente. |
+
+Les mots de passe déjà enregistrés ne sont pas invalidés : l'ancienne règle n'exigeait que
+6 caractères, et forcer un changement à la connexion bloquerait des clientes pour un risque que
+le bandeau d'invitation couvre en grande partie. Un mot de passe qui figure dans une
+fuite publique n'est pas la preuve que **ce** compte est compromis (cas où le NIST impose un
+changement) : il est signalé, pas bloqué.
+
+Contrepartie de la limite par compte : quelqu'un peut bloquer la connexion par mot de passe
+d'une cliente pendant 15 minutes en se trompant 5 fois avec son adresse. Effet limité et
+temporaire : la connexion Google et « mot de passe oublié » restent possibles.
 
 ## A08 — Intégrité des logiciels et des données
 
@@ -140,9 +172,10 @@ Identifiées lors de l'audit de pré-publication, prévues dans une prochaine pu
 - **A03** — Validation centralisée des entrées par schémas (zod) sur toutes les routes, et option
   `sanitizeFilter` de Mongoose activée globalement (aujourd'hui la validation est faite route par
   route ; quelques routes admin ne vérifient pas encore le type de chaque champ).
-- **A07** — Mots de passe de 12 caractères minimum (6 aujourd'hui) ; limite de connexion par
-  compte en plus de la limite par IP ; connexion Google obligatoire pour les administrateurs
-  (double authentification déléguée à Google) ; coût bcrypt porté à 12.
+- **A07** — Coût bcrypt porté à 12 (10 aujourd'hui). Longueur minimale à relever à
+  15 caractères pour suivre la révision 4 du NIST SP 800-63B (voir A07). L'écran admin permet
+  encore de poser un mot de passe sur un compte administrateur : sans effet (refusé à la
+  connexion), mais à masquer.
 - **A09** — Journal d'audit (qui, quoi, quand, IP) des actions admin et des échecs de connexion.
 - **A05** — CSP avec `script-src 'unsafe-inline'` : compromis assumé, des nonces imposeraient un
   rendu dynamique de toutes les pages et supprimeraient le cache ISR.
