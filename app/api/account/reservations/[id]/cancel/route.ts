@@ -62,7 +62,7 @@ export async function PATCH(
     // une commande payée/expédiée se rembourse via la boutique, et une réservation
     // déjà annulée ne peut pas être ré-annulée (ni relibérer la pièce).
     const cancelled = await Reservation.findOneAndUpdate(
-      { _id: reservation._id, status: "pending", paymentStatus: { $ne: "paid" } },
+      { _id: reservation._id, status: "pending", paymentStatus: mongoose.trusted({ $ne: "paid" }) },
       { $set: { status: "cancelled", cancelReason: reason, cancelledBy: "user" } },
       { new: true }
     );

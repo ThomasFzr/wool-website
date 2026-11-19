@@ -31,7 +31,7 @@ export const revalidate = 300;
 export async function generateStaticParams() {
   try {
     await connectToDatabase();
-    const creations = await CreationModel.find({ hidden: { $ne: true } })
+    const creations = await CreationModel.find({ hidden: mongoose.trusted({ $ne: true }) })
       .select("slug")
       .lean();
 
@@ -83,11 +83,11 @@ const getCreation = cache(async (slug: string) => {
   await connectToDatabase();
   // Essayer d'abord par slug, sinon par ID (rétrocompatibilité)
   // Exclure les créations cachées pour les utilisateurs publics
-  let creation = await CreationModel.findOne({ slug, hidden: { $ne: true } })
+  let creation = await CreationModel.findOne({ slug, hidden: mongoose.trusted({ $ne: true }) })
     .populate('relatedCreations', 'title imageUrl images price color type slug sold reserved hidden')
     .lean();
   if (!creation && mongoose.Types.ObjectId.isValid(slug)) {
-    creation = await CreationModel.findOne({ _id: slug, hidden: { $ne: true } })
+    creation = await CreationModel.findOne({ _id: slug, hidden: mongoose.trusted({ $ne: true }) })
       .populate('relatedCreations', 'title imageUrl images price color type slug sold reserved hidden')
       .lean();
   }
@@ -121,10 +121,10 @@ const getCreation = cache(async (slug: string) => {
     // Proposer uniquement les articles avec la même couleur
     if (creationData.color) {
       const byColor = await CreationModel.find({
-        _id: { $ne: currentId },
-        sold: { $ne: true },
-        reserved: { $ne: true },
-        hidden: { $ne: true },
+        _id: mongoose.trusted({ $ne: currentId }),
+        sold: mongoose.trusted({ $ne: true }),
+        reserved: mongoose.trusted({ $ne: true }),
+        hidden: mongoose.trusted({ $ne: true }),
         color: creationData.color,
       })
         .select('title imageUrl images price color type slug sold hidden yarnBrand')

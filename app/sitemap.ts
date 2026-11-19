@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { MetadataRoute } from 'next';
 import { connectToDatabase } from '@/lib/db';
 import CreationModel from '@/models/Creation';
@@ -28,7 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Pages dynamiques des créations
   try {
     await connectToDatabase();
-    const creations = await CreationModel.find({ hidden: { $ne: true } })
+    const creations = await CreationModel.find({ hidden: mongoose.trusted({ $ne: true }) })
       .select('_id slug updatedAt')
       .lean();
 

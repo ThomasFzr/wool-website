@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (search) {
-      const regex = { $regex: escapeRegex(search), $options: "i" };
+      const regex = mongoose.trusted({ $regex: escapeRegex(search), $options: "i" });
       query.$or = [
         { name: regex },
         { message: regex },

@@ -507,7 +507,7 @@ describe("fulfillCheckoutSession", () => {
       await expect(fulfillCheckoutSession(paidSession())).rejects.toThrow("db down");
       expect(sendEmail).not.toHaveBeenCalled();
       // fulfillingAt est levé même en cas d'échec : le nouvel essai n'attend pas
-      expect(await Reservation.countDocuments({ fulfillingAt: { $exists: true } })).toBe(0);
+      expect(await Reservation.countDocuments({ fulfillingAt: mongoose.trusted({ $exists: true }) })).toBe(0);
 
       await fulfillCheckoutSession(paidSession());
       expect(emailTo("client@example.com")).toHaveLength(1);

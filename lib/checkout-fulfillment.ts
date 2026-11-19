@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Stripe from "stripe";
 import { after } from "next/server";
 import { revalidateCatalog, revalidateOrders } from "@/lib/revalidate";
@@ -107,7 +108,7 @@ export async function fulfillCheckoutSession(
 
   const reservations =
     reservationIds.length > 0
-      ? await Reservation.find({ _id: { $in: reservationIds } })
+      ? await Reservation.find({ _id: mongoose.trusted({ $in: reservationIds }) })
       : await Reservation.find({ stripeCheckoutSessionId: session.id });
 
   if (reservations.length === 0) {
@@ -193,7 +194,7 @@ export async function fulfillCheckoutSession(
       // la condition `sold: { $ne: true }` garantit que l'incrément n'a lieu qu'une fois.
       // On libère aussi le flag `reserved` posé à la création de la session Checkout.
       const creation = await Creation.findOneAndUpdate(
-        { _id: updatedReservation.creationId, sold: { $ne: true } },
+        { _id: updatedReservation.creationId, sold: mongoose.trusted({ $ne: true }) },
         {
           $set: { sold: true, reserved: false },
           $unset: LOCK_FIELDS_UNSET,
@@ -220,8 +221,8 @@ export async function fulfillCheckoutSession(
   // (session remplacée, expirée) et ce paiement ne correspond à aucune commande.
   if (processedReservations.length === 0 && conflicts.length === 0) {
     const recorded = await Reservation.exists({
-      _id: { $in: reservations.map((r: any) => r._id) },
-      paymentStatus: { $in: ["paid", "refunded"] },
+      _id: mongoose.trusted({ $in: reservations.map((r: any) => r._id) }),
+      paymentStatus: mongoose.trusted({ $in: ["paid", "refunded"] }),
     });
     if (!recorded) {
       console.error(`[FULFILL] Session ${session.id} payée sans réservation en attente`);
@@ -242,7 +243,7 @@ export async function fulfillCheckoutSession(
 
   // Traitement de CET appel terminé : ses réservations ne bloquent plus l'email
   if (gatedIds.length > 0) {
-    await Reservation.updateMany({ _id: { $in: gatedIds } }, { $unset: { fulfillingAt: "" } });
+    await Reservation.updateMany({ _id: mongoose.trusted({ $in: gatedIds }) }, { $unset: { fulfillingAt: "" } });
   }
 
   if (processedReservations.length > 0) {
@@ -295,7 +296,7 @@ async function sendOrderConfirmationOnce({
 }) {
   // Toutes les réservations de la session, pas seulement celles vues par cet appel
   const all = await Reservation.find({
-    $or: [{ _id: { $in: reservationIds } }, { stripeCheckoutSessionId: session.id }],
+    $or: [{ _id: mongoose.trusted({ $in: reservationIds }) }, { stripeCheckoutSessionId: session.id }],
   }).lean<any[]>();
   const busy = all.some(
     (r) =>
@@ -314,7 +315,7 @@ async function sendOrderConfirmationOnce({
     throw err;
   }
 
-  const creations = await Creation.find({ _id: { $in: honored.map((r) => r.creationId) } }).lean<any[]>();
+  const creations = await Creation.find({ _id: mongoose.trusted({ $in: honored.map((r) => r.creationId) }) }).lean<any[]>();
   const byId = new Map(creations.map((c) => [String(c._id), c]));
   const items = honored.filter((r) => byId.has(String(r.creationId)));
 
@@ -484,8 +485,8 @@ async function settleSoldConflicts({
   // concurrent) : rembourser aussi les frais de port
   const honored = await Reservation.exists({
     stripeCheckoutSessionId: session.id,
-    paymentStatus: { $in: ["paid", "pending"] },
-    status: { $ne: "cancelled" },
+    paymentStatus: mongoose.trusted({ $in: ["paid", "pending"] }),
+    status: mongoose.trusted({ $ne: "cancelled" }),
   });
   if (!honored && shippingCost > 0) {
     await refund(shippingCost, `conflict-shipping-${session.id}`);
@@ -775,7 +776,7 @@ export async function releaseExpiredCheckoutSession(
 
   const query =
     reservationIds.length > 0
-      ? { _id: { $in: reservationIds } }
+      ? { _id: mongoose.trusted({ $in: reservationIds }) }
       : { stripeCheckoutSessionId: session.id };
 
   const pendingReservations = await Reservation.find({

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { cloudinary } from "@/lib/cloudinary";
 import Creation from "@/models/Creation";
 
@@ -12,7 +13,7 @@ export async function destroyUnusedImages(publicIds: unknown[]): Promise<string[
   if (candidates.length === 0) return [];
 
   const used = await Creation.find({
-    $or: [{ imagePublicIds: { $in: candidates } }, { imagePublicId: { $in: candidates } }],
+    $or: [{ imagePublicIds: mongoose.trusted({ $in: candidates }) }, { imagePublicId: mongoose.trusted({ $in: candidates }) }],
   })
     .select("imagePublicIds imagePublicId")
     .lean<{ imagePublicIds?: string[]; imagePublicId?: string }[]>();

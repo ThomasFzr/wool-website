@@ -19,8 +19,8 @@ export async function GET() {
     const [savedBrands, creations] = await Promise.all([
       YarnBrand.find({}).sort({ brand: 1 }).lean(),
       Creation.find({
-        yarnBrand: { $exists: true, $ne: null },
-        yarnPrice: { $exists: true, $ne: null },
+        yarnBrand: mongoose.trusted({ $exists: true, $ne: null }),
+        yarnPrice: mongoose.trusted({ $exists: true, $ne: null }),
       })
         .select("yarnBrand yarnPrice")
         .lean(),

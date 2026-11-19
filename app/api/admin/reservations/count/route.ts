@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
@@ -17,11 +18,11 @@ export async function GET() {
     const [newSessions, pendingSessions] = await Promise.all([
       Reservation.distinct("stripeCheckoutSessionId", {
         paymentStatus: "paid",
-        seenByAdmin: { $ne: true },
+        seenByAdmin: mongoose.trusted({ $ne: true }),
       }),
       Reservation.distinct("stripeCheckoutSessionId", {
         paymentStatus: "paid",
-        status: { $in: ["pending", "preparing"] },
+        status: mongoose.trusted({ $in: ["pending", "preparing"] }),
       }),
     ]);
 

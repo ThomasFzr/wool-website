@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
 
+// Anti injection d'opérateur (A03) : tout objet à clé « $… » venu d'une saisie est enveloppé dans
+// $eq, donc comparé comme une valeur et jamais interprété (`{ "$ne": null }` ne matche plus tout).
+// Les opérateurs écrits volontairement dans le code sont marqués avec `mongoose.trusted()`.
+mongoose.set("sanitizeFilter", true);
+
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) throw new Error("Missing MONGODB_URI");

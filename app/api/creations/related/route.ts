@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
-    const cartCreations = await CreationModel.find({ _id: { $in: cartIds } })
+    const cartCreations = await CreationModel.find({ _id: mongoose.trusted({ $in: cartIds }) })
       .select("relatedCreations")
       .populate(
         "relatedCreations",

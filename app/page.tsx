@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Header } from "@/components/Header";
 import { Creation as CreationType } from "@/components/CreationCard";
 import { HomeClient } from "./HomeClient";
@@ -48,7 +49,7 @@ async function getCreations(): Promise<CreationType[]> {
   let creations: any[];
   try {
     await connectToDatabase();
-    creations = await CreationModel.find({ hidden: { $ne: true } })
+    creations = await CreationModel.find({ hidden: mongoose.trusted({ $ne: true }) })
       .sort({ displayOrder: -1, createdAt: -1 })
       .lean();
   } catch (err) {

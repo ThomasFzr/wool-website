@@ -1,4 +1,5 @@
 import "./load-env";
+import mongoose from "mongoose";
 import { connectToDatabase } from "../lib/db";
 import Creation from "../models/Creation";
 
@@ -23,7 +24,7 @@ async function generateSlugs() {
     await connectToDatabase();
     console.log("📦 Connexion à la base de données...");
 
-    const creations = await Creation.find({ slug: { $exists: false } });
+    const creations = await Creation.find({ slug: mongoose.trusted({ $exists: false }) });
     console.log(`✨ ${creations.length} créations sans slug trouvées`);
 
     for (const creation of creations) {
@@ -32,7 +33,7 @@ async function generateSlugs() {
       let counter = 1;
 
       // Vérifie l'unicité du slug
-      while (await Creation.findOne({ slug, _id: { $ne: creation._id } })) {
+      while (await Creation.findOne({ slug, _id: mongoose.trusted({ $ne: creation._id }) })) {
         slug = `${baseSlug}-${counter}`;
         counter++;
       }

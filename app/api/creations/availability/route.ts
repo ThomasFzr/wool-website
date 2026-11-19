@@ -29,9 +29,9 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
 
     const creations = await CreationModel.find({
-      _id: { $in: ids },
-      sold: { $ne: true },
-      hidden: { $ne: true },
+      _id: mongoose.trusted({ $in: ids }),
+      sold: mongoose.trusted({ $ne: true }),
+      hidden: mongoose.trusted({ $ne: true }),
     })
       .select("_id")
       .lean();

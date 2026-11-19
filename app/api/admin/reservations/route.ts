@@ -47,7 +47,7 @@ export async function GET(req: Request) {
         const paymentFilter = {
             $or: [
                 { paymentStatus: "paid" }, // Paiements validés
-                { stripeCheckoutSessionId: { $exists: false } }, // Réservations manuelles (sans Stripe)
+                { stripeCheckoutSessionId: mongoose.trusted({ $exists: false }) }, // Réservations manuelles (sans Stripe)
                 { stripeCheckoutSessionId: null }, // Réservations manuelles (sans Stripe)
             ],
         };
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
         }
         
         if (search) {
-            const regex = { $regex: escapeRegex(search), $options: "i" };
+            const regex = mongoose.trusted({ $regex: escapeRegex(search), $options: "i" });
             conditions.push({
                 $or: [
                     { name: regex },
@@ -105,8 +105,8 @@ export async function GET(req: Request) {
                 paymentFilter,
                 {
                     $or: [
-                        { stripeCheckoutSessionId: { $in: keys } },
-                        { _id: { $in: keys.filter((k) => mongoose.isValidObjectId(k)) } },
+                        { stripeCheckoutSessionId: mongoose.trusted({ $in: keys }) },
+                        { _id: mongoose.trusted({ $in: keys.filter((k) => mongoose.isValidObjectId(k)) }) },
                     ],
                 },
             ],
@@ -168,7 +168,7 @@ export async function POST(req: Request) {
         }
 
         // Vérifier que les créations existent
-        const creations = await Creation.find({ _id: { $in: creationIds } });
+        const creations = await Creation.find({ _id: mongoose.trusted({ $in: creationIds }) });
         if (creations.length !== creationIds.length) {
             return NextResponse.json(
                 { error: "Certaines créations n'existent pas" },

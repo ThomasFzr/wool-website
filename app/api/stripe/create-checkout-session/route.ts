@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     // Récupérer les créations et vérifier leur disponibilité
     const creationIds = items.map((item: any) => item.creationId);
     // Une pièce cachée n'est pas en vente : traitée comme inexistante
-    const creations = await Creation.find({ _id: { $in: creationIds }, hidden: { $ne: true } });
+    const creations = await Creation.find({ _id: mongoose.trusted({ $in: creationIds }), hidden: mongoose.trusted({ $ne: true }) });
 
     if (creations.length !== items.length) {
       return new NextResponse("Certaines créations n'existent pas", {
@@ -189,10 +189,10 @@ export async function POST(req: NextRequest) {
       let lockedCreation = await Creation.findOneAndUpdate(
         {
           _id: creation._id,
-          sold: { $ne: true },
-          reserved: { $ne: true },
+          sold: mongoose.trusted({ $ne: true }),
+          reserved: mongoose.trusted({ $ne: true }),
           // Cachée entre-temps par l'admin : plus en vente
-          hidden: { $ne: true },
+          hidden: mongoose.trusted({ $ne: true }),
         },
         { $set: lockFields(reservationId) }
       );
@@ -207,8 +207,8 @@ export async function POST(req: NextRequest) {
           creationId: creation._id,
           contact: session.user.email,
           paymentStatus: "pending",
-          status: { $ne: "cancelled" },
-          stripeCheckoutSessionId: { $exists: true, $ne: null },
+          status: mongoose.trusted({ $ne: "cancelled" }),
+          stripeCheckoutSessionId: mongoose.trusted({ $exists: true, $ne: null }),
         }).select("_id stripeCheckoutSessionId");
         const staleIds = staleReservations.map((r: any) => r._id);
 
@@ -216,9 +216,9 @@ export async function POST(req: NextRequest) {
           staleIds.length > 0 &&
           (await Creation.exists({
             _id: creation._id,
-            sold: { $ne: true },
+            sold: mongoose.trusted({ $ne: true }),
             reserved: true,
-            reservedByReservationId: { $in: staleIds },
+            reservedByReservationId: mongoose.trusted({ $in: staleIds }),
           }));
 
         if (ownStaleLock) {
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
           if (blocked) break;
 
           await Reservation.updateMany(
-            { _id: { $in: staleIds }, paymentStatus: "pending" },
+            { _id: mongoose.trusted({ $in: staleIds }), paymentStatus: "pending" },
             {
               $set: {
                 status: "cancelled",
@@ -252,8 +252,8 @@ export async function POST(req: NextRequest) {
           lockedCreation = await Creation.findOneAndUpdate(
             {
               _id: creation._id,
-              sold: { $ne: true },
-              $or: [{ reserved: { $ne: true } }, { reservedByReservationId: { $in: staleIds } }],
+              sold: mongoose.trusted({ $ne: true }),
+              $or: [{ reserved: mongoose.trusted({ $ne: true }) }, { reservedByReservationId: mongoose.trusted({ $in: staleIds }) }],
             },
             { $set: lockFields(reservationId) }
           );
@@ -398,7 +398,7 @@ export async function POST(req: NextRequest) {
       // libérer les articles et expirer la session Stripe (best effort)
       try {
         await Reservation.deleteMany({
-          _id: { $in: reservationDocs.map((doc) => doc._id) },
+          _id: mongoose.trusted({ $in: reservationDocs.map((doc) => doc._id) }),
         });
       } catch (deleteErr) {
         console.error("[CHECKOUT] Échec du nettoyage des réservations:", deleteErr);

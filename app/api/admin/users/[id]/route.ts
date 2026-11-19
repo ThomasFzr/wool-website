@@ -41,7 +41,7 @@ export async function PATCH(
     // Vérifier si l'email est déjà utilisé par un autre utilisateur (le schéma met les
     // emails en minuscules : on compare de même, et on ignore le compte lui-même)
     if (email && String(email).trim().toLowerCase() !== user.email) {
-      const existingUser = await User.findOne({ email: String(email).trim().toLowerCase(), _id: { $ne: user._id } });
+      const existingUser = await User.findOne({ email: String(email).trim().toLowerCase(), _id: mongoose.trusted({ $ne: user._id }) });
       if (existingUser) {
         return NextResponse.json(
           { error: "Cet email est déjà utilisé" },

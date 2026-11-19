@@ -48,3 +48,28 @@ describe("connectToDatabase", () => {
     expect(mongoose.connection.readyState).toBe(1);
   });
 });
+
+describe("sanitizeFilter (anti injection d'opérateur, A03)", () => {
+  it("est activé dès le chargement de lib/db", async () => {
+    await load();
+    expect(mongoose.get("sanitizeFilter")).toBe(true);
+  });
+
+  it("neutralise un opérateur injecté et laisse passer ceux marqués mongoose.trusted()", async () => {
+    const connectToDatabase = await load();
+    await connectToDatabase();
+    const Sample =
+      mongoose.models.SanitizeSample ??
+      mongoose.model("SanitizeSample", new mongoose.Schema({ email: String, hidden: Boolean }));
+    await Sample.create([{ email: "a@exemple.fr" }, { email: "b@exemple.fr", hidden: true }]);
+
+    // Saisie malveillante : `{ "$ne": null }` matcherait le premier document sans sanitizeFilter
+    const injected = JSON.parse('{"$ne": null}');
+    await expect(Sample.findOne({ email: injected })).rejects.toThrow(/Cast to string failed/);
+    await expect(Sample.find({ $where: "true" })).rejects.toThrow(/not allowed with sanitizeFilter/);
+
+    // Opérateur écrit volontairement dans le code
+    const visible = await Sample.find({ hidden: mongoose.trusted({ $ne: true }) });
+    expect(visible.map((d) => d.email)).toEqual(["a@exemple.fr"]);
+  });
+});

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
@@ -13,7 +14,7 @@ export async function POST() {
 
     await connectToDatabase();
 
-    const creations = await Creation.find({ slug: { $exists: false } });
+    const creations = await Creation.find({ slug: mongoose.trusted({ $exists: false }) });
     const results = [];
 
     for (const creation of creations) {

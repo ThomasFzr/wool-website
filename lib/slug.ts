@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Creation from "@/models/Creation";
 
 /**
@@ -26,7 +27,7 @@ export async function generateUniqueSlug(title: string, excludeId?: string): Pro
   const query: Record<string, unknown> = {
     $or: [{ slug: pattern }, { previousSlugs: pattern }],
   };
-  if (excludeId) query._id = { $ne: excludeId };
+  if (excludeId) query._id = mongoose.trusted({ $ne: excludeId });
 
   const existing = await Creation.find(query).select("slug previousSlugs").lean();
   const taken = new Set(
@@ -45,7 +46,7 @@ export async function generateUniqueSlug(title: string, excludeId?: string): Pro
  * Les créations cachées ne sont pas exposées.
  */
 export async function findRenamedSlug(oldSlug: string): Promise<string | null> {
-  const creation = await Creation.findOne({ previousSlugs: oldSlug, hidden: { $ne: true } })
+  const creation = await Creation.findOne({ previousSlugs: oldSlug, hidden: mongoose.trusted({ $ne: true }) })
     .select("slug")
     .lean<{ slug?: string } | null>();
   return creation?.slug || null;

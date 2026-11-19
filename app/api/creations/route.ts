@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     if (!isAdmin) {
       query = query
         .select("-yarnBrand -weight -yarnPrice")
-        .where({ hidden: { $ne: true } }); // Exclure les créations cachées
+        .where({ hidden: mongoose.trusted({ $ne: true }) }); // Exclure les créations cachées
     }
     
     const creations = await query

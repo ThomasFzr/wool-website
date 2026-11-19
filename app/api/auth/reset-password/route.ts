@@ -1,4 +1,5 @@
 // app/api/auth/reset-password/route.ts
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     // Trouver l'utilisateur avec le token valide
     const user = await User.findOne({
       resetToken: hashedToken,
-      resetTokenExpiry: { $gt: new Date() }, // Le token n'a pas expiré
+      resetTokenExpiry: mongoose.trusted({ $gt: new Date() }), // Le token n'a pas expiré
     });
 
     if (!user) {

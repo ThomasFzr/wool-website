@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
       
       if (finalCreationIds.length > 0) {
         try {
-          const creations = await Creation.find({ _id: { $in: finalCreationIds } });
+          const creations = await Creation.find({ _id: mongoose.trusted({ $in: finalCreationIds }) });
           if (creations.length > 0) {
             const creationsHtml = creations.map((creation) => {
               const imageUrl = creation.imageUrl || (creation.images && creation.images[0]) || '';

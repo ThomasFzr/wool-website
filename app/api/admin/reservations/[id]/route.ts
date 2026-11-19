@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
@@ -216,7 +217,7 @@ async function findTargets(id: string, wholeOrder: boolean) {
   if (!wholeOrder || !reservation.stripeCheckoutSessionId) return [reservation];
   return Reservation.find({
     stripeCheckoutSessionId: reservation.stripeCheckoutSessionId,
-    $or: [{ _id: reservation._id }, { status: { $ne: "cancelled" } }],
+    $or: [{ _id: reservation._id }, { status: mongoose.trusted({ $ne: "cancelled" }) }],
   })
     .sort({ createdAt: 1, _id: 1 })
     .lean<any[]>();
@@ -276,7 +277,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       if (body.status === "validated" || body.status === "preparing") {
         // Atomique + conditionnel : salesCount ne s'incrémente qu'une seule fois par article
         await Creation.findOneAndUpdate(
-          { _id: creation._id, sold: { $ne: true } },
+          { _id: creation._id, sold: mongoose.trusted({ $ne: true }) },
           { $set: { sold: true }, $inc: { salesCount: 1 } }
         );
         validatedItems.push(reservation);
@@ -346,7 +347,7 @@ export async function DELETE(
         ? await Reservation.find({ stripeCheckoutSessionId: reservation.stripeCheckoutSessionId }).lean<any[]>()
         : [reservation];
 
-    await Reservation.deleteMany({ _id: { $in: targets.map((r) => r._id) } });
+    await Reservation.deleteMany({ _id: mongoose.trusted({ $in: targets.map((r) => r._id) }) });
 
     // Une commande déjà annulée a déjà rendu sa pièce : on n'y touche plus.
     // Sinon, remise en vente sauf si la pièce a été revendue depuis.

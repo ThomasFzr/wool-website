@@ -29,7 +29,7 @@ export async function GET(
     const isAdmin = session !== null;
     
     // Construire la requête avec ou sans filtre hidden selon le rôle
-    const baseQuery = isAdmin ? {} : { hidden: { $ne: true } };
+    const baseQuery = isAdmin ? {} : { hidden: mongoose.trusted({ $ne: true }) };
     
     // Récupérer la création par ID ou slug avec les articles liés
     // (un id non-ObjectId ferait lever un CastError sur _id, d'où le test explicite)
