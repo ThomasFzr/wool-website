@@ -4,7 +4,7 @@ import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import Settings from "@/models/Settings";
 import User from "@/models/User";
-import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS } from "../data";
+import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS, E2E_LEGACY_CLIENT } from "../data";
 
 /** Vide la base e2e et la remplit avec le jeu de données de référence. */
 export async function seed() {
@@ -23,9 +23,19 @@ export async function seed() {
     {
       name: E2E_ADMIN.name,
       email: E2E_ADMIN.email,
+      // Comme en production, l'admin se connecte avec Google. Ce mot de passe hérité ne sert
+      // qu'à prouver le refus du provider credentials pour un admin (auth.spec.ts).
       password: await bcrypt.hash(E2E_ADMIN.password, 10),
-      provider: "credentials",
+      provider: "google",
+      emailVerifiedAt: new Date("2026-01-01T00:00:00Z"),
       role: "admin",
+    },
+    {
+      name: "Ancien Client",
+      email: E2E_LEGACY_CLIENT.email,
+      password: await bcrypt.hash(E2E_LEGACY_CLIENT.password, 10),
+      provider: "credentials",
+      role: "user",
     },
   ]);
 

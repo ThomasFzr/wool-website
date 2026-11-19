@@ -1,9 +1,19 @@
+import fs from "fs";
+import path from "path";
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
-import { E2E_STRIPE_URL } from "./data";
+import { encode } from "next-auth/jwt";
+import { E2E_ADMIN, E2E_APP_PORT, E2E_AUTH_SECRET, E2E_HIBP_URL, E2E_STRIPE_URL } from "./data";
 
 /** Remet la base dans son état initial (via le serveur e2e). */
 export async function resetDatabase(request: APIRequestContext) {
   const res = await request.post(`${E2E_STRIPE_URL}/__e2e/reset`);
+  expect(res.ok()).toBeTruthy();
+  expect((await request.post(`${E2E_HIBP_URL}/__e2e/reset`)).ok()).toBeTruthy();
+}
+
+/** Pilote le faux Have I Been Pwned : mots de passe compromis, ou API en panne. */
+export async function setHibp(request: APIRequestContext, state: { pwned?: string[]; down?: boolean }) {
+  const res = await request.post(`${E2E_HIBP_URL}/__e2e/hibp`, { data: state });
   expect(res.ok()).toBeTruthy();
 }
 
@@ -49,4 +59,52 @@ export async function login(
 ) {
   await submitLogin(page, user, callbackUrl);
   await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+}
+
+/**
+ * Lien de réinitialisation du dernier email « mot de passe oublié » reçu par `to` depuis
+ * `since` (emails capturés dans .emails/ par EMAIL_TRANSPORT=preview).
+ */
+export async function resetLinkFor(to: string, since: string): Promise<string> {
+  const outbox = path.join(process.cwd(), ".emails");
+  const read = () =>
+    fs.existsSync(outbox)
+      ? fs
+          .readdirSync(outbox)
+          .filter((f) => f.endsWith(".json"))
+          .map((f) => JSON.parse(fs.readFileSync(path.join(outbox, f), "utf-8")))
+          .filter((e) => e.sentAt >= since && e.to === to)
+          .sort((a, b) => a.sentAt.localeCompare(b.sentAt))
+      : [];
+  await expect.poll(() => read().length).toBeGreaterThan(0);
+  const link = read().at(-1).html.match(/href="([^"]*\/reset-password\?token=[^"]+)"/)?.[1];
+  expect(link, "lien de réinitialisation").toBeTruthy();
+  return link.replace("&amp;", "&");
+}
+
+/**
+ * Connecte l'administratrice par une session Google simulée, puis ouvre `path`.
+ *
+ * Les admins n'ont pas le droit de se connecter par mot de passe et le parcours OAuth de
+ * Google ne peut pas tourner en e2e : on pose directement le cookie de session que
+ * next-auth aurait créé après une connexion Google (JWT chiffré avec le secret du serveur
+ * e2e). roleCheckedAt à 0 : le serveur relit aussitôt le compte en base (rôle, id).
+ */
+export async function loginAsAdmin(page: Page, path = "/") {
+  const value = await encode({
+    secret: E2E_AUTH_SECRET,
+    token: {
+      name: E2E_ADMIN.name,
+      email: E2E_ADMIN.email,
+      sub: "e2e-admin",
+      provider: "google",
+      role: "admin",
+      roleCheckedAt: 0,
+      authAt: Date.now(),
+    },
+  });
+  await page.context().addCookies([
+    { name: "next-auth.session-token", value, url: `http://localhost:${E2E_APP_PORT}`, httpOnly: true, sameSite: "Lax" },
+  ]);
+  await page.goto(path);
 }

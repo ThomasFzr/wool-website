@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { checkNewPassword } from "@/lib/password-policy";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,11 +17,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 6 caractères" },
-        { status: 400 }
-      );
+    const passwordError = await checkNewPassword(password);
+    if (passwordError) {
+      return NextResponse.json({ error: passwordError }, { status: 400 });
     }
 
     await connectToDatabase();

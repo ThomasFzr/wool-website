@@ -8,6 +8,7 @@ import User from "@/models/User";
 import { makeRequest, readJson, routeParams } from "../../../../helpers/http";
 import { asAdmin } from "../../../../helpers/session";
 import { createUser, expectAdminOnly, failSession } from "../../../../helpers/admin-fixtures";
+import { PASSWORD_MESSAGES } from "@/lib/password-policy";
 
 vi.mock("next-auth", async (orig) => ({ ...(await orig<object>()), getServerSession: vi.fn() }));
 
@@ -59,11 +60,15 @@ describe("POST /api/admin/users", () => {
     expect(body.error).toBe("L'email est requis");
   });
 
-  it.each([["12345"], [12345678]])("refuse un mot de passe trop court ou non textuel (%j)", async (password) => {
+  it.each([
+    ["1234567", PASSWORD_MESSAGES.tooShort],
+    [12345678, PASSWORD_MESSAGES.required],
+    ["password123", PASSWORD_MESSAGES.pwned],
+  ])("refuse un mot de passe trop court, non textuel ou compromis (%j)", async (password, error) => {
     asAdmin();
     const { status, body } = await readJson(await create({ email: "a@example.com", password }));
     expect(status).toBe(400);
-    expect(body.error).toMatch(/6 caractères/);
+    expect(body.error).toBe(error);
     expect(await User.countDocuments()).toBe(0);
   });
 
@@ -225,12 +230,15 @@ describe("PATCH /api/admin/users/[id]", () => {
     expect((await User.findById(user.id))!.role).toBe("user");
   });
 
-  it("refuse un nouveau mot de passe trop court", async () => {
+  it.each([
+    ["123", PASSWORD_MESSAGES.tooShort],
+    ["azertyuiop", PASSWORD_MESSAGES.pwned],
+  ])("refuse un nouveau mot de passe trop court ou compromis (%s)", async (password, error) => {
     const user = await createUser({ name: "Avant" });
     asAdmin();
-    const { status, body } = await readJson(await patch(user.id, { name: "Après", password: "123" }));
+    const { status, body } = await readJson(await patch(user.id, { name: "Après", password }));
     expect(status).toBe(400);
-    expect(body.error).toMatch(/6 caractères/);
+    expect(body.error).toBe(error);
     expect((await User.findById(user.id))!.name).toBe("Avant");
   });
 

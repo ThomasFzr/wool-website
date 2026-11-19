@@ -3,6 +3,7 @@ import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { CartProvider } from "@/contexts/CartContext";
 import { CartModal } from "@/components/CartModal";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
+import { PasswordWarningBanner } from "@/components/PasswordWarningBanner";
 import { Analytics } from "@vercel/analytics/react";
 import { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
@@ -90,6 +91,7 @@ export default async function RootLayout({
           <CartProvider shippingCost={shippingCost} pickupConditions={pickupConditions}>
             {children}
             <CartModal />
+            <PasswordWarningBanner />
           </CartProvider>
         </AuthSessionProvider>
         <Analytics />

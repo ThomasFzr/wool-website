@@ -4,6 +4,8 @@ import { POST } from "@/app/api/register/route";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { makeRequest, readJson } from "../../helpers/http";
+import { PASSWORD_MESSAGES } from "@/lib/password-policy";
+import { pwnedCount } from "@/lib/hibp";
 
 const post = (body: unknown, headers?: Record<string, string>) =>
   POST(makeRequest("/api/register", { method: "POST", body, headers }));
@@ -30,12 +32,31 @@ describe("POST /api/register", () => {
     }
   });
 
-  it("refuse un mot de passe trop court ou qui n'est pas une chaîne", async () => {
-    for (const password of ["12345", 12345678]) {
-      const { status, body } = await readJson(await post({ ...valid, password }));
-      expect(status).toBe(400);
-      expect(body.error).toMatch(/6 caractères/);
-    }
+  it("refuse un mot de passe de moins de 8 caractères", async () => {
+    const { status, body } = await readJson(await post({ ...valid, password: "1234567" }));
+    expect(status).toBe(400);
+    expect(body.error).toBe(PASSWORD_MESSAGES.tooShort);
+    expect(await User.countDocuments()).toBe(0);
+  });
+
+  it("refuse un mot de passe qui n'est pas une chaîne", async () => {
+    const { status, body } = await readJson(await post({ ...valid, password: 12345678 }));
+    expect(status).toBe(400);
+    expect(body.error).toBe(PASSWORD_MESSAGES.required);
+  });
+
+  it("refuse un mot de passe présent dans une fuite connue", async () => {
+    const { status, body } = await readJson(await post({ ...valid, password: "password123" }));
+    expect(status).toBe(400);
+    expect(body.error).toBe(PASSWORD_MESSAGES.pwned);
+    expect(await User.countDocuments()).toBe(0);
+  });
+
+  it("accepte le mot de passe quand l'API des fuites ne répond pas", async () => {
+    vi.mocked(pwnedCount).mockResolvedValueOnce(null);
+    const { status } = await readJson(await post(valid));
+    expect(status).toBe(200);
+    expect(await User.countDocuments()).toBe(1);
   });
 
   it("refuse un nom trop long ou qui n'est pas une chaîne", async () => {

@@ -31,9 +31,13 @@ export function signInOutcome(res: SignInResponse | undefined): SignInOutcome {
   return { ok: true };
 }
 
-/** Message affiché sous le formulaire de connexion pour chaque échec. */
+/**
+ * Message affiché sous le formulaire de connexion pour chaque échec. `credentials` est
+ * volontairement neutre : mauvais identifiants, compte inconnu, trop de tentatives (par IP
+ * ou par compte) ou compte admin (Google obligatoire) donnent le même message.
+ */
 export const SIGN_IN_MESSAGES: Record<Exclude<SignInOutcome, { ok: true }>["reason"], string> = {
-  credentials: "Connexion impossible.",
+  credentials: "Connexion impossible : vérifiez vos identifiants ou réessayez dans quelques minutes.",
   csrf: "La connexion n'a pas abouti (jeton de sécurité expiré). Veuillez réessayer.",
   failed: "La connexion n'a pas abouti. Veuillez réessayer.",
 };

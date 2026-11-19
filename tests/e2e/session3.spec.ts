@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS } from "./data";
-import { login, resetDatabase, waitForLoginPageReady } from "./helpers";
+import { E2E_CLIENT, E2E_CREATIONS, LOGIN_FAILED } from "./data";
+import { login, loginAsAdmin, resetDatabase, waitForLoginPageReady } from "./helpers";
 
 // Parcours corrigés en session 3 (docs/revue-2026-11.md) : compte, admin, front.
 
@@ -85,7 +85,7 @@ test.describe("compte", () => {
     await page.getByPlaceholder("Email").fill(E2E_CLIENT.email);
     await page.getByPlaceholder("Mot de passe").fill(E2E_CLIENT.password);
     await page.getByRole("button", { name: "Se connecter", exact: true }).click();
-    await expect(page.getByText("Connexion impossible.")).toBeVisible();
+    await expect(page.getByText(LOGIN_FAILED)).toBeVisible();
     await login(page, { email: E2E_CLIENT.email, password: "Nouveau-pass-456" }, "/account");
     await expect(page).toHaveURL(/\/account$/);
   });
@@ -95,11 +95,11 @@ test.describe("compte", () => {
     await expect(page.getByRole("heading", { name: "Token invalide" })).toBeVisible();
   });
 
-  test("inscription : mot de passe de 6 caractères minimum, puis compte créé", async ({ page }) => {
+  test("inscription : mot de passe de 8 caractères minimum, puis compte créé", async ({ page }) => {
     await page.goto("/login");
     await page.getByRole("button", { name: "Pas encore de compte ? Créer un compte" }).click();
     const password = page.getByPlaceholder("Mot de passe");
-    await expect(password).toHaveAttribute("minlength", "6");
+    await expect(password).toHaveAttribute("minlength", "8");
     await expect(password).toHaveAttribute("required", "");
 
     await page.getByPlaceholder("Email").fill("nouveau@maillemum.test");
@@ -118,7 +118,7 @@ test.describe("compte", () => {
 
 test.describe("admin", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page, E2E_ADMIN, "/admin/reservations");
+    await loginAsAdmin(page, "/admin/reservations");
     await expect(page).toHaveURL(/\/admin\/reservations$/);
   });
 

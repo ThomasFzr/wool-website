@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { E2E_CLIENT, E2E_CREATIONS } from "./data";
-import { login, resetDatabase, submitLogin, waitForLoginPageReady } from "./helpers";
+import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS, E2E_LEGACY_CLIENT, LOGIN_FAILED } from "./data";
+import { login, loginAsAdmin, resetDatabase, submitLogin, waitForLoginPageReady } from "./helpers";
 
 test.beforeEach(async ({ request }) => {
   await resetDatabase(request);
@@ -25,8 +25,44 @@ test("une page protégée renvoie vers /login avec le callbackUrl", async ({ pag
 
 test("mauvais mot de passe : message d'erreur, pas de connexion", async ({ page }) => {
   await submitLogin(page, { email: E2E_CLIENT.email, password: "pas-le-bon" });
-  await expect(page.getByText("Connexion impossible.")).toBeVisible();
+  await expect(page.getByText(LOGIN_FAILED)).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
+});
+
+test("admin : le bon mot de passe est refusé (Google uniquement), message neutre, aucune session", async ({ page, context }) => {
+  await submitLogin(page, E2E_ADMIN, "/admin");
+  await expect(page.getByText(LOGIN_FAILED)).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+  expect((await context.cookies()).map((c) => c.name)).not.toContain("next-auth.session-token");
+  expect((await page.request.get("/api/admin/users")).status()).toBe(401);
+});
+
+test("admin : une session Google donne accès à l'administration", async ({ page }) => {
+  await loginAsAdmin(page, "/admin/users");
+  await expect(page).toHaveURL(/\/admin\/users$/);
+  expect((await page.request.get("/api/admin/users")).status()).toBe(200);
+});
+
+test("5 échecs sur un compte : bloqué même avec le bon mot de passe, message neutre, autres comptes libres", async ({ page }) => {
+  await submitLogin(page, { email: E2E_CLIENT.email, password: "pas-le-bon-0" });
+  await expect(page.getByText(LOGIN_FAILED)).toBeVisible();
+  const password = page.getByPlaceholder("Mot de passe");
+  const submit = async (value: string) => {
+    await password.fill(value);
+    const answered = page.waitForResponse((r) => r.url().includes("/api/auth/callback/credentials"));
+    await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+    await answered;
+    await expect(page.getByText(LOGIN_FAILED)).toBeVisible();
+  };
+  for (let i = 1; i < 5; i++) await submit(`pas-le-bon-${i}`);
+
+  // Bon mot de passe : même message qu'un échec, rien n'indique le blocage ni l'existence du compte
+  await submit(E2E_CLIENT.password);
+  await expect(page).toHaveURL(/\/login/);
+
+  // La limite est par compte : un autre compte se connecte depuis la même IP
+  await login(page, E2E_LEGACY_CLIENT, "/account");
+  await expect(page).toHaveURL(/\/account$/);
 });
 
 test("jeton CSRF refusé : message d'erreur, aucune session, jamais de faux succès", async ({ page, context }) => {

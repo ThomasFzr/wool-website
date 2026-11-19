@@ -1,9 +1,12 @@
 import "next-auth";
 import "next-auth/jwt";
+import type { PasswordWarning } from "@/lib/password-policy";
 
 declare module "next-auth" {
   interface Session {
     provider?: string;
+    /** Mot de passe de connexion trop court ou compromis : bandeau d'invitation à le changer. */
+    passwordWarning?: PasswordWarning;
     user: {
       id: string;
       email?: string | null;
@@ -15,6 +18,7 @@ declare module "next-auth" {
 
   interface User {
     role?: "user" | "admin";
+    passwordWarning?: PasswordWarning;
   }
 }
 
@@ -27,5 +31,6 @@ declare module "next-auth/jwt" {
     roleCheckedAt?: number;
     /** Date de connexion (ms), comparée à User.passwordChangedAt. */
     authAt?: number;
+    passwordWarning?: PasswordWarning;
   }
 }

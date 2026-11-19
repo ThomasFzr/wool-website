@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { checkAdminAuth } from "@/lib/auth";
+import { checkNewPassword } from "@/lib/password-policy";
 
 /**
  * GET /api/admin/users
@@ -59,12 +60,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Même règle que register/reset-password : 6 caractères minimum
-    if (password && (typeof password !== "string" || password.length < 6)) {
-      return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 6 caractères" },
-        { status: 400 }
-      );
+    // Mot de passe facultatif (compte sans mot de passe sinon) ; s'il est fourni, même
+    // politique que l'inscription (lib/password-policy)
+    if (password) {
+      const passwordError = await checkNewPassword(password);
+      if (passwordError) {
+        return NextResponse.json({ error: passwordError }, { status: 400 });
+      }
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();

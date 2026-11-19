@@ -5,6 +5,7 @@ export const STRIPE_E2E_APP_PORT = 3200;
 export const STRIPE_E2E_CONTROL_PORT = 3201;
 export const STRIPE_E2E_APP_URL = `http://localhost:${STRIPE_E2E_APP_PORT}`;
 export const STRIPE_E2E_CONTROL_URL = `http://localhost:${STRIPE_E2E_CONTROL_PORT}`;
+export const STRIPE_E2E_HIBP_PORT = 3202;
 
 /** Fichier (ignoré par git) qui contient STRIPE_SECRET_KEY=sk_test_… */
 export const STRIPE_TEST_ENV_FILE = ".env.stripe-test.local";

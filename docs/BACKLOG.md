@@ -47,8 +47,12 @@ Issue : [#20](https://github.com/ThomasFzr/wool-website/issues/20)
 Issue : [#21](https://github.com/ThomasFzr/wool-website/issues/21)
 
 - Validation centralisée des entrées (zod) et `sanitizeFilter` de Mongoose.
-- Mots de passe de 12 caractères minimum, limite de connexion par compte, connexion Google
-  obligatoire pour les administrateurs, coût bcrypt à 12.
+- ~~Politique de mot de passe (minimum, fuites Have I Been Pwned), limite de connexion par
+  compte, connexion Google obligatoire pour les administrateurs~~ : faits (PR « Durcissement de
+  l'authentification »). Reste : coût bcrypt à 12, minimum à 15 caractères (NIST SP 800-63B
+  rév. 4), masquer le champ mot de passe d'un compte admin dans l'écran admin, normalisation
+  Unicode NFC des mots de passe avant hachage (NIST SP 800-63B, *SHOULD* ; prévoir la
+  compatibilité avec les hachages existants).
 - Journal d'audit des actions admin et des échecs de connexion.
 - Détail : [`docs/SECURITY.md`](SECURITY.md), section « Limites connues ».
 

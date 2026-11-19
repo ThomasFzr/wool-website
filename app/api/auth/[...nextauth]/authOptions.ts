@@ -4,19 +4,28 @@ import Google from "next-auth/providers/google";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { getClientPromise } from "@/lib/mongodb";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import User, { IUserDocument } from "@/models/User";
 import { connectToDatabase } from "@/lib/db";
 import { clientIp, hitRateLimit, rateLimitCount } from "@/lib/rate-limit";
 import { ACCOUNT_CHECK_TTL, lookupAccount, type AccountState } from "@/lib/account-check";
+import { passwordWarning } from "@/lib/password-policy";
 
 // Le rôle stocké dans le JWT est revérifié en DB au plus toutes les ROLE_REFRESH_INTERVAL ms
 // (sinon un admin révoqué garderait son rôle jusqu'à expiration du token).
 const ROLE_REFRESH_INTERVAL = ACCOUNT_CHECK_TTL;
 
-// Anti force brute : au-delà de LOGIN_MAX_FAILURES échecs depuis une même IP dans la fenêtre,
-// toute tentative est refusée (même avec le bon mot de passe) jusqu'à la fenêtre suivante.
+// Anti force brute : au-delà de LOGIN_MAX_FAILURES échecs depuis une même IP, ou de
+// LOGIN_MAX_FAILURES_PER_ACCOUNT échecs sur un même email (attaque répartie sur plusieurs
+// IP), toute tentative est refusée dans la fenêtre, même avec le bon mot de passe. Le refus
+// est identique à un mauvais mot de passe : rien n'indique si le compte existe.
 const LOGIN_MAX_FAILURES = 10;
+const LOGIN_MAX_FAILURES_PER_ACCOUNT = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+// Compteur par compte : clé dérivée de l'email (aucune adresse en clair dans les compteurs)
+const accountRateKey = (email: string) =>
+  `login:account:${crypto.createHash("sha256").update(email).digest("hex")}`;
 
 export const authOptions: NextAuthOptions = {
   // Fonction et non promesse : après un échec de connexion, l'adaptateur retente au lieu de
@@ -46,16 +55,20 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials.password) return null;
 
         await connectToDatabase();
-        const rateKey = `login:ip:${clientIp(req?.headers)}`;
-        if ((await rateLimitCount(rateKey, LOGIN_WINDOW_MS)) >= LOGIN_MAX_FAILURES) return null;
+        const email = credentials.email.toLowerCase().trim();
+        const ipKey = `login:ip:${clientIp(req?.headers)}`;
+        const accountKey = accountRateKey(email);
+        const [ipFailures, accountFailures] = await Promise.all([
+          rateLimitCount(ipKey, LOGIN_WINDOW_MS),
+          rateLimitCount(accountKey, LOGIN_WINDOW_MS),
+        ]);
+        if (ipFailures >= LOGIN_MAX_FAILURES || accountFailures >= LOGIN_MAX_FAILURES_PER_ACCOUNT) return null;
         const fail = async () => {
-          await hitRateLimit(rateKey, LOGIN_WINDOW_MS);
+          await Promise.all([hitRateLimit(ipKey, LOGIN_WINDOW_MS), hitRateLimit(accountKey, LOGIN_WINDOW_MS)]);
           return null;
         };
 
-        const user = await User.findOne({
-          email: credentials.email.toLowerCase().trim(),
-        })
+        const user = await User.findOne({ email })
           .select("+password")
           .lean<IUserDocument | null>();
 
@@ -66,11 +79,21 @@ export const authOptions: NextAuthOptions = {
         const ok = await bcrypt.compare(credentials.password, user.password);
         if (!ok) return fail();
 
+        // Administrateurs : connexion Google uniquement (double authentification déléguée à
+        // Google). Refus vérifié après bcrypt pour que le temps de réponse ne trahisse pas
+        // un compte admin, et compté comme un échec, avec le même message neutre.
+        if (user.role === "admin") return fail();
+
+        // Ancien mot de passe trop court ou compromis : connexion acceptée, mais un bandeau
+        // invite à le changer (aucune invalidation des mots de passe existants).
+        const warning = await passwordWarning(credentials.password);
+
         return {
           id: user._id.toString(),
           email: user.email,
           name: user.name ?? undefined,
           role: user.role,
+          ...(warning && { passwordWarning: warning }),
         };
       }
     }),
@@ -140,6 +163,8 @@ export const authOptions: NextAuthOptions = {
         token.roleCheckedAt = Date.now();
         // Date de connexion : une session ouverte avant un changement de mot de passe est révoquée
         token.authAt = Date.now();
+        // Recalculé à chaque connexion : disparaît après reconnexion avec un nouveau mot de passe
+        if (user.passwordWarning) token.passwordWarning = user.passwordWarning;
       }
 
       if (account) {
@@ -177,6 +202,11 @@ export const authOptions: NextAuthOptions = {
         if (account.passwordChangedAt && (token.authAt ?? 0) < account.passwordChangedAt) {
           throw new Error("Session révoquée : mot de passe changé");
         }
+        // Compte devenu admin (promotion) avec une session ouverte autrement que par Google :
+        // révoquée, l'accès admin exige une reconnexion avec Google.
+        if (account.role === "admin" && token.provider !== "google") {
+          throw new Error("Session révoquée : un administrateur se connecte avec Google");
+        }
         token.role = account.role;
         token.userId = account.userId;
         token.roleCheckedAt = checkedAt;
@@ -190,6 +220,9 @@ export const authOptions: NextAuthOptions = {
       }
       if (token?.userId) {
         session.user.id = token.userId as string;
+      }
+      if (token?.passwordWarning) {
+        session.passwordWarning = token.passwordWarning;
       }
       if (token?.role) {
         session.user.role = token.role as "user" | "admin";

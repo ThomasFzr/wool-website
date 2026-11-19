@@ -5,7 +5,9 @@ import type { JWT } from "next-auth/jwt";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
+import RateLimit from "@/models/RateLimit";
 import { resetAccountCheckCache } from "@/lib/account-check";
+import { pwnedCount } from "@/lib/hibp";
 
 // Les callbacks et authorize sont appelés directement : on teste notre logique, pas next-auth.
 const callbacks = authOptions.callbacks!;
@@ -83,14 +85,17 @@ describe("authOptions", () => {
       const ip = { "x-real-ip": "203.0.113.7" };
       await User.create({ email: "google@example.com", provider: "google" });
       // Tous les types d'échec comptent : compte inconnu, compte sans mot de passe, mauvais mot de passe
-      expect(await authorize({ email: "inconnu@example.com", password: "x" }, ip)).toBeNull();
+      // (répartis sur plusieurs comptes pour rester sous la limite par compte)
       expect(await authorize({ email: "google@example.com", password: "x" }, ip)).toBeNull();
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 4; i++) {
+        expect(await authorize({ email: `inconnu${i}@example.com`, password: "x" }, ip)).toBeNull();
+      }
+      for (let i = 0; i < 4; i++) {
         expect(await authorize({ email: "client@example.com", password: "mauvais" }, ip)).toBeNull();
       }
       // Une connexion réussie ne compte pas comme un échec
       expect(await authorize({ email: "client@example.com", password: "secret123" }, ip)).not.toBeNull();
-      expect(await authorize({ email: "client@example.com", password: "mauvais" }, ip)).toBeNull();
+      expect(await authorize({ email: "inconnu9@example.com", password: "x" }, ip)).toBeNull();
 
       expect(await authorize({ email: "client@example.com", password: "secret123" }, ip)).toBeNull();
       // Une autre IP n'est pas concernée
@@ -99,15 +104,125 @@ describe("authOptions", () => {
       ).not.toBeNull();
     });
 
+    describe("mot de passe existant faible (aucune invalidation)", () => {
+      const createWith = async (password: string) =>
+        User.create({ email: "faible@example.com", password: await bcrypt.hash(password, 4), provider: "credentials" });
+
+      it("accepte un mot de passe de moins de 8 caractères, en le signalant", async () => {
+        await createWith("chaton");
+        const user = await authorize({ email: "faible@example.com", password: "chaton" });
+        expect(user).toMatchObject({ email: "faible@example.com", passwordWarning: "short" });
+      });
+
+      it("accepte un mot de passe présent dans une fuite, en le signalant", async () => {
+        await createWith("password123");
+        const user = await authorize({ email: "faible@example.com", password: "password123" });
+        expect(user).toMatchObject({ email: "faible@example.com", passwordWarning: "pwned" });
+      });
+
+      it("ne signale rien si l'API des fuites ne répond pas", async () => {
+        await createWith("password123");
+        vi.mocked(pwnedCount).mockResolvedValueOnce(null);
+        const user = await authorize({ email: "faible@example.com", password: "password123" });
+        expect(user).not.toBeNull();
+        expect(user).not.toHaveProperty("passwordWarning");
+      });
+
+      it("n'interroge pas l'API des fuites sur un mauvais mot de passe", async () => {
+        await createWith("password123");
+        expect(await authorize({ email: "faible@example.com", password: "mauvais-mdp" })).toBeNull();
+        expect(pwnedCount).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("limite par compte (5 échecs en 15 minutes)", () => {
+      beforeEach(() => {
+        vi.spyOn(Date, "now").mockReturnValue(3_000_000 * 900_000 + 1_000);
+      });
+      // Une IP différente à chaque essai : attaque répartie, la limite par IP ne joue pas
+      const fromIp = (i: number) => ({ "x-real-ip": `198.51.100.${i}` });
+
+      it("bloque le compte après 5 échecs, même avec le bon mot de passe et depuis une autre IP", async () => {
+        for (let i = 0; i < 4; i++) {
+          expect(await authorize({ email: "client@example.com", password: "mauvais" }, fromIp(i))).toBeNull();
+        }
+        // 4 échecs : encore possible
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(10))).not.toBeNull();
+        expect(await authorize({ email: "client@example.com", password: "mauvais" }, fromIp(11))).toBeNull();
+        // 5 échecs : refusé, même réponse qu'un mauvais mot de passe
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(12))).toBeNull();
+        // Les autres comptes ne sont pas concernés
+        await User.create({ email: "autre@example.com", password: await bcrypt.hash("secret123", 4) });
+        expect(await authorize({ email: "autre@example.com", password: "secret123" }, fromIp(13))).not.toBeNull();
+      });
+
+      it("compte les échecs quelle que soit la casse de l'email, y compris pour un compte inconnu", async () => {
+        for (const email of ["Client@Example.com", " CLIENT@example.com", "client@example.com", "client@EXAMPLE.com", "client@example.COM"]) {
+          expect(await authorize({ email, password: "mauvais" }, fromIp(1))).toBeNull();
+        }
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(2))).toBeNull();
+
+        for (let i = 0; i < 5; i++) await authorize({ email: "fantome@example.com", password: "x" }, fromIp(i));
+        expect(await RateLimit.countDocuments({ _id: /^login:account:/ })).toBe(2);
+      });
+
+      it("ne stocke pas l'email en clair dans les compteurs", async () => {
+        await authorize({ email: "client@example.com", password: "mauvais" }, fromIp(1));
+        const ids = (await RateLimit.find().lean()).map((d) => String(d._id));
+        expect(ids).toHaveLength(2);
+        expect(ids.join(" ")).not.toContain("client@example.com");
+        expect(ids.some((id) => /^login:account:[0-9a-f]{64}:/.test(id))).toBe(true);
+      });
+
+      it("repart de zéro à la fenêtre suivante", async () => {
+        for (let i = 0; i < 5; i++) await authorize({ email: "client@example.com", password: "mauvais" }, fromIp(i));
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(9))).toBeNull();
+        vi.mocked(Date.now).mockReturnValue(3_000_001 * 900_000 + 1_000);
+        expect(await authorize({ email: "client@example.com", password: "secret123" }, fromIp(9))).not.toBeNull();
+      });
+    });
+
     it("renvoie name undefined quand le compte n'a pas de nom", async () => {
       await User.create({
         email: "anonyme@example.com",
         password: await bcrypt.hash("secret123", 4),
-        role: "admin",
       });
       const user = await authorize({ email: "anonyme@example.com", password: "secret123" });
       expect(user.name).toBeUndefined();
-      expect(user.role).toBe("admin");
+      expect(user.role).toBe("user");
+    });
+
+    describe("compte admin : Google uniquement", () => {
+      beforeEach(async () => {
+        await User.create({
+          email: "admin@example.com",
+          password: await bcrypt.hash("secret123", 4),
+          provider: "google",
+          role: "admin",
+        });
+      });
+
+      it("refuse le bon mot de passe d'un admin", async () => {
+        expect(await authorize({ email: "admin@example.com", password: "secret123" })).toBeNull();
+      });
+
+      it("vérifie le mot de passe avant de refuser (pas d'écart de temps révélant un admin)", async () => {
+        const compare = vi.spyOn(bcrypt, "compare");
+        await authorize({ email: "admin@example.com", password: "secret123" });
+        expect(compare).toHaveBeenCalledTimes(1);
+      });
+
+      it("compte le refus comme un échec (limite par compte)", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(4_000_000 * 900_000 + 1_000);
+        await authorize({ email: "admin@example.com", password: "secret123" }, { "x-real-ip": "192.0.2.1" });
+        const [counter] = await RateLimit.find({ _id: /^login:account:/ }).lean<{ count: number }[]>();
+        expect(counter.count).toBe(1);
+      });
+
+      it("n'interroge pas l'API des fuites pour un admin", async () => {
+        await authorize({ email: "admin@example.com", password: "secret123" });
+        expect(pwnedCount).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -218,6 +333,17 @@ describe("authOptions", () => {
       expect(typeof token.roleCheckedAt).toBe("number");
     });
 
+    it("copie l'alerte sur le mot de passe dans le token, uniquement si elle existe", async () => {
+      const weak = await jwt({
+        token: { email: "x@example.com" },
+        user: { id: "u1", passwordWarning: "pwned" } as any,
+        account: credAccount,
+      });
+      expect(weak.passwordWarning).toBe("pwned");
+      const fine = await jwt({ token: { email: "x@example.com" }, user: { id: "u1" } as any, account: credAccount });
+      expect(fine).not.toHaveProperty("passwordWarning");
+    });
+
     it("donne le rôle user par défaut", async () => {
       const token = await jwt({ token: { email: "x@example.com" }, user: { id: "u1" } as any, account: credAccount });
       expect(token.role).toBe("user");
@@ -267,9 +393,29 @@ describe("authOptions", () => {
     it("revérifie le rôle sur trigger update même s'il est récent", async () => {
       await User.create({ email: "promu@example.com", role: "admin" });
       const token = await jwt({
-        token: { email: "promu@example.com", role: "user", roleCheckedAt: Date.now() },
+        token: { email: "promu@example.com", role: "user", provider: "google", roleCheckedAt: Date.now() },
         trigger: "update",
       });
+      expect(token.role).toBe("admin");
+    });
+
+    it("révoque la session par mot de passe d'un compte promu admin", async () => {
+      await User.create({ email: "promu@example.com", role: "admin" });
+      await expect(
+        jwt({ token: { email: "promu@example.com", role: "user", provider: "credentials", roleCheckedAt: 0 } })
+      ).rejects.toThrow("un administrateur se connecte avec Google");
+    });
+
+    it("révoque une session admin sans provider connu", async () => {
+      await User.create({ email: "admin@example.com", role: "admin" });
+      await expect(jwt({ token: { email: "admin@example.com", role: "admin", roleCheckedAt: 0 } })).rejects.toThrow(
+        "un administrateur se connecte avec Google"
+      );
+    });
+
+    it("garde la session Google d'un admin", async () => {
+      await User.create({ email: "admin@example.com", role: "admin" });
+      const token = await jwt({ token: { email: "admin@example.com", role: "admin", provider: "google", roleCheckedAt: 0 } });
       expect(token.role).toBe("admin");
     });
 
@@ -316,7 +462,7 @@ describe("authOptions", () => {
 
     it("relit la base sur trigger update malgré une vérification récente en cache", async () => {
       await User.create({ email: "promu@example.com", role: "user" });
-      const stale = { email: "promu@example.com", role: "user" as const, roleCheckedAt: 0 };
+      const stale = { email: "promu@example.com", role: "user" as const, provider: "google", roleCheckedAt: 0 };
       await jwt({ token: { ...stale } });
       await User.updateOne({ email: "promu@example.com" }, { role: "admin" });
       expect((await jwt({ token: { ...stale } })).role).toBe("user");
@@ -355,8 +501,13 @@ describe("authOptions", () => {
       expect(s.user).toMatchObject({ id: "u1", role: "admin", email: "client@example.com" });
     });
 
-    it("met le rôle user par défaut et n'ajoute ni provider ni id", async () => {
+    it("expose l'alerte sur le mot de passe du token", async () => {
+      expect((await session({ passwordWarning: "short" })).passwordWarning).toBe("short");
+    });
+
+    it("met le rôle user par défaut et n'ajoute ni provider, ni id, ni alerte", async () => {
       const s = await session({});
+      expect(s.passwordWarning).toBeUndefined();
       expect(s.provider).toBeUndefined();
       expect(s.user.id).toBeUndefined();
       expect(s.user.role).toBe("user");
