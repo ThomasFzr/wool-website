@@ -9,6 +9,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Lancement manuel (onglet Actions ou `gh workflow run Tests`)
+  workflow_dispatch:
 
 # Lecture seule : le workflow n'a besoin d'écrire nulle part
 permissions:
