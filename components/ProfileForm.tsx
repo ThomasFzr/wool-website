@@ -3,6 +3,7 @@
 import { useState, FormEvent, ChangeEvent } from "react";
 import { signIn } from "next-auth/react";
 import { Button, Input, Card } from "@/components";
+import { PASSWORD_MESSAGES, PASSWORD_MIN_LENGTH, passwordLength } from "@/lib/password-policy";
 
 type ProfileFormData = {
   name: string;
@@ -99,8 +100,8 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
       return;
     }
 
-    if (form.newPassword && form.newPassword.length < 6) {
-      setMessage("Le mot de passe doit contenir au moins 6 caractères");
+    if (form.newPassword && passwordLength(form.newPassword) < PASSWORD_MIN_LENGTH) {
+      setMessage(PASSWORD_MESSAGES.tooShort);
       setSaving(false);
       return;
     }

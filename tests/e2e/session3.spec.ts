@@ -95,11 +95,11 @@ test.describe("compte", () => {
     await expect(page.getByRole("heading", { name: "Token invalide" })).toBeVisible();
   });
 
-  test("inscription : mot de passe de 6 caractères minimum, puis compte créé", async ({ page }) => {
+  test("inscription : mot de passe de 8 caractères minimum, puis compte créé", async ({ page }) => {
     await page.goto("/login");
     await page.getByRole("button", { name: "Pas encore de compte ? Créer un compte" }).click();
     const password = page.getByPlaceholder("Mot de passe");
-    await expect(password).toHaveAttribute("minlength", "6");
+    await expect(password).toHaveAttribute("minlength", "8");
     await expect(password).toHaveAttribute("required", "");
 
     await page.getByPlaceholder("Email").fill("nouveau@maillemum.test");

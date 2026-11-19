@@ -5,6 +5,7 @@ import { POST } from "@/app/api/auth/reset-password/route";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { makeRequest, readJson } from "../../../helpers/http";
+import { PASSWORD_MESSAGES } from "@/lib/password-policy";
 
 const post = (body: unknown) => POST(makeRequest("/api/auth/reset-password", { method: "POST", body }));
 const hash = (t: string) => crypto.createHash("sha256").update(t).digest("hex");
@@ -34,10 +35,17 @@ describe("POST /api/auth/reset-password", () => {
     }
   });
 
-  it("refuse un mot de passe de moins de 6 caractères", async () => {
-    const { status, body } = await readJson(await post({ token: TOKEN, password: "12345" }));
-    expect(status).toBe(400);
-    expect(body.error).toMatch(/6 caractères/);
+  it("refuse un mot de passe de moins de 8 caractères ou présent dans une fuite, sans consommer le lien", async () => {
+    await createUserWithToken();
+    for (const [password, error] of [
+      ["1234567", PASSWORD_MESSAGES.tooShort],
+      ["azertyuiop", PASSWORD_MESSAGES.pwned],
+    ]) {
+      const { status, body } = await readJson(await post({ token: TOKEN, password }));
+      expect(status).toBe(400);
+      expect(body.error).toBe(error);
+    }
+    expect((await findUser())!.resetToken).toBe(hash(TOKEN));
   });
 
   it("refuse un token inconnu", async () => {

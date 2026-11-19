@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
+import { checkNewPassword } from "@/lib/password-policy";
 
 /**
  * PATCH /api/account/password
@@ -30,13 +31,6 @@ export async function PATCH(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Mots de passe requis" },
-        { status: 400 }
-      );
-    }
-
-    if (newPassword.length < 6) {
-      return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 6 caractères" },
         { status: 400 }
       );
     }
@@ -74,6 +68,11 @@ export async function PATCH(req: NextRequest) {
         { error: "Mot de passe actuel incorrect" },
         { status: 400 }
       );
+    }
+
+    const passwordError = await checkNewPassword(newPassword);
+    if (passwordError) {
+      return NextResponse.json({ error: passwordError }, { status: 400 });
     }
 
     // Hasher et enregistrer le nouveau mot de passe

@@ -6,7 +6,8 @@ import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import Settings from "@/models/Settings";
 import { seed } from "../../e2e/server/seed";
-import { STRIPE_E2E_APP_PORT, STRIPE_E2E_APP_URL, STRIPE_E2E_CONTROL_PORT } from "../data";
+import { startFakeHibp } from "../../e2e/server/fake-hibp";
+import { STRIPE_E2E_APP_PORT, STRIPE_E2E_APP_URL, STRIPE_E2E_CONTROL_PORT, STRIPE_E2E_HIBP_PORT } from "../data";
 import { readStripeTestKey } from "../stripe-key";
 
 /**
@@ -15,7 +16,7 @@ import { readStripeTestKey } from "../stripe-key";
  * + `next dev` branché sur Stripe en mode test.
  *
  * Seule la clé Stripe est réelle (et forcément de test) : base, emails, Google,
- * Cloudinary et Gemini sont neutralisés comme dans tests/e2e.
+ * Cloudinary, Gemini et Have I Been Pwned sont neutralisés comme dans tests/e2e.
  *
  * Routes de pilotage (port de contrôle) :
  *   POST /__e2e/reset          remet la base dans son état initial
@@ -81,6 +82,7 @@ async function main() {
     }
   });
   await new Promise<void>((resolve) => control.listen(STRIPE_E2E_CONTROL_PORT, resolve));
+  const hibp = await startFakeHibp(STRIPE_E2E_HIBP_PORT);
 
   // --webpack : contournement de ANO-2026-11-02 (docs/anomalies/2026-11-login-csrf.md, § 9).
   // Avec Turbopack, Next 16.4.6 peut boucler en rechargements au démarrage à froid (environ
@@ -99,6 +101,7 @@ async function main() {
         STRIPE_SECRET_KEY: stripeKey,
         STRIPE_API_BASE_URL: "",
         STRIPE_WEBHOOK_SECRET: webhookSecret,
+        HIBP_API_BASE_URL: `http://localhost:${STRIPE_E2E_HIBP_PORT}`,
         // Emails capturés dans .emails/ (jamais envoyés), sans ouvrir de navigateur
         EMAIL_TRANSPORT: "preview",
         EMAIL_PREVIEW_OPEN: "0",
@@ -120,6 +123,7 @@ async function main() {
   const stop = async () => {
     for (const child of children) child.kill("SIGTERM");
     control.close();
+    hibp.close();
     await mongoose.disconnect();
     await mongod.stop();
     process.exit(0);

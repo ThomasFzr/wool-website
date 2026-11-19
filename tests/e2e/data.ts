@@ -3,6 +3,8 @@
 export const E2E_APP_PORT = 3100;
 export const E2E_STRIPE_PORT = 3101;
 export const E2E_STRIPE_URL = `http://localhost:${E2E_STRIPE_PORT}`;
+export const E2E_HIBP_PORT = 3102;
+export const E2E_HIBP_URL = `http://localhost:${E2E_HIBP_PORT}`;
 
 export const E2E_CLIENT = {
   email: "client@maillemum.test",

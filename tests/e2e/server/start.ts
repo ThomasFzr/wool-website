@@ -2,15 +2,16 @@ import { spawn } from "child_process";
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { startFakeStripe } from "./fake-stripe";
+import { startFakeHibp } from "./fake-hibp";
 import { seed } from "./seed";
-import { E2E_APP_PORT, E2E_STRIPE_PORT, E2E_STRIPE_URL } from "../data";
+import { E2E_APP_PORT, E2E_HIBP_PORT, E2E_HIBP_URL, E2E_STRIPE_PORT, E2E_STRIPE_URL } from "../data";
 
 /**
  * Serveur des tests e2e (lancé par playwright.config.ts) :
- * MongoDB en mémoire préremplie + faux Stripe + `next dev`.
+ * MongoDB en mémoire préremplie + faux Stripe + faux Have I Been Pwned + `next dev`.
  *
  * Next charge aussi .env.local : TOUTES les variables qui pourraient viser un vrai
- * service (base, Stripe, Resend, Google, Cloudinary, Gemini) sont donc forcées ici,
+ * service (base, Stripe, Resend, Google, Cloudinary, Gemini, HIBP) sont donc forcées ici,
  * les variables d'environnement du processus ayant priorité sur les fichiers .env.
  */
 async function main() {
@@ -20,6 +21,7 @@ async function main() {
   await seed();
 
   const stripeServer = await startFakeStripe(E2E_STRIPE_PORT, seed);
+  const hibpServer = await startFakeHibp(E2E_HIBP_PORT);
   const appUrl = `http://localhost:${E2E_APP_PORT}`;
 
   // --webpack : contournement de ANO-2026-11-02 (docs/anomalies/2026-11-login-csrf.md, § 9).
@@ -36,6 +38,7 @@ async function main() {
       STRIPE_SECRET_KEY: "sk_test_e2e",
       STRIPE_API_BASE_URL: E2E_STRIPE_URL,
       STRIPE_WEBHOOK_SECRET: "whsec_e2e",
+      HIBP_API_BASE_URL: E2E_HIBP_URL,
       // Emails capturés dans .emails/ (jamais envoyés), sans ouvrir de navigateur
       EMAIL_TRANSPORT: "preview",
       EMAIL_PREVIEW_OPEN: "0",
@@ -55,6 +58,7 @@ async function main() {
   const stop = async () => {
     next.kill("SIGTERM");
     stripeServer.close();
+    hibpServer.close();
     await mongoose.disconnect();
     await mongod.stop();
     process.exit(0);

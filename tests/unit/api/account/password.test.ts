@@ -5,6 +5,8 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { makeRequest, readJson } from "../../../helpers/http";
 import { asAnonymous, asUser } from "../../../helpers/session";
+import { PASSWORD_MESSAGES } from "@/lib/password-policy";
+import { pwnedCount } from "@/lib/hibp";
 
 vi.mock("next-auth", async (orig) => ({ ...(await orig<object>()), getServerSession: vi.fn() }));
 
@@ -32,13 +34,6 @@ describe("PATCH /api/account/password", () => {
       expect(status).toBe(400);
       expect(res.error).toBe("Mots de passe requis");
     }
-  });
-
-  it("refuse un nouveau mot de passe de moins de 6 caractères", async () => {
-    asUser();
-    const { status, body } = await readJson(await patch({ ...valid, newPassword: "12345" }));
-    expect(status).toBe(400);
-    expect(body.error).toMatch(/6 caractères/);
   });
 
   it("refuse des mots de passe qui ne sont pas des chaînes", async () => {
@@ -86,6 +81,23 @@ describe("PATCH /api/account/password", () => {
       expect(status).toBe(400);
       expect(body.error).toBe("Mot de passe actuel incorrect");
       expect(await bcrypt.compare("ancien1", await storedPassword())).toBe(true);
+    });
+
+    it("refuse un nouveau mot de passe de moins de 8 caractères ou présent dans une fuite", async () => {
+      for (const [newPassword, error] of [
+        ["1234567", PASSWORD_MESSAGES.tooShort],
+        ["motdepasse", PASSWORD_MESSAGES.pwned],
+      ]) {
+        const { status, body } = await readJson(await patch({ ...valid, newPassword }));
+        expect(status).toBe(400);
+        expect(body.error).toBe(error);
+      }
+      expect(await bcrypt.compare("ancien1", await storedPassword())).toBe(true);
+    });
+
+    it("n'interroge pas l'API des fuites si le mot de passe actuel est faux", async () => {
+      await patch({ ...valid, currentPassword: "mauvais" });
+      expect(pwnedCount).not.toHaveBeenCalled();
     });
 
     it("enregistre le nouveau mot de passe haché", async () => {

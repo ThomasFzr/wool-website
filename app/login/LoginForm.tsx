@@ -6,6 +6,7 @@ import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { safeCallbackPath } from "@/lib/safe-redirect";
 import { SIGN_IN_MESSAGES, signInOutcome } from "@/lib/sign-in-result";
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 
 export default function LoginForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -106,7 +107,8 @@ export default function LoginForm() {
             type="password"
             placeholder="Mot de passe"
             required
-            minLength={6}
+            // En connexion, pas de minimum : les anciens mots de passe plus courts restent valables
+            minLength={mode === "register" ? PASSWORD_MIN_LENGTH : undefined}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}

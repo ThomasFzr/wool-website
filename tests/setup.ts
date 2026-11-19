@@ -29,3 +29,10 @@ afterAll(async () => {
 
 // Hors requête Next, revalidatePath lève une erreur : on l'observe sans l'exécuter
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+
+// Aucun test n'interroge la vraie API Have I Been Pwned : faux pwnedCount (tests/helpers/hibp-fake).
+// lib/hibp est testé sur son code réel (vi.importActual) dans tests/unit/lib/hibp.test.ts.
+vi.mock("@/lib/hibp", async () => {
+  const { fakePwnedCount } = await import("./helpers/hibp-fake");
+  return { pwnedCount: vi.fn(fakePwnedCount) };
+});

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { clientIp, hitRateLimit } from "@/lib/rate-limit";
+import { checkNewPassword } from "@/lib/password-policy";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -31,15 +32,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email invalide" }, { status: 400 });
     }
 
-    if (typeof password !== "string" || password.length < 6) {
-      return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 6 caractères" },
-        { status: 400 }
-      );
-    }
-
     if (name && (typeof name !== "string" || name.length > 100)) {
       return NextResponse.json({ error: "Nom invalide" }, { status: 400 });
+    }
+
+    const passwordError = await checkNewPassword(password);
+    if (passwordError) {
+      return NextResponse.json({ error: passwordError }, { status: 400 });
     }
 
     const normalizedEmail = email.toLowerCase().trim();

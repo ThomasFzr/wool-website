@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { checkAdminAuth } from "@/lib/auth";
 import { isInvalidInput } from "@/lib/validation-error";
+import { checkNewPassword } from "@/lib/password-policy";
 
 /**
  * PATCH /api/admin/users/[id]
@@ -60,13 +61,11 @@ export async function PATCH(
     if (postalCode !== undefined) updateData.postalCode = postalCode;
     if (emailNotifications !== undefined) updateData.emailNotifications = emailNotifications;
 
-    // Si un nouveau mot de passe est fourni (même règle : 6 caractères minimum)
+    // Si un nouveau mot de passe est fourni : même politique que l'inscription
     if (password) {
-      if (typeof password !== "string" || password.length < 6) {
-        return NextResponse.json(
-          { error: "Le mot de passe doit contenir au moins 6 caractères" },
-          { status: 400 }
-        );
+      const passwordError = await checkNewPassword(password);
+      if (passwordError) {
+        return NextResponse.json({ error: passwordError }, { status: 400 });
       }
       updateData.password = await bcrypt.hash(password, 10);
     }

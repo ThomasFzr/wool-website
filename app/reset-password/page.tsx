@@ -4,6 +4,7 @@
 import { FormEvent, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { PASSWORD_MESSAGES, PASSWORD_MIN_LENGTH, passwordLength } from "@/lib/password-policy";
 
 function ResetPasswordForm() {
   const [password, setPassword] = useState("");
@@ -25,8 +26,8 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (password.length < 6) {
-      setMessage("Le mot de passe doit contenir au moins 6 caractères");
+    if (passwordLength(password) < PASSWORD_MIN_LENGTH) {
+      setMessage(PASSWORD_MESSAGES.tooShort);
       return;
     }
 
@@ -96,7 +97,7 @@ function ResetPasswordForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={6}
+            minLength={PASSWORD_MIN_LENGTH}
             className="w-full rounded-lg border px-3 py-2 text-base"
           />
 
@@ -106,7 +107,7 @@ function ResetPasswordForm() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            minLength={6}
+            minLength={PASSWORD_MIN_LENGTH}
             className="w-full rounded-lg border px-3 py-2 text-base"
           />
 
