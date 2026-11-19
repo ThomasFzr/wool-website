@@ -85,6 +85,29 @@ issue GitHub (le lien sera ajouté ici).
 - **Critère d'acceptation :** 5 exécutions consécutives à 7/7.
 - **Hors CI :** la suite demande la CLI Stripe et une clé de test ; elle se lance à la main.
 
+## Isoler l'environnement Preview de Vercel
+
+Constaté le 19/11/2026 en testant la preview de la PR #13. La preview a déjà sa propre base
+MongoDB et une clé Stripe de test ; `NEXTAUTH_URL` a été retirée de la portée Preview (next-auth
+prend alors l'hôte de la requête). Restent partagées avec la production :
+
+- **`AUTH_SECRET`** : la même valeur en Preview et en Production, donc un jeton de session émis
+  par une preview est cryptographiquement valide en production. Risque faible (previews protégées
+  par Vercel Authentication, bases différentes), mais à isoler : définir une valeur dédiée à la
+  Preview.
+- **`NEXT_PUBLIC_APP_URL`** : pointe sur le domaine de production ; les liens des emails envoyés
+  depuis une preview mènent à la production. Définir une valeur propre à la Preview (l'alias
+  stable de la branche, ou la dériver de `VERCEL_BRANCH_URL` dans le code). Variable figée au
+  build : redéployer après changement.
+- **`RESEND_API_KEY`, `EMAIL_FROM`, `SELLER_EMAIL`** : partagées entre tous les environnements.
+  Les emails déclenchés depuis une preview **partent vraiment** : à l'acheteur, et à la vendeuse
+  pour chaque commande de test. Pistes : `SELLER_EMAIL` propre à la Preview (adresse de test),
+  ou capture des emails en Preview comme en local (`lib/emailOutbox.ts`), sans jamais l'activer
+  en production.
+- **Connexion Google** : non testable sur une preview tant que son URL n'est pas déclarée dans
+  les URI de redirection du client OAuth Google. À vérifier en production après fusion, ou
+  déclarer l'alias stable d'une branche de recette.
+
 ## Tests e2e sur build de production (piste)
 
 - **Pourquoi :** tester ce qui est réellement déployé (`next build` + `next start`, Turbopack),
