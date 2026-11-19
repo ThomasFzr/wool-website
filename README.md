@@ -1,292 +1,238 @@
-# Wool Creations E-commerce Platform
+# MailleMum
 
-A modern, full-stack e-commerce platform built with Next.js 16 for showcasing and selling handmade wool creations. Features include user authentication, admin dashboard, reservation system, and Cloudinary image management.
+Boutique en ligne de créations en laine faites main, en production sur
+[maillemum.fr](https://www.maillemum.fr).
 
-## 🚀 Features
+Chaque création est une **pièce unique** : le site gère la réservation d'un article pendant le
+paiement, le paiement en ligne par Stripe, le suivi des commandes jusqu'à l'expédition, et un
+backoffice complet pour la vendeuse.
 
-### Public Features
-- **Product Gallery** - Browse wool creations with image carousel, zoom, and filtering
-- **Color & Availability Filters** - Find items by color or availability status
-- **Lightbox Modal** - View high-resolution images with touch support (swipe, pinch-to-zoom)
-- **Reservation System** - Reserve items directly from the modal
-- **Responsive Design** - Mobile-first approach with touch gestures support
-
-### User Features
-- **Authentication** - Email/password and Google OAuth login
-- **User Dashboard** - View account details
-- **Reservation Management** - Track and cancel your reservations
-- **Password Recovery** - Reset forgotten passwords via email
-
-### Admin Features
-- **Creation Management** - Add, edit, and delete products
-- **Image Upload** - Multi-image upload with drag-and-drop reordering
-- **Reservation Dashboard** - View, validate, or cancel reservations with pagination and search
-- **Settings Panel** - Customize homepage title and subtitle
-- **Notification Badge** - See pending reservations count in real-time
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **Next.js 16** - React framework with App Router
-- **TypeScript** - Type-safe development
-- **Tailwind CSS 4** - Utility-first styling
-- **Next-Auth** - Authentication with JWT sessions
-
-### Backend
-- **MongoDB** - Database with Mongoose ODM
-- **Next.js API Routes** - Server-side endpoints
-- **Cloudinary** - Image hosting and optimization
-
-### Additional Services
-- **Resend** - Email delivery for password resets
-- **bcryptjs** - Password hashing
-
-## 📁 Project Structure
-
-```
-wool-starter/
-├── app/                          # Next.js App Router
-│   ├── api/                      # API routes
-│   │   ├── auth/                 # Authentication endpoints
-│   │   ├── creations/            # Product CRUD
-│   │   ├── account/              # User reservations
-│   │   ├── admin/                # Admin operations
-│   │   ├── register/             # User registration
-│   │   └── settings/             # Site settings
-│   ├── account/                  # User pages
-│   ├── admin/                    # Admin pages
-│   ├── login/                    # Authentication pages
-│   └── page.tsx                  # Homepage
-│
-├── components/                   # React components
-│   ├── ui/                       # Atomic UI components
-│   │   ├── Button.tsx
-│   │   ├── Badge.tsx
-│   │   ├── Card.tsx
-│   │   ├── Input.tsx
-│   │   └── Textarea.tsx
-│   ├── Header.tsx                # Site header with auth menu
-│   ├── CreationCard.tsx          # Product card
-│   ├── CreationModal.tsx         # Product detail modal
-│   ├── ReservationCard.tsx       # Reservation display
-│   ├── Filters.tsx               # Product filters
-│   └── index.ts                  # Component exports
-│
-├── models/                       # MongoDB models
-│   ├── Creation.ts               # Product schema
-│   ├── Reservation.ts            # Reservation schema
-│   ├── User.ts                   # User schema
-│   └── Settings.ts               # Site settings schema
-│
-├── lib/                          # Utilities
-│   ├── db.ts                     # MongoDB connection
-│   ├── auth.ts                   # Auth helpers
-│   ├── cloudinary.ts             # Image upload config
-│   └── sendEmail.ts              # Email service
-│
-└── types/                        # TypeScript declarations
-```
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js 20.9+ and npm
-- MongoDB database
-- Cloudinary account
-- Google OAuth credentials (optional)
-- Resend account for emails
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone https://github.com/ThomasFzr/wool-website.git
-cd wool-website
-```
-
-2. **Install dependencies**
-```bash
-npm install
-```
-
-3. **Configure environment variables**
-
-Create a `.env.local` file:
-
-```env
-# MongoDB
-# Le nom de la base de données est inclus dans l'URI
-# Production: mongodb+srv://username:password@cluster.mongodb.net/maillemum-prod
-# Staging: mongodb+srv://username:password@cluster.mongodb.net/maillemum-staging
-# Développement: mongodb+srv://username:password@cluster.mongodb.net/maillemum-dev
-# Local: mongodb://localhost:27017/maillemum-dev
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/maillemum-prod
-
-# NextAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-key-here
-
-# Google OAuth (optional)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# Cloudinary
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=your-api-key
-CLOUDINARY_API_SECRET=your-api-secret
-CLOUDINARY_UPLOAD_PRESET=your-signed-upload-preset # optional, server-side only
-
-# Resend (for password reset emails)
-RESEND_API_KEY=your-resend-api-key
-EMAIL_FROM=noreply@yourdomain.com
-SELLER_EMAIL=your-email@yourdomain.com
-
-# Stripe (for payments)
-STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-4. **Run the development server**
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Build for Production
-
-```bash
-npm run build
-npm start
-```
-
-## 🔐 Authentication Setup
-
-### Email/Password
-Users can register with email and password. Passwords are hashed with bcrypt.
-
-### Google OAuth
-1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable Google+ API
-3. Create OAuth 2.0 credentials
-4. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-5. Add credentials to `.env.local`
-
-## 📸 Cloudinary Setup
-
-1. Create a [Cloudinary account](https://cloudinary.com/)
-2. Get your cloud name from the dashboard
-3. Uploads are signed by the server (`/api/admin/cloudinary-signature`, admin only) with the API secret:
-   no unsigned preset is needed. Optionally create a **signed** upload preset (Settings → Upload →
-   Upload presets) and set its name in `CLOUDINARY_UPLOAD_PRESET`.
-   Never keep an unsigned preset: anyone who knows its name can upload to the account.
-4. Add credentials to `.env.local`
-
-## 📧 Email Setup (Resend)
-
-1. Sign up at [Resend](https://resend.com/)
-2. Verify your domain or use their test domain
-3. Get your API key
-4. Add to `.env.local`
-
-## 👨‍💼 Admin Access
-
-To make a user an admin:
-
-1. Connect to your MongoDB database
-2. Find the user in the `users` collection
-3. Update the `role` field to `"admin"`
-
-```javascript
-db.users.updateOne(
-  { email: "admin@example.com" },
-  { $set: { role: "admin" } }
-)
-```
-
-## 🎨 Component Architecture
-
-This project uses a component-based architecture with reusable UI elements:
-
-- **UI Components** (`components/ui/`) - Atomic, reusable components (Button, Badge, Card, Input, Textarea)
-- **Feature Components** - Complex components with business logic (Header, CreationCard, CreationModal, ReservationCard, Filters)
-- **Centralized Exports** - Import all components from `@/components`
-
-See `components/README.md` for detailed component documentation.
-
-## 🗃️ Database Schema
-
-### Creation
-- Title, description, color, price
-- Multiple images with Cloudinary public IDs
-- Reserved/sold status
-
-### Reservation
-- Reference to creation
-- User information (name, contact, email)
-- Status (pending, validated, cancelled)
-- Cancellation reason and initiator
-
-### User
-- Email, password (hashed), name
-- Role (user/admin)
-- OAuth provider info
-
-### Settings
-- Homepage title and subtitle
-
-## 📱 Mobile Support
-
-- Touch gestures in image modal (swipe, pinch-to-zoom, double-tap)
-- Responsive grid layout
-- Mobile-optimized navigation menu
-
-## 🔒 Security Features
-
-- Password hashing with bcrypt
-- JWT-based sessions
-- Protected API routes with authentication middleware
-- Admin-only routes protection
-- CSRF protection via NextAuth
-
-## 💳 Stripe Payment Setup
-
-1. Create a [Stripe account](https://stripe.com/)
-2. Get your API keys from the [Stripe Dashboard](https://dashboard.stripe.com/apikeys)
-   - Use test keys for development (`sk_test_...`)
-   - Use live keys for production (`sk_live_...`)
-3. Set up webhooks:
-   - Go to [Webhooks](https://dashboard.stripe.com/webhooks) in Stripe Dashboard
-   - Add endpoint: `https://yourdomain.com/api/stripe/webhook`
-   - Select event: `checkout.session.completed`
-   - Copy the webhook signing secret (`whsec_...`)
-4. Add credentials to `.env.local`
-
-## 🚧 Roadmap
-
-- [x] Payment integration (Stripe)
-- [ ] Order history and tracking
-- [ ] Email notifications for reservation status
-- [ ] Product categories and tags
-- [ ] Wishlist functionality
-- [ ] Product reviews and ratings
-- [ ] Dark mode support
-- [ ] Multi-language support
-
-## 📄 License
-
-This project is private and proprietary.
-
-## 👤 Author
-
-**Thomas Foltzer**
-- GitHub: [@ThomasFzr](https://github.com/ThomasFzr)
-
-## 🤝 Contributing
-
-This is a private project. For issues or suggestions, please contact the repository owner.
+Projet réalisé seul, de la conception à la mise en production : V1 fin 2025, V2 en 2026
+(refonte du paiement, sécurité, tests automatisés). Le détail de la revue et des corrections de
+la V2 est dans [`docs/revue-2026-11.md`](docs/revue-2026-11.md).
 
 ---
 
-Built with ❤️ using Next.js and React
+## Sommaire
+
+- [Fonctionnalités](#fonctionnalités)
+- [Stack technique](#stack-technique)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Variables d'environnement](#variables-denvironnement)
+- [Tests](#tests)
+- [Déploiement](#déploiement)
+- [Sécurité](#sécurité)
+- [Licence](#licence)
+
+---
+
+## Fonctionnalités
+
+### Visiteurs et clients
+- Catalogue filtrable (type, couleur, disponibilité), fiche produit avec galerie (zoom, glisser au doigt).
+- Panier, choix entre livraison et retrait sur place (selon le code postal).
+- Paiement par **Stripe Checkout** ; la pièce est verrouillée le temps du paiement puis marquée vendue.
+- Compte : connexion par email et mot de passe ou par **Google**, mot de passe oublié, historique
+  des commandes, préférences de notification.
+- Emails transactionnels : confirmation de commande, validation, expédition (avec numéro de
+  suivi), annulation, remboursement.
+- Formulaire de contact protégé contre le spam.
+
+### Backoffice (rôle `admin`)
+- Créations : ajout, modification, masquage, réordonnancement par glisser-déposer, envoi de photos
+  vers Cloudinary, slug et métadonnées SEO, description générée par IA (Google Gemini).
+- Commandes : recherche, actions groupées par commande, statuts (validée, expédiée, livrée,
+  annulée), étiquette d'expédition, saisie manuelle d'une vente.
+- Utilisateurs (rôles), messages de contact, statistiques de ventes, réglages du site (textes,
+  couleurs, types, frais de port, conditions de retrait).
+
+---
+
+## Stack technique
+
+| Domaine | Choix |
+|---|---|
+| Framework | **Next.js 16** (App Router, Server Components, route handlers), **React 19**, **TypeScript** |
+| Style | Tailwind CSS 4 |
+| Données | **MongoDB Atlas** avec **Mongoose** |
+| Authentification | **next-auth 4** (JWT), providers Credentials (bcrypt) et Google, adaptateur MongoDB |
+| Paiement | **Stripe** Checkout + webhooks signés |
+| Images | Cloudinary (envois signés côté serveur) |
+| Emails | Resend |
+| IA | Google Gemini (descriptions produit) |
+| Hébergement | **Vercel** (fonctions Node.js, cron, analytics) |
+| Tests | **Vitest** (unitaires, 100 % de couverture de la logique), **Playwright** (e2e), mongodb-memory-server |
+
+---
+
+## Architecture
+
+```
+app/
+├── page.tsx, creations/[id]/     Catalogue et fiche produit (rendu serveur, ISR)
+├── cart/, checkout/              Panier, retour de paiement
+├── account/, login/, …           Espace client et authentification
+├── admin/                        Backoffice (garde serveur sur le rôle admin)
+└── api/                          Route handlers
+    ├── auth/                     next-auth, inscription, mot de passe oublié
+    ├── stripe/                   Création de session, vérification, annulation, webhook
+    ├── admin/                    API du backoffice (toutes protégées par checkAdminAuth)
+    ├── creations/, contact/, …   API publiques
+    └── cron/release-locks/       Libération des pièces restées verrouillées (cron Vercel)
+components/                       Composants React (ui/ = composants de base, admin/)
+contexts/CartContext.tsx          État du panier (localStorage + revérification serveur)
+hooks/                            Upload d'images, glisser-déposer, articles liés…
+lib/                              Logique métier et intégrations
+├── checkout-fulfillment.ts       Traitement d'un paiement (idempotent, webhook + retour client)
+├── creation-lock.ts              Verrou des pièces uniques pendant le paiement
+├── auth.ts, rate-limit.ts        Contrôle d'accès admin, limites de débit partagées (MongoDB)
+├── sanitize.ts, escape.ts        Nettoyage HTML, échappement (XSS, injection regex)
+└── stripe.ts, cloudinary.ts, sendEmail.ts, gemini.ts …
+models/                           Schémas Mongoose (User, Creation, Reservation, Settings…)
+scripts/                          Scripts de maintenance (npm run …)
+tests/                            unit/ (Vitest), e2e/ (faux Stripe), e2e-stripe/ (Stripe test)
+docs/                             Revue de code, sécurité
+```
+
+**Parcours d'achat.** `POST /api/stripe/create-checkout-session` relit les prix en base (jamais
+ceux du client), verrouille chaque pièce de façon atomique et crée la session Stripe. Le paiement
+est confirmé par le **webhook** `checkout.session.completed` (signature vérifiée) ou par le retour
+du client sur `/checkout/success` : les deux passent par `lib/checkout-fulfillment.ts`, idempotent.
+Une session expirée ou annulée libère la pièce ; un cron quotidien rattrape les verrous oubliés.
+Un remboursement fait depuis Stripe (`charge.refunded`) remet la pièce en vente.
+
+---
+
+## Installation
+
+Prérequis : **Node.js ≥ 20.9** (24 recommandé), **MongoDB** en local
+(`brew install mongodb-community` puis `brew services start mongodb-community`, ou Docker),
+la [CLI Stripe](https://docs.stripe.com/stripe-cli) pour recevoir les webhooks en local.
+
+```bash
+git clone https://github.com/ThomasFzr/wool-website.git
+cd wool-website
+npm install                 # active aussi le hook pre-push (.githooks)
+cp .env.example .env.local  # puis remplir les valeurs (voir ci-dessous)
+npm run init-settings       # crée les réglages par défaut du site
+npm run dev                 # http://localhost:3000
+```
+
+Pour recevoir les webhooks Stripe en local, dans un second terminal :
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+En local, les emails ne sont pas envoyés : ils sont capturés et consultables sur
+`http://localhost:3000/dev/emails` (`EMAIL_TRANSPORT=resend` pour les envoyer vraiment).
+
+**Créer un administrateur.** Il n'existe aucun compte admin par défaut. Créer un compte sur le
+site, puis lui donner le rôle en base :
+
+```javascript
+db.users.updateOne({ email: "vous@exemple.fr" }, { $set: { role: "admin" } })
+```
+
+### Scripts
+
+| Commande | Rôle |
+|---|---|
+| `npm run dev` / `build` / `start` | Développement, build de production, serveur de production |
+| `npm run lint` / `typecheck` | ESLint, vérification TypeScript |
+| `npm test` / `test:coverage` | Tests unitaires (couverture exigée : 100 %) |
+| `npm run test:e2e` | Tests de bout en bout sur faux Stripe |
+| `npm run test:e2e:stripe` | Tests de bout en bout sur le vrai Stripe (mode test) |
+| `npm run init-settings` | Réglages par défaut du site |
+| `npm run generate-slugs` | Génère les slugs manquants des créations |
+| `npm run sync-users` | Synchronise les comptes next-auth et la collection `users` |
+
+---
+
+## Variables d'environnement
+
+La liste complète, commentée, est dans [`.env.example`](.env.example). Les principales :
+
+| Variable | Rôle |
+|---|---|
+| `MONGODB_URI` | Base MongoDB (en local : `mongodb://localhost:27017/wool-starter-dev`) |
+| `AUTH_SECRET`, `NEXTAUTH_URL` | Signature des sessions, URL vue par next-auth |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Connexion Google |
+| `NEXT_PUBLIC_APP_URL` | URL publique utilisée dans les emails |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Paiement et vérification des webhooks |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Images |
+| `RESEND_API_KEY`, `EMAIL_FROM`, `SELLER_EMAIL` | Emails |
+| `GEMINI_API_KEY` | Descriptions générées par IA (facultatif) |
+| `CRON_SECRET` | Authentifie l'appel du cron Vercel |
+
+Règle : **aucune clé de production sur un poste de développement**. En local, uniquement des clés
+Stripe de test et une base MongoDB locale.
+
+---
+
+## Tests
+
+- **Unitaires et intégration (Vitest)** — `tests/unit/`, environ 1 000 tests sur les routes API,
+  la logique métier, les modèles, les hooks et le contexte du panier, avec une MongoDB en mémoire.
+  La couverture de la logique (`app/api`, `lib`, `models`, `hooks`, `contexts`) est exigée à
+  **100 %** (`npm run test:coverage` échoue sinon).
+- **Bout en bout (Playwright)** — `tests/e2e/` : le site est lancé sur une MongoDB en mémoire
+  préremplie (`tests/e2e/server/seed.ts`) et un faux Stripe ; parcours connexion, compte, panier,
+  paiement, backoffice.
+- **Paiement réel (Playwright + Stripe test)** — `tests/e2e-stripe/` : vraie page Stripe
+  Checkout, webhooks relayés par la CLI Stripe. Prérequis : `stripe` installée et
+  `.env.stripe-test.local` contenant `STRIPE_SECRET_KEY=sk_test_…`.
+- **Bundler des tests e2e** — les deux suites lancent `next dev --webpack` au lieu de Turbopack :
+  contournement temporaire d'un défaut de Next.js 16.4.6 (boucle de rechargements au démarrage à
+  froid), décrit dans la [fiche d'anomalie](docs/anomalies/2026-11-login-csrf.md) et suivi dans le
+  [backlog](docs/BACKLOG.md). Le développement (`npm run dev`) et le build de production
+  restent sur Turbopack.
+- **Intégration continue** — `.github/workflows/tests.yml` lance lint, typecheck, tests unitaires
+  et e2e à chaque push et pull request ; le hook `pre-push` lance les mêmes contrôles en local.
+  Dependabot surveille les dépendances.
+
+---
+
+## Déploiement
+
+Le site est déployé sur **Vercel** : chaque pull request crée une preview (protégée par Vercel
+Authentication), chaque fusion sur `main` déploie la production.
+
+1. **Variables** : définir celles de `.env.example` dans Vercel → Settings → Environment
+   Variables, en type « Sensitive » pour les secrets ; clés Stripe **live** en production
+   uniquement.
+2. **Webhook Stripe** : Stripe → Développeurs → Webhooks → endpoint
+   `https://<domaine>/api/stripe/webhook`, abonné à :
+   - `checkout.session.completed` (paiement confirmé),
+   - `checkout.session.expired` (libération de la pièce),
+   - `charge.refunded` (remboursement fait depuis Stripe).
+
+   Copier son secret de signature dans `STRIPE_WEBHOOK_SECRET`.
+3. **Cron** : `vercel.json` appelle `/api/cron/release-locks` chaque jour à 4 h UTC. Définir
+   `CRON_SECRET` : Vercel l'envoie en `Authorization: Bearer`, la route refuse tout autre appel.
+4. **Google OAuth** : ajouter `https://<domaine>/api/auth/callback/google` aux URI de redirection.
+5. **MongoDB Atlas** : autoriser l'accès depuis Vercel (Network Access).
+
+---
+
+## Sécurité
+
+Le projet suit l'**OWASP Top 10** : contrôle d'accès vérifié côté serveur sur chaque route admin,
+mots de passe hachés (bcrypt), limites de débit sur la connexion et l'inscription, webhooks
+Stripe signés, envois d'images signés, nettoyage du HTML, en-têtes de sécurité (CSP, HSTS…),
+dépendances surveillées.
+
+Le détail par catégorie, avec les liens vers le code et les tests, est dans
+**[`docs/SECURITY.md`](docs/SECURITY.md)**.
+
+---
+
+## Licence
+
+**Tous droits réservés.** Le code est public pour consultation uniquement ; toute réutilisation
+est interdite sans autorisation écrite. Voir [`LICENSE`](LICENSE).
+
+## Auteur
+
+Thomas Foltzer — [@ThomasFzr](https://github.com/ThomasFzr)

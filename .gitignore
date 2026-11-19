@@ -13,9 +13,26 @@ out/
 !.env.example
 
 # Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+logs/
+
+# Dumps et exports de base de données (peuvent contenir des données clients)
+dump/
+*.dump
+*.bson
+*.sql
+*.sql.gz
+*.archive
+*.csv
+
+# Fichiers envoyés en local
+uploads/
+
+# Rapport d'audit local
+AUDIT_PUBLICATION.md
 
 # Mac
 .DS_Store
@@ -39,3 +56,6 @@ coverage/
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Généré et réécrit par `next dev` (consignes pour assistants de code)
+AGENTS.md

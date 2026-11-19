@@ -2,9 +2,10 @@
 "use client";
 
 import { FormEvent, useState, useEffect } from "react";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { safeCallbackPath } from "@/lib/safe-redirect";
+import { SIGN_IN_MESSAGES, signInOutcome } from "@/lib/sign-in-result";
 
 export default function LoginForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -52,8 +53,17 @@ export default function LoginForm() {
         redirect: false,
       });
 
-      if (res?.error) {
-        setMessage("Connexion impossible.");
+      // Lire toute la réponse : un refus CSRF arrive avec error: null (cf. lib/sign-in-result)
+      const outcome = signInOutcome(res);
+      if (!outcome.ok) {
+        setMessage(SIGN_IN_MESSAGES[outcome.reason]);
+        return;
+      }
+
+      // N'annoncer la connexion que si le serveur a réellement ouvert une session
+      const session = await getSession();
+      if (!session?.user) {
+        setMessage(SIGN_IN_MESSAGES.failed);
         return;
       }
 

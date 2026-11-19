@@ -82,9 +82,12 @@ async function main() {
   });
   await new Promise<void>((resolve) => control.listen(STRIPE_E2E_CONTROL_PORT, resolve));
 
+  // --webpack : contournement de ANO-2026-11-02 (docs/anomalies/2026-11-login-csrf.md, § 9).
+  // Avec Turbopack, Next 16.4.6 peut boucler en rechargements au démarrage à froid (environ
+  // 2 démarrages sur 5). À retirer dès qu'une version de Next corrige le défaut (docs/BACKLOG.md).
   const next = spawn(
     "npx",
-    ["next", "dev", "--port", String(STRIPE_E2E_APP_PORT)],
+    ["next", "dev", "--webpack", "--port", String(STRIPE_E2E_APP_PORT)],
     {
       stdio: "inherit",
       env: {

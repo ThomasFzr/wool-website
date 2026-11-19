@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { E2E_CLIENT, E2E_CREATIONS } from "./data";
-import { fakeStripeSessions, login, resetDatabase } from "./helpers";
+import { fakeStripeSessions, login, resetDatabase, waitForLoginPageReady } from "./helpers";
 
 const { rose, bleu, hidden } = E2E_CREATIONS;
 
@@ -46,6 +46,7 @@ test("paiement : connexion demandée, redirection vers Stripe, commande enregist
   // Anonyme : le bouton de paiement envoie vers la connexion, puis revient au panier
   await page.getByRole("button", { name: "Se connecter pour payer" }).click();
   await expect(page).toHaveURL(/\/login\?callbackUrl=/);
+  await waitForLoginPageReady(page);
   await page.getByPlaceholder("Email").fill(E2E_CLIENT.email);
   await page.getByPlaceholder("Mot de passe").fill(E2E_CLIENT.password);
   await page.getByRole("button", { name: "Se connecter", exact: true }).click();

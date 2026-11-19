@@ -22,7 +22,10 @@ async function main() {
   const stripeServer = await startFakeStripe(E2E_STRIPE_PORT, seed);
   const appUrl = `http://localhost:${E2E_APP_PORT}`;
 
-  const next = spawn("npx", ["next", "dev", "--port", String(E2E_APP_PORT)], {
+  // --webpack : contournement de ANO-2026-11-02 (docs/anomalies/2026-11-login-csrf.md, § 9).
+  // Avec Turbopack, Next 16.4.6 peut boucler en rechargements au démarrage à froid (environ
+  // 2 démarrages sur 5). À retirer dès qu'une version de Next corrige le défaut (docs/BACKLOG.md).
+  const next = spawn("npx", ["next", "dev", "--webpack", "--port", String(E2E_APP_PORT)], {
     stdio: "inherit",
     env: {
       ...process.env,
