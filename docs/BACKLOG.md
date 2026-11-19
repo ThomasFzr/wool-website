@@ -1,9 +1,11 @@
 # Backlog
 
-Chantiers identifiés et non encore réalisés. Une fois le dépôt public, chaque entrée deviendra une
-issue GitHub (le lien sera ajouté ici).
+Chantiers identifiés et non encore réalisés. Chaque entrée a son issue GitHub (lien sous le
+titre) : le suivi se fait dans l'issue, ce fichier garde le contexte.
 
 ## Migration Auth.js v5 (next-auth 4 → 5)
+
+Issue : [#19](https://github.com/ThomasFzr/wool-website/issues/19)
 
 - **Pourquoi :** next-auth 4 est en maintenance. Il crée un cookie CSRF par requête sans cookie et
   signale un refus CSRF par `ok: true` / `error: null` ; ces deux comportements sont à l'origine de
@@ -25,6 +27,8 @@ issue GitHub (le lien sera ajouté ici).
 
 ## Montée vers vitest 5
 
+Issue : [#20](https://github.com/ThomasFzr/wool-website/issues/20)
+
 - **Pourquoi :** vulnérabilités critiques et hautes dans l'outillage de test (`vitest`,
   `tinypool`, `picomatch`…), non déployé en production.
 - **Étapes :**
@@ -40,6 +44,8 @@ issue GitHub (le lien sera ajouté ici).
 
 ## Durcissements de sécurité (audit de pré-publication, option 2)
 
+Issue : [#21](https://github.com/ThomasFzr/wool-website/issues/21)
+
 - Validation centralisée des entrées (zod) et `sanitizeFilter` de Mongoose.
 - Mots de passe de 12 caractères minimum, limite de connexion par compte, connexion Google
   obligatoire pour les administrateurs, coût bcrypt à 12.
@@ -47,6 +53,8 @@ issue GitHub (le lien sera ajouté ici).
 - Détail : [`docs/SECURITY.md`](SECURITY.md), section « Limites connues ».
 
 ## Boucle de rechargements en développement (Turbopack, Next 16.4.6)
+
+Issue : [#22](https://github.com/ThomasFzr/wool-website/issues/22)
 
 - Anomalie ANO-2026-11-02, décrite dans la [fiche d'anomalie](anomalies/2026-11-login-csrf.md#9-anomalie-liée--ano-2026-11-02--boucle-de-rechargements-en-développement).
 - Contournement en place : les serveurs e2e lancent `next dev --webpack`
@@ -56,6 +64,8 @@ issue GitHub (le lien sera ajouté ici).
   `test:e2e:stripe` plusieurs fois à froid pour vérifier l'absence de boucle.
 
 ## Fiabiliser test:e2e:stripe
+
+Issue : [#23](https://github.com/ThomasFzr/wool-website/issues/23)
 
 - **Symptômes :** la suite sur le vrai Stripe (`npm run test:e2e:stripe`, mode test) échoue de
   façon intermittente, sur 1 à 3 tests différents à chaque fois :
@@ -87,6 +97,8 @@ issue GitHub (le lien sera ajouté ici).
 
 ## Isoler l'environnement Preview de Vercel
 
+Issue : [#24](https://github.com/ThomasFzr/wool-website/issues/24)
+
 Constaté le 19/11/2026 en testant la preview de la PR #13. La preview a déjà sa propre base
 MongoDB et une clé Stripe de test ; `NEXTAUTH_URL` a été retirée de la portée Preview (next-auth
 prend alors l'hôte de la requête). Restent partagées avec la production :
@@ -108,7 +120,23 @@ prend alors l'hôte de la requête). Restent partagées avec la production :
   les URI de redirection du client OAuth Google. À vérifier en production après fusion, ou
   déclarer l'alias stable d'une branche de recette.
 
+## [PREVIEW] dans le sujet des emails hors production
+
+Issue : [#25](https://github.com/ThomasFzr/wool-website/issues/25)
+
+- **Pourquoi :** les emails envoyés depuis une preview Vercel partent vraiment (voir « Isoler
+  l'environnement Preview de Vercel ») et sont indiscernables de ceux de la production, pour
+  l'acheteur comme pour la vendeuse.
+- **Proposition :** dans `lib/sendEmail.ts`, préfixer le sujet par `[PREVIEW] ` quand
+  `VERCEL_ENV` ne vaut pas `production` (preview, ou envoi réel en développement avec
+  `EMAIL_TRANSPORT=resend`). En production, sujet inchangé.
+- **Critères d'acceptation :** tests unitaires des trois cas (`production` : sujet inchangé ;
+  `preview` : préfixe ; variable absente : préfixe), couverture à 100 % ; vérifié sur une preview
+  avec un email de commande.
+
 ## Tests e2e sur build de production (piste)
+
+Issue : [#26](https://github.com/ThomasFzr/wool-website/issues/26)
 
 - **Pourquoi :** tester ce qui est réellement déployé (`next build` + `next start`, Turbopack),
   sans rechargement à chaud ni double exécution des effets du mode strict.
