@@ -57,7 +57,7 @@ describe("POST /api/admin/users", () => {
     asAdmin();
     const { status, body } = await readJson(await create({ name: "Sans email" }));
     expect(status).toBe(400);
-    expect(body.error).toBe("L'email est requis");
+    expect(body).toEqual({ error: "Adresse email requise.", champ: "email" });
   });
 
   it.each([
@@ -129,10 +129,9 @@ describe("POST /api/admin/users", () => {
     expect(await bcrypt.compare("secret123", stored!.password!)).toBe(true);
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await create("{pas du json")).status).toBe(500);
+    expect((await create("{pas du json")).status).toBe(400);
   });
 });
 
@@ -226,7 +225,7 @@ describe("PATCH /api/admin/users/[id]", () => {
     asAdmin();
     const { status, body } = await readJson(await patch(user.id, { role: "superadmin" }));
     expect(status).toBe(400);
-    expect(body.error).toBe("Données invalides");
+    expect(body).toEqual({ error: "Rôle invalide.", champ: "role" });
     expect((await User.findById(user.id))!.role).toBe("user");
   });
 
@@ -257,9 +256,11 @@ describe("PATCH /api/admin/users/[id]", () => {
     expect(await bcrypt.compare("nouveau-secret", stored!.password!)).toBe(true);
   });
 
-  it("répond 404 pour un identifiant mal formé", async () => {
+  it("répond 400 pour un identifiant mal formé", async () => {
     asAdmin();
-    expect((await patch("pas-un-id", { name: "X" })).status).toBe(404);
+    const { status, body } = await readJson(await patch("pas-un-id", { name: "X" }));
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: "Identifiant invalide.", champ: "id" });
   });
 
   it("répond 500 si la base échoue", async () => {

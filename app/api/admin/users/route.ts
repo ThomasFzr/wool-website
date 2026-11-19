@@ -4,6 +4,8 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { checkAdminAuth } from "@/lib/auth";
 import { checkNewPassword } from "@/lib/password-policy";
+import { parseBody } from "@/lib/validation";
+import { createUserSchema } from "@/lib/schemas/user";
 
 /**
  * GET /api/admin/users
@@ -50,15 +52,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { name, email, role, password, phone, address, city, postalCode, emailNotifications } = body;
-
-    if (!email) {
-      return NextResponse.json(
-        { error: "L'email est requis" },
-        { status: 400 }
-      );
-    }
+    // Audit A03 : l'email du body allait tel quel dans User.findOne ; il est maintenant
+    // validé (chaîne, format, minuscules) avant toute requête
+    const parsed = await parseBody(req, createUserSchema);
+    if (!parsed.ok) return parsed.response;
+    const { name, email: normalizedEmail, role, password, phone, address, city, postalCode, emailNotifications } =
+      parsed.data;
 
     // Mot de passe facultatif (compte sans mot de passe sinon) ; s'il est fourni, même
     // politique que l'inscription (lib/password-policy)
@@ -68,8 +67,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: passwordError }, { status: 400 });
       }
     }
-
-    const normalizedEmail = String(email).toLowerCase().trim();
 
     await connectToDatabase();
 
