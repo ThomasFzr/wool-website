@@ -4,7 +4,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { startFakeStripe } from "./fake-stripe";
 import { startFakeHibp } from "./fake-hibp";
 import { seed } from "./seed";
-import { E2E_APP_PORT, E2E_HIBP_PORT, E2E_HIBP_URL, E2E_STRIPE_PORT, E2E_STRIPE_URL } from "../data";
+import { E2E_APP_PORT, E2E_AUTH_SECRET, E2E_HIBP_PORT, E2E_HIBP_URL, E2E_STRIPE_PORT, E2E_STRIPE_URL } from "../data";
 
 /**
  * Serveur des tests e2e (lancé par playwright.config.ts) :
@@ -32,7 +32,7 @@ async function main() {
     env: {
       ...process.env,
       MONGODB_URI: mongoUri,
-      AUTH_SECRET: "e2e-secret",
+      AUTH_SECRET: E2E_AUTH_SECRET,
       NEXTAUTH_URL: appUrl,
       NEXT_PUBLIC_APP_URL: appUrl,
       STRIPE_SECRET_KEY: "sk_test_e2e",

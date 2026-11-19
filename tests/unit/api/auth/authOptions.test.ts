@@ -186,11 +186,43 @@ describe("authOptions", () => {
       await User.create({
         email: "anonyme@example.com",
         password: await bcrypt.hash("secret123", 4),
-        role: "admin",
       });
       const user = await authorize({ email: "anonyme@example.com", password: "secret123" });
       expect(user.name).toBeUndefined();
-      expect(user.role).toBe("admin");
+      expect(user.role).toBe("user");
+    });
+
+    describe("compte admin : Google uniquement", () => {
+      beforeEach(async () => {
+        await User.create({
+          email: "admin@example.com",
+          password: await bcrypt.hash("secret123", 4),
+          provider: "google",
+          role: "admin",
+        });
+      });
+
+      it("refuse le bon mot de passe d'un admin", async () => {
+        expect(await authorize({ email: "admin@example.com", password: "secret123" })).toBeNull();
+      });
+
+      it("vérifie le mot de passe avant de refuser (pas d'écart de temps révélant un admin)", async () => {
+        const compare = vi.spyOn(bcrypt, "compare");
+        await authorize({ email: "admin@example.com", password: "secret123" });
+        expect(compare).toHaveBeenCalledTimes(1);
+      });
+
+      it("compte le refus comme un échec (limite par compte)", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(4_000_000 * 900_000 + 1_000);
+        await authorize({ email: "admin@example.com", password: "secret123" }, { "x-real-ip": "192.0.2.1" });
+        const [counter] = await RateLimit.find({ _id: /^login:account:/ }).lean<{ count: number }[]>();
+        expect(counter.count).toBe(1);
+      });
+
+      it("n'interroge pas l'API des fuites pour un admin", async () => {
+        await authorize({ email: "admin@example.com", password: "secret123" });
+        expect(pwnedCount).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -361,9 +393,29 @@ describe("authOptions", () => {
     it("revérifie le rôle sur trigger update même s'il est récent", async () => {
       await User.create({ email: "promu@example.com", role: "admin" });
       const token = await jwt({
-        token: { email: "promu@example.com", role: "user", roleCheckedAt: Date.now() },
+        token: { email: "promu@example.com", role: "user", provider: "google", roleCheckedAt: Date.now() },
         trigger: "update",
       });
+      expect(token.role).toBe("admin");
+    });
+
+    it("révoque la session par mot de passe d'un compte promu admin", async () => {
+      await User.create({ email: "promu@example.com", role: "admin" });
+      await expect(
+        jwt({ token: { email: "promu@example.com", role: "user", provider: "credentials", roleCheckedAt: 0 } })
+      ).rejects.toThrow("un administrateur se connecte avec Google");
+    });
+
+    it("révoque une session admin sans provider connu", async () => {
+      await User.create({ email: "admin@example.com", role: "admin" });
+      await expect(jwt({ token: { email: "admin@example.com", role: "admin", roleCheckedAt: 0 } })).rejects.toThrow(
+        "un administrateur se connecte avec Google"
+      );
+    });
+
+    it("garde la session Google d'un admin", async () => {
+      await User.create({ email: "admin@example.com", role: "admin" });
+      const token = await jwt({ token: { email: "admin@example.com", role: "admin", provider: "google", roleCheckedAt: 0 } });
       expect(token.role).toBe("admin");
     });
 
@@ -410,7 +462,7 @@ describe("authOptions", () => {
 
     it("relit la base sur trigger update malgré une vérification récente en cache", async () => {
       await User.create({ email: "promu@example.com", role: "user" });
-      const stale = { email: "promu@example.com", role: "user" as const, roleCheckedAt: 0 };
+      const stale = { email: "promu@example.com", role: "user" as const, provider: "google", roleCheckedAt: 0 };
       await jwt({ token: { ...stale } });
       await User.updateOne({ email: "promu@example.com" }, { role: "admin" });
       expect((await jwt({ token: { ...stale } })).role).toBe("user");

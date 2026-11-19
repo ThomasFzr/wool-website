@@ -23,8 +23,11 @@ export async function seed() {
     {
       name: E2E_ADMIN.name,
       email: E2E_ADMIN.email,
+      // Comme en production, l'admin se connecte avec Google. Ce mot de passe hérité ne sert
+      // qu'à prouver le refus du provider credentials pour un admin (auth.spec.ts).
       password: await bcrypt.hash(E2E_ADMIN.password, 10),
-      provider: "credentials",
+      provider: "google",
+      emailVerifiedAt: new Date("2026-01-01T00:00:00Z"),
       role: "admin",
     },
     {

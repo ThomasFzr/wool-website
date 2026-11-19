@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { E2E_CLIENT, E2E_CREATIONS } from "./data";
-import { fakeStripeSessions, login, resetDatabase, waitForLoginPageReady } from "./helpers";
+import { fakeStripeSessions, login, loginAsAdmin, resetDatabase, waitForLoginPageReady } from "./helpers";
 
 const { rose, bleu, hidden } = E2E_CREATIONS;
 
@@ -84,7 +84,7 @@ test("une pièce verrouillée par un autre acheteur ne peut pas être payée", a
 }) => {
   // Second acheteur (admin, autre session navigateur) : met la pièce au panier pendant qu'elle est libre
   const other = await browser.newPage();
-  await login(other, { email: "admin@maillemum.test", password: "Admin-e2e-123" }, "/");
+  await loginAsAdmin(other, "/");
   await addToCart(other, bleu.slug);
 
   // Premier acheteur : arrive jusqu'à Stripe (la pièce est verrouillée)

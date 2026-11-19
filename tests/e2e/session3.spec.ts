@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS, LOGIN_FAILED } from "./data";
-import { login, resetDatabase, waitForLoginPageReady } from "./helpers";
+import { E2E_CLIENT, E2E_CREATIONS, LOGIN_FAILED } from "./data";
+import { login, loginAsAdmin, resetDatabase, waitForLoginPageReady } from "./helpers";
 
 // Parcours corrigés en session 3 (docs/revue-2026-11.md) : compte, admin, front.
 
@@ -118,7 +118,7 @@ test.describe("compte", () => {
 
 test.describe("admin", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page, E2E_ADMIN, "/admin/reservations");
+    await loginAsAdmin(page, "/admin/reservations");
     await expect(page).toHaveURL(/\/admin\/reservations$/);
   });
 

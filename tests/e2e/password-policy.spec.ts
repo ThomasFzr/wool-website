@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_CLIENT } from "./data";
-import { login, resetDatabase, resetLinkFor, setHibp } from "./helpers";
+import { E2E_CLIENT } from "./data";
+import { login, loginAsAdmin, resetDatabase, resetLinkFor, setHibp } from "./helpers";
 
 // Politique de mot de passe (docs/SECURITY.md, A07) : 8 caractères minimum, aucune règle de
 // composition, refus des mots de passe présents dans une fuite (faux Have I Been Pwned,
@@ -87,7 +87,7 @@ test("changement depuis le compte : un mot de passe compromis est refusé", asyn
 });
 
 test("admin : un mot de passe compromis est refusé pour un utilisateur", async ({ page }) => {
-  await login(page, E2E_ADMIN, "/admin/users");
+  await loginAsAdmin(page, "/admin/users");
   const row = page.locator("div", { hasText: E2E_CLIENT.email }).filter({ has: page.getByRole("button", { name: /Modifier/ }) }).last();
   await row.getByRole("button", { name: /Modifier/ }).click();
   await page.getByPlaceholder("••••••••").fill("password123");

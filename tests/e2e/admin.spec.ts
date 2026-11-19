@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS } from "./data";
-import { login, resetDatabase } from "./helpers";
+import { E2E_CLIENT, E2E_CREATIONS } from "./data";
+import { login, loginAsAdmin, resetDatabase } from "./helpers";
 
 test.beforeEach(async ({ request }) => {
   await resetDatabase(request);
@@ -15,7 +15,7 @@ test("un client n'a pas accès à l'admin", async ({ page }) => {
 
 test.describe("admin connecté", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page, E2E_ADMIN, "/admin/reservations");
+    await loginAsAdmin(page, "/admin/reservations");
     await expect(page).toHaveURL(/\/admin\/reservations$/);
   });
 

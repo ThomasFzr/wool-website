@@ -5,6 +5,8 @@ export const E2E_STRIPE_PORT = 3101;
 export const E2E_STRIPE_URL = `http://localhost:${E2E_STRIPE_PORT}`;
 export const E2E_HIBP_PORT = 3102;
 export const E2E_HIBP_URL = `http://localhost:${E2E_HIBP_PORT}`;
+/** Secret next-auth du serveur e2e : signe aussi les sessions admin simulées (helpers.loginAsAdmin). */
+export const E2E_AUTH_SECRET = "e2e-secret";
 
 /** Message neutre de tout échec de connexion (lib/sign-in-result.ts). */
 export const LOGIN_FAILED = "Connexion impossible : vérifiez vos identifiants ou réessayez dans quelques minutes.";
@@ -21,6 +23,11 @@ export const E2E_LEGACY_CLIENT = {
   password: "chaton",
 };
 
+/**
+ * Administratrice : connexion Google uniquement (provider credentials refusé). Le mot de
+ * passe n'existe que pour prouver ce refus ; les tests admin se connectent par
+ * helpers.loginAsAdmin (session Google simulée).
+ */
 export const E2E_ADMIN = {
   email: "admin@maillemum.test",
   password: "Admin-e2e-123",

@@ -79,6 +79,11 @@ export const authOptions: NextAuthOptions = {
         const ok = await bcrypt.compare(credentials.password, user.password);
         if (!ok) return fail();
 
+        // Administrateurs : connexion Google uniquement (double authentification déléguée à
+        // Google). Refus vérifié après bcrypt pour que le temps de réponse ne trahisse pas
+        // un compte admin, et compté comme un échec, avec le même message neutre.
+        if (user.role === "admin") return fail();
+
         // Ancien mot de passe trop court ou compromis : connexion acceptée, mais un bandeau
         // invite à le changer (aucune invalidation des mots de passe existants).
         const warning = await passwordWarning(credentials.password);
@@ -196,6 +201,11 @@ export const authOptions: NextAuthOptions = {
         if (!account) throw new Error("Session révoquée : compte supprimé");
         if (account.passwordChangedAt && (token.authAt ?? 0) < account.passwordChangedAt) {
           throw new Error("Session révoquée : mot de passe changé");
+        }
+        // Compte devenu admin (promotion) avec une session ouverte autrement que par Google :
+        // révoquée, l'accès admin exige une reconnexion avec Google.
+        if (account.role === "admin" && token.provider !== "google") {
+          throw new Error("Session révoquée : un administrateur se connecte avec Google");
         }
         token.role = account.role;
         token.userId = account.userId;

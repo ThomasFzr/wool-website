@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { expect, test, type Page } from "@playwright/test";
-import { E2E_ADMIN, E2E_CLIENT, E2E_CREATIONS } from "./data";
-import { login, resetDatabase } from "./helpers";
+import { E2E_CLIENT, E2E_CREATIONS } from "./data";
+import { loginAsAdmin, resetDatabase } from "./helpers";
 
 // Parcours corrigés en session 4 (docs/revue-2026-11.md) : petits points du front et du SEO.
 
@@ -50,7 +50,7 @@ test.beforeEach(async ({ request }) => {
 
 test.describe("fiche produit", () => {
   test("visionneuse : la première flèche clavier change bien de photo", async ({ page }) => {
-    await login(page, E2E_ADMIN, "/");
+    await loginAsAdmin(page, "/");
     const id = await creationIdOf(page, rose.slug);
     const res = await page.request.patch(`/api/creations/${id}`, { data: { images: [svg("red"), svg("blue")] } });
     expect(res.ok()).toBe(true);
@@ -81,7 +81,7 @@ test.describe("fiche produit", () => {
   });
 
   test("« Vous pourriez aussi aimer » sur mobile : flèches invisibles et non cliquables", async ({ page }) => {
-    await login(page, E2E_ADMIN, "/");
+    await loginAsAdmin(page, "/");
     const created = await page.request.post("/api/creations", {
       data: { title: "Bandeau Lin Vert", price: 25, color: "Vert", type: "bandeau", hidden: false },
     });
@@ -160,7 +160,7 @@ test.describe("SEO", () => {
 
 test.describe("admin", () => {
   test("passer une commande en « expédiée » prévient le client avec le suivi", async ({ page }) => {
-    await login(page, E2E_ADMIN, "/");
+    await loginAsAdmin(page, "/");
     const list = await (await page.request.get("/api/admin/reservations?limit=50")).json();
     const order = collectReservations(list).find((r) => r.contact === E2E_CLIENT.email);
     expect(order, "commande payée du client (seed)").toBeTruthy();
