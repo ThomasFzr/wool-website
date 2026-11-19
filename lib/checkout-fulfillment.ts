@@ -11,6 +11,32 @@ import Reservation from "@/models/Reservation";
 import Creation from "@/models/Creation";
 import CheckoutNotification from "@/models/CheckoutNotification";
 import { LOCK_FIELDS_UNSET, releaseCreationLocks, releaseSoldCreation } from "@/lib/creation-lock";
+import { z } from "zod";
+import { objectId } from "@/lib/validation";
+
+const metadataIdsSchema = z.array(objectId).max(100);
+
+/**
+ * Identifiants des réservations écrits dans les metadata de la session à sa création.
+ * Ils partent dans un `$in` marqué mongoose.trusted() : validés comme toute entrée (A03).
+ * Absents, illisibles ou invalides → [] : l'appelant cherche alors par identifiant de session.
+ */
+export function reservationIdsFromMetadata(session: Pick<Stripe.Checkout.Session, "id" | "metadata">): string[] {
+  const raw = session.metadata?.reservationIds;
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = undefined;
+  }
+  const result = metadataIdsSchema.safeParse(parsed);
+  if (!result.success) {
+    console.warn(`[FULFILL] metadata.reservationIds invalides pour la session ${session.id} : recherche par session`);
+    return [];
+  }
+  return result.data;
+}
 
 export type FulfillmentResult = {
   /** true si la session Stripe est réellement payée (payment_status=paid, status=complete, PaymentIntent succeeded) */
@@ -102,9 +128,7 @@ export async function fulfillCheckoutSession(
   }
 
   // Récupérer les réservations : via les metadata, sinon via l'ID de session
-  const reservationIds: string[] = session.metadata?.reservationIds
-    ? JSON.parse(session.metadata.reservationIds)
-    : [];
+  const reservationIds = reservationIdsFromMetadata(session);
 
   const reservations =
     reservationIds.length > 0
@@ -770,9 +794,7 @@ function buildEmailDispatcher({
 export async function releaseExpiredCheckoutSession(
   session: Stripe.Checkout.Session
 ): Promise<{ cancelledCount: number }> {
-  const reservationIds: string[] = session.metadata?.reservationIds
-    ? JSON.parse(session.metadata.reservationIds)
-    : [];
+  const reservationIds = reservationIdsFromMetadata(session);
 
   const query =
     reservationIds.length > 0
