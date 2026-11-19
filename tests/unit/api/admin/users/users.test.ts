@@ -270,6 +270,16 @@ describe("PATCH /api/admin/users/[id]", () => {
     vi.spyOn(User, "findByIdAndUpdate").mockRejectedValueOnce(new Error("db down"));
     expect((await patch(user.id, { name: "X" })).status).toBe(500);
   });
+
+  it("garde un 400 si Mongoose refuse une valeur passée par le schéma zod (filet de sécurité)", async () => {
+    const user = await createUser();
+    asAdmin();
+    vi.spyOn(User, "findByIdAndUpdate").mockRejectedValueOnce(new mongoose.Error.ValidationError());
+    expect(await readJson(await patch(user.id, { name: "X" }))).toEqual({
+      status: 400,
+      body: { error: "Données invalides" },
+    });
+  });
 });
 
 describe("DELETE /api/admin/users/[id]", () => {

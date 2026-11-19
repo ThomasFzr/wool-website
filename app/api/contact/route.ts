@@ -63,8 +63,6 @@ function containsOffensiveContent(text: string): boolean {
   return offensiveWords.some(pattern => pattern.test(text));
 }
 
-const isNonEmptyString = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
-
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

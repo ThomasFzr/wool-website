@@ -411,6 +411,18 @@ describe("PATCH /api/creations/[id]", () => {
     expect((await fresh(c._id)).weight).toBe(80);
   });
 
+  it("garde un 400 si Mongoose refuse une valeur passée par le schéma zod (filet de sécurité)", async () => {
+    const c = await createCreation();
+    asAdmin();
+    vi.spyOn(Creation, "updateOne").mockRejectedValueOnce(
+      new mongoose.Error.CastError("Number", "x", "weight")
+    );
+    expect(await readJson(await patch(c._id.toString(), { weight: 80 }))).toEqual({
+      status: 400,
+      body: { error: "Données invalides" },
+    });
+  });
+
   it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     const c = await createCreation();
     asAdmin();
