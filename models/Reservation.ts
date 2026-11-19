@@ -1,5 +1,17 @@
 import mongoose, { Schema } from "mongoose";
 
+// Valeurs autorisées, partagées avec les schémas de validation des routes (lib/validation)
+export const RESERVATION_STATUSES = [
+  "pending",
+  "preparing",
+  "shipped",
+  "in_transit",
+  "delivered",
+  "validated",
+  "cancelled",
+] as const;
+export const DELIVERY_MODES = ["pickup", "shipping"] as const;
+
 const schema = new Schema(
   {
     creationId: {
@@ -19,7 +31,7 @@ const schema = new Schema(
 
     status: {
       type: String,
-      enum: ["pending", "preparing", "shipped", "in_transit", "delivered", "validated", "cancelled"],
+      enum: RESERVATION_STATUSES,
       default: "pending",
     },
     
@@ -41,7 +53,7 @@ const schema = new Schema(
     // 🚚 Mode de livraison
     deliveryMode: {
       type: String,
-      enum: ["pickup", "shipping"],
+      enum: DELIVERY_MODES,
       default: "pickup",
     },
     

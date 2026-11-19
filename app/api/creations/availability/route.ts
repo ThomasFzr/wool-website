@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import CreationModel from "@/models/Creation";
+import { z } from "zod";
+import { idList, parseQuery } from "@/lib/validation";
+
+// ?ids=a,b,c : identifiants du panier, les entrées mal formées sont ignorées
+const idsQuery = z.object({ ids: idList(100) });
 
 /**
  * GET /api/creations/availability?ids=a,b,c
@@ -16,11 +21,9 @@ import CreationModel from "@/models/Creation";
  */
 export async function GET(req: NextRequest) {
   try {
-    const idsParam = req.nextUrl.searchParams.get("ids") || "";
-    const ids = idsParam
-      .split(",")
-      .map((id) => id.trim())
-      .filter((id) => mongoose.isValidObjectId(id));
+    const parsed = parseQuery(req.nextUrl.searchParams, idsQuery);
+    if (!parsed.ok) return parsed.response;
+    const ids = parsed.data.ids;
 
     if (ids.length === 0) {
       return NextResponse.json({ available: [] });

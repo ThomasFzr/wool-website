@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
+import { idParams, parseParams } from "@/lib/validation";
 
 type AdminRouteContext = {
   params: Promise<{ id: string }>;
@@ -17,9 +18,12 @@ export async function GET(req: NextRequest, context: AdminRouteContext) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    const parsedParams = await parseParams(context.params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
+
     await connectToDatabase();
 
-    const { id } = await context.params;
     const reservation = await Reservation.findById(id).populate("creationId");
 
     if (!reservation) {

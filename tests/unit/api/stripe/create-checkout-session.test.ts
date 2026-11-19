@@ -62,9 +62,9 @@ describe("POST /api/stripe/create-checkout-session", () => {
       ["items non tableau", { items: "abc" }],
       ["panier vide", { items: [] }],
     ])("refuse un panier invalide (%s)", async (_label, body) => {
-      const res = await checkout(body);
-      expect(res.status).toBe(400);
-      expect(await res.text()).toBe("Panier vide");
+      const { status, body: res } = await readJson(await checkout(body));
+      expect(status).toBe(400);
+      expect(res).toEqual({ error: "Panier vide", champ: "items" });
     });
 
     it("répond 404 quand une création n'existe pas", async () => {

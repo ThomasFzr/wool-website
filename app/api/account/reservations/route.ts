@@ -6,16 +6,19 @@ import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
 import "@/models/Creation";
 import { escapeRegex } from "@/lib/escape";
+import { z } from "zod";
+import { pageNumber, parseQuery, text } from "@/lib/validation";
+import { RESERVATION_STATUSES } from "@/models/Reservation";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
 
-/** Entier strictement positif lu dans l'URL, sinon la valeur par défaut ; borné à max. */
-function positiveInt(value: string | null, fallback: number, max = Infinity) {
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < 1) return fallback;
-  return Math.min(n, max);
-}
+const querySchema = z.object({
+  page: pageNumber(1),
+  limit: pageNumber(DEFAULT_LIMIT, MAX_LIMIT),
+  status: z.enum(RESERVATION_STATUSES, "Statut invalide.").optional(),
+  search: text(100).optional(),
+});
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,11 +33,9 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
-    const searchParams = req.nextUrl.searchParams;
-    const page = positiveInt(searchParams.get("page"), 1);
-    const limit = positiveInt(searchParams.get("limit"), DEFAULT_LIMIT, MAX_LIMIT);
-    const status = searchParams.get("status");
-    const search = searchParams.get("search");
+    const parsed = parseQuery(req.nextUrl.searchParams, querySchema);
+    if (!parsed.ok) return parsed.response;
+    const { page, limit, status, search } = parsed.data;
 
     const query: any = {
       contact: session.user.email, // 🔥 ne renvoie QUE les commandes de cet email

@@ -4,6 +4,14 @@ import { checkAdminAuth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import YarnBrand from "@/models/YarnBrand";
 import Creation from "@/models/Creation";
+import { z } from "zod";
+import { idParams, parseBody, parseQuery, requiredText } from "@/lib/validation";
+
+const PRICE_MESSAGE = "Marque et prix requis";
+const brandSchema = z.object({
+  brand: requiredText(100, PRICE_MESSAGE),
+  pricePerHundredGrams: z.number(PRICE_MESSAGE).positive(PRICE_MESSAGE).max(10_000, "Prix trop élevé."),
+});
 
 // GET - Récupérer toutes les marques (enregistrées + celles des créations)
 export async function GET() {
@@ -73,19 +81,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const { brand, pricePerHundredGrams } = await request.json();
-
-    if (!brand || !pricePerHundredGrams) {
-      return NextResponse.json(
-        { error: "Marque et prix requis" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(request, brandSchema);
+    if (!parsed.ok) return parsed.response;
+    const { brand, pricePerHundredGrams } = parsed.data;
 
     await connectToDatabase();
 
     // Vérifier si la marque existe déjà
-    const existingBrand = await YarnBrand.findOne({ brand: brand.trim() });
+    const existingBrand = await YarnBrand.findOne({ brand });
     
     if (existingBrand) {
       // Mettre à jour
@@ -95,7 +98,7 @@ export async function POST(request: Request) {
     } else {
       // Créer
       const newBrand = await YarnBrand.create({
-        brand: brand.trim(),
+        brand,
         pricePerHundredGrams,
       });
       return NextResponse.json(newBrand);
@@ -114,12 +117,9 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-
-    if (!id || !mongoose.isValidObjectId(id)) {
-      return NextResponse.json({ error: "ID invalide" }, { status: 400 });
-    }
+    const parsed = parseQuery(new URL(request.url).searchParams, idParams);
+    if (!parsed.ok) return parsed.response;
+    const { id } = parsed.data;
 
     await connectToDatabase();
 

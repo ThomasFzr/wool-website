@@ -10,6 +10,9 @@ import { checkAdminAuth } from "@/lib/auth";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { escapeHtml } from "@/lib/escape";
 import { releaseCreationOfReservation } from "@/lib/creation-lock";
+import { z } from "zod";
+import { idParams, parseBody, parseParams, parseQuery, text } from "@/lib/validation";
+import { DELIVERY_MODES, RESERVATION_STATUSES } from "@/models/Reservation";
 
 // Whitelist des champs modifiables par le PATCH admin (anti mass assignment :
 // on ne passe jamais le body entier à findByIdAndUpdate)
@@ -25,6 +28,26 @@ const UPDATABLE_FIELDS = [
   "contact",
   "message",
 ] as const;
+
+// Champs modifiables (cf. UPDATABLE_FIELDS) et options de l'action ; le reste est ignoré
+const patchSchema = z.object({
+  wholeOrder: z.boolean().optional(),
+  status: z.enum(RESERVATION_STATUSES, "Statut invalide.").optional(),
+  trackingNumber: text(100).nullish(),
+  shippedAt: z.coerce.date("Date d'expédition invalide.").nullish(),
+  cancelReason: text(1000).nullish(),
+  deliveryMode: z.enum(DELIVERY_MODES, "Mode de livraison invalide.").optional(),
+  shippingCost: z.number().min(0).max(1000).optional(),
+  seenByAdmin: z.boolean().optional(),
+  name: text(200).optional(),
+  contact: text(200).optional(),
+  message: text(2000).optional(),
+});
+
+// ?wholeOrder=1 : supprimer tous les articles de la commande
+const deleteQuery = z.object({
+  wholeOrder: z.string().max(5).optional().transform((v) => v === "1"),
+});
 
 type AdminRouteContext = {
   params: Promise<{ id: string }>;
@@ -231,10 +254,15 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    await connectToDatabase();
-    const body = await req.json();
+    const parsedParams = await parseParams(context.params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
 
-    const { id } = await context.params;
+    const parsed = await parseBody(req, patchSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
+
+    await connectToDatabase();
 
     const targets = await findTargets(id, body.wholeOrder === true);
     if (!targets) {
@@ -242,7 +270,7 @@ export async function PATCH(req: Request, context: AdminRouteContext) {
     }
 
     // Préparer les mises à jour (champs whitelistés uniquement)
-    const updates: any = {};
+    const updates: Record<string, unknown> = {};
     for (const field of UPDATABLE_FIELDS) {
       if (body[field] !== undefined) updates[field] = body[field];
     }
@@ -332,11 +360,15 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    await connectToDatabase();
+    const parsedParams = await parseParams(context.params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
 
-    const { id } = await context.params;
-    // ?wholeOrder=1 : supprimer tous les articles de la commande
-    const wholeOrder = req.nextUrl.searchParams.get("wholeOrder") === "1";
+    const parsed = parseQuery(req.nextUrl.searchParams, deleteQuery);
+    if (!parsed.ok) return parsed.response;
+    const { wholeOrder } = parsed.data;
+
+    await connectToDatabase();
 
     const reservation = await Reservation.findById(id).lean<any>();
     if (!reservation) {

@@ -32,7 +32,7 @@ describe("PATCH /api/account/password", () => {
     for (const body of [{ currentPassword: "ancien1" }, { newPassword: "nouveau1" }]) {
       const { status, body: res } = await readJson(await patch(body));
       expect(status).toBe(400);
-      expect(res.error).toBe("Mots de passe requis");
+      expect(res.error).toBe(PASSWORD_MESSAGES.required);
     }
   });
 
@@ -41,7 +41,7 @@ describe("PATCH /api/account/password", () => {
     for (const body of [{ currentPassword: 123456, newPassword: "nouveau1" }, { ...valid, newPassword: 1234567 }]) {
       const { status, body: res } = await readJson(await patch(body));
       expect(status).toBe(400);
-      expect(res.error).toBe("Mots de passe requis");
+      expect(res.error).toBe(PASSWORD_MESSAGES.required);
     }
   });
 
@@ -123,11 +123,10 @@ describe("PATCH /api/account/password", () => {
     });
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     asUser();
-    vi.spyOn(console, "error").mockImplementation(() => {});
     const { status, body } = await readJson(await patch("{pas du json"));
-    expect(status).toBe(500);
-    expect(body.error).toBe("Erreur serveur");
+    expect(status).toBe(400);
+    expect(body.error).toBe("Le corps de la requête doit être un objet JSON.");
   });
 });

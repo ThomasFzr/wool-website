@@ -10,6 +10,12 @@ import { connectToDatabase } from "@/lib/db";
 import { clientIp, hitRateLimit, rateLimitCount } from "@/lib/rate-limit";
 import { ACCOUNT_CHECK_TTL, lookupAccount, type AccountState } from "@/lib/account-check";
 import { passwordWarning } from "@/lib/password-policy";
+import { z } from "zod";
+import { email as emailField, password as passwordField } from "@/lib/validation";
+
+// Identifiants du formulaire de connexion : une entrée invalide est un refus de connexion
+// ordinaire (null), sans requête en base (A03)
+const credentialsSchema = z.object({ email: emailField, password: passwordField });
 
 // Le rôle stocké dans le JWT est revérifié en DB au plus toutes les ROLE_REFRESH_INTERVAL ms
 // (sinon un admin révoqué garderait son rôle jusqu'à expiration du token).
@@ -52,10 +58,11 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials, req) {
-        if (!credentials?.email || !credentials.password) return null;
+        const parsed = credentialsSchema.safeParse(credentials);
+        if (!parsed.success) return null;
+        const { email, password } = parsed.data;
 
         await connectToDatabase();
-        const email = credentials.email.toLowerCase().trim();
         const ipKey = `login:ip:${clientIp(req?.headers)}`;
         const accountKey = accountRateKey(email);
         const [ipFailures, accountFailures] = await Promise.all([
@@ -76,7 +83,7 @@ export const authOptions: NextAuthOptions = {
         // Compte créé via Google : pas de mot de passe local
         if (!user.password) return fail();
 
-        const ok = await bcrypt.compare(credentials.password, user.password);
+        const ok = await bcrypt.compare(password, user.password);
         if (!ok) return fail();
 
         // Administrateurs : connexion Google uniquement (double authentification déléguée à
@@ -86,7 +93,7 @@ export const authOptions: NextAuthOptions = {
 
         // Ancien mot de passe trop court ou compromis : connexion acceptée, mais un bandeau
         // invite à le changer (aucune invalidation des mots de passe existants).
-        const warning = await passwordWarning(credentials.password);
+        const warning = await passwordWarning(password);
 
         return {
           id: user._id.toString(),

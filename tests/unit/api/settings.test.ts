@@ -147,9 +147,8 @@ describe("POST /api/settings", () => {
     expect(doc.pickupConditions).toEqual(DEFAULT_PICKUP);
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await post("{oops")).status).toBe(500);
+    expect((await post("{oops")).status).toBe(400);
   });
 });

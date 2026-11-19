@@ -6,17 +6,20 @@ import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { checkNewPassword } from "@/lib/password-policy";
+import { z } from "zod";
+import { parseBody, password } from "@/lib/validation";
+
+const resetPasswordSchema = z.object({
+  // Jeton envoyé par email : 32 octets en hexadécimal (cf. forgot-password)
+  token: z.string("Lien de réinitialisation invalide.").regex(/^[a-f\d]{64}$/i, "Lien de réinitialisation invalide."),
+  password,
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const { token, password } = await req.json();
-
-    if (typeof token !== "string" || typeof password !== "string" || !token || !password) {
-      return NextResponse.json(
-        { error: "Token et mot de passe requis" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(req, resetPasswordSchema);
+    if (!parsed.ok) return parsed.response;
+    const { token, password } = parsed.data;
 
     const passwordError = await checkNewPassword(password);
     if (passwordError) {

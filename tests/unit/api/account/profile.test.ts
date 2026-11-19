@@ -75,7 +75,8 @@ describe("/api/account/profile", () => {
       asUser();
       const { status, body } = await readJson(await patch({ [key]: value }));
       expect(status).toBe(400);
-      expect(body.error).toBe(`Champ "${key}" invalide`);
+      expect(body.error).toMatch(/longueur maximale|invalide/);
+      expect(body.champ).toBe(key);
     });
 
     it("répond 404 si l'utilisateur n'existe plus", async () => {
@@ -119,10 +120,9 @@ describe("/api/account/profile", () => {
       expect(body.user.phone).toBe("");
     });
 
-    it("répond 500 sur un corps JSON invalide", async () => {
+    it("répond 400 sur un corps qui n'est pas du JSON", async () => {
       asUser();
-      vi.spyOn(console, "error").mockImplementation(() => {});
-      expect((await patch("{pas du json")).status).toBe(500);
+        expect((await patch("{pas du json")).status).toBe(400);
     });
   });
 });

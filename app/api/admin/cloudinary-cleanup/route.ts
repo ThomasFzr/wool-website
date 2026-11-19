@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminAuth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { destroyUnusedImages } from "@/lib/cloudinary-images";
+import { z } from "zod";
+import { parseBody } from "@/lib/validation";
 
 const MAX_IDS = 100;
+
+const cleanupSchema = z.object({
+  publicIds: z.array(z.string().min(1).max(300), "publicIds invalides").max(MAX_IDS, "publicIds invalides"),
+});
 
 /**
  * POST /api/admin/cloudinary-cleanup { publicIds: string[] }
@@ -17,11 +23,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const publicIds = body?.publicIds;
-    if (!Array.isArray(publicIds) || publicIds.length > MAX_IDS) {
-      return NextResponse.json({ error: "publicIds invalides" }, { status: 400 });
-    }
+    const parsed = await parseBody(req, cleanupSchema);
+    if (!parsed.ok) return parsed.response;
+    const { publicIds } = parsed.data;
 
     await connectToDatabase();
     const deleted = await destroyUnusedImages(publicIds);

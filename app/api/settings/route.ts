@@ -4,6 +4,29 @@ import { connectToDatabase } from "@/lib/db";
 import Settings from "@/models/Settings";
 import { checkAdminAuth } from "@/lib/auth";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/prompts";
+import { z } from "zod";
+import { parseBody, text } from "@/lib/validation";
+
+const labels = z.array(text(50)).max(200, "Liste trop longue.");
+
+// Réglages envoyés par la page d'admin (objet complet, champs facultatifs) ;
+// les autres clés du body (dont `_id`) sont ignorées
+const settingsSchema = z.object({
+  title: text(200).optional(),
+  subtitle: text(500).optional(),
+  colors: labels.optional(),
+  types: labels.optional(),
+  shippingCost: z.number().min(0).max(1000).optional(),
+  pickupConditions: z
+    .object({
+      enabled: z.boolean().optional(),
+      minimumAmount: z.number().min(0).max(100_000).optional(),
+      allowedPostalCodes: z.array(text(10)).max(500, "Liste trop longue.").optional(),
+      message: text(1000).optional(),
+    })
+    .nullish(),
+  systemPrompt: z.string().max(20_000, "Prompt trop long.").optional(),
+});
 
 const DEFAULT_SETTINGS = {
   title: "Les créations de maman",
@@ -94,8 +117,11 @@ export async function POST(req: NextRequest) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    const parsed = await parseBody(req, settingsSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
+
     await connectToDatabase();
-    const body = await req.json();
 
     // Préparer les données de mise à jour
     const updateData: any = {

@@ -465,12 +465,11 @@ describe("PATCH /api/admin/reservations/[id]", () => {
     });
   });
 
-  it("répond 500 pour un identifiant invalide", async () => {
+  it("répond 400 pour un identifiant mal formé", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
     const { status, body } = await readJson(await patch("pas-un-id", { status: "validated" }));
-    expect(status).toBe(500);
-    expect(body.error).toBe("Server error");
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: "Identifiant invalide.", champ: "id" });
   });
 });
 

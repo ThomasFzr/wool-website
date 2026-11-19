@@ -3,6 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
+import { z } from "zod";
+import { parseBody } from "@/lib/validation";
+
+const preferencesSchema = z.object({
+  emailNotifications: z.boolean("Préférence d'email invalide.").optional(),
+});
 
 /**
  * PATCH /api/account/preferences
@@ -18,15 +24,9 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { emailNotifications } = body;
-
-    if (emailNotifications !== undefined && typeof emailNotifications !== "boolean") {
-      return NextResponse.json(
-        { error: "emailNotifications doit être un booléen" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(req, preferencesSchema);
+    if (!parsed.ok) return parsed.response;
+    const { emailNotifications } = parsed.data;
 
     const updateData: Record<string, boolean> = {};
     if (emailNotifications !== undefined) {

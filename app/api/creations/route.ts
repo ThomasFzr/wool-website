@@ -6,6 +6,8 @@ import { checkAdminAuth } from "@/lib/auth";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
 import { sanitizeDescriptionHtml } from "@/lib/sanitize";
+import { parseBody } from "@/lib/validation";
+import { createCreationSchema } from "@/lib/schemas/creation";
 
 // Désactiver le cache pour cette route API pour éviter les problèmes de synchronisation
 export const dynamic = 'force-dynamic';
@@ -61,46 +63,15 @@ export async function POST(req: NextRequest) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    // Champs validés et typés ; les clés inconnues du body sont ignorées
+    const parsed = await parseBody(req, createCreationSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
+
     await connectToDatabase();
-    const body = await req.json();
 
-    // Validation des champs obligatoires
-    if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
-      return NextResponse.json(
-        { error: "Le titre est obligatoire." },
-        { status: 400 }
-      );
-    }
-    if (!body.type || typeof body.type !== 'string' || body.type.trim() === '') {
-      return NextResponse.json(
-        { error: "Le type d'article est obligatoire." },
-        { status: 400 }
-      );
-    }
-    if (!body.price || typeof body.price !== 'number' || body.price <= 0) {
-      return NextResponse.json(
-        { error: "Le prix est obligatoire et doit être supérieur à 0." },
-        { status: 400 }
-      );
-    }
-    if (!body.color || typeof body.color !== 'string' || body.color.trim() === '') {
-      return NextResponse.json(
-        { error: "La couleur est obligatoire." },
-        { status: 400 }
-      );
-    }
-
-    const images: string[] =
-      Array.isArray(body.images) && body.images.length
-        ? body.images
-        : body.imageUrl
-        ? [body.imageUrl]
-        : [];
-
-    const imagePublicIds: string[] =
-      Array.isArray(body.imagePublicIds) && body.imagePublicIds.length
-        ? body.imagePublicIds
-        : [];
+    const images: string[] = body.images?.length ? body.images : body.imageUrl ? [body.imageUrl] : [];
+    const imagePublicIds: string[] = body.imagePublicIds ?? [];
 
     // Récupérer le displayOrder maximum actuel
     const maxOrderCreation = await Creation.findOne().sort({ displayOrder: -1 }).select('displayOrder').lean();
@@ -110,24 +81,24 @@ export async function POST(req: NextRequest) {
     const slug = await generateUniqueSlug(body.title);
 
     const creation = await Creation.create({
-      title: body.title.trim(),
+      title: body.title,
       slug,
       description: body.description,
       // Rendue en HTML sur la fiche produit : nettoyée à l'enregistrement (XSS)
-      seoDescription: body.seoDescription === undefined ? undefined : sanitizeDescriptionHtml(body.seoDescription),
+      seoDescription: body.seoDescription == null ? undefined : sanitizeDescriptionHtml(body.seoDescription),
       imageUrl: body.imageUrl ?? images[0] ?? undefined,
       images,
       imagePublicIds,
       price: body.price,
-      color: body.color.trim(),
-      type: body.type.trim(),
+      color: body.color,
+      type: body.type,
       displayOrder: nextDisplayOrder,
-      showAsNew: body.showAsNew !== undefined ? body.showAsNew : true,
-      hidden: body.hidden !== undefined ? body.hidden : true, // Nouveaux articles cachés par défaut
+      showAsNew: body.showAsNew ?? true,
+      hidden: body.hidden ?? true, // Nouveaux articles cachés par défaut
       yarnBrand: body.yarnBrand,
       weight: body.weight,
       yarnPrice: body.yarnPrice,
-      relatedCreations: body.relatedCreations || [],
+      relatedCreations: body.relatedCreations ?? [],
     });
 
     // 🔄 Invalider le cache immédiatement après création

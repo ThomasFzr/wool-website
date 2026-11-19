@@ -7,6 +7,10 @@ import { emailTemplate } from "@/lib/emailTemplate";
 import { getEmailBaseUrl } from "@/lib/url";
 import { clientIp, hitRateLimit } from "@/lib/rate-limit";
 import crypto from "crypto";
+import { z } from "zod";
+import { email, parseBody } from "@/lib/validation";
+
+const forgotPasswordSchema = z.object({ email });
 
 // Un email de réinitialisation par adresse et par minute, et un nombre de demandes borné
 // par IP (sinon une seule machine peut faire envoyer des emails à des milliers d'adresses).
@@ -24,16 +28,9 @@ const neutralResponse = () =>
 
 export async function POST(req: NextRequest) {
   try {
-    const { email } = await req.json();
-
-    if (!email || typeof email !== "string") {
-      return NextResponse.json(
-        { error: "Email requis" },
-        { status: 400 }
-      );
-    }
-
-    const normalizedEmail = email.toLowerCase().trim();
+    const parsed = await parseBody(req, forgotPasswordSchema);
+    if (!parsed.ok) return parsed.response;
+    const normalizedEmail = parsed.data.email;
 
     await connectToDatabase();
 

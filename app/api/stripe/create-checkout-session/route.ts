@@ -13,8 +13,18 @@ import Settings from "@/models/Settings";
 import User from "@/models/User";
 import mongoose from "mongoose";
 import Stripe from "stripe";
+import { z } from "zod";
+import { objectId, parseBody } from "@/lib/validation";
+import { DELIVERY_MODES } from "@/models/Reservation";
 
-type DeliveryMode = "pickup" | "shipping";
+// Seul l'identifiant de chaque article est lu : le prix vient toujours de la base
+const checkoutSchema = z.object({
+  items: z
+    .array(z.object({ creationId: objectId }), "Panier vide")
+    .min(1, "Panier vide")
+    .max(50, "Panier trop volumineux"),
+  deliveryMode: z.enum(DELIVERY_MODES, "Mode de livraison invalide.").default("pickup"),
+});
 
 // Durée de vie de la session Checkout : 30 minutes (minimum autorisé par Stripe),
 // + 60 s de marge contre une dérive d'horloge. Le webhook `checkout.session.expired`
@@ -59,14 +69,9 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    const { items, deliveryMode = "pickup" } = await req.json() as {
-      items: any[];
-      deliveryMode?: DeliveryMode;
-    };
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return new NextResponse("Panier vide", { status: 400 });
-    }
+    const parsed = await parseBody(req, checkoutSchema);
+    if (!parsed.ok) return parsed.response;
+    const { items, deliveryMode } = parsed.data;
 
     // Récupérer les frais de livraison et les conditions depuis les settings
     const settings = await Settings.findById("main").lean() as {
@@ -81,7 +86,7 @@ export async function POST(req: NextRequest) {
     const shippingCost = settings?.shippingCost ?? 5;
 
     // Récupérer les créations et vérifier leur disponibilité
-    const creationIds = items.map((item: any) => item.creationId);
+    const creationIds = items.map((item) => item.creationId);
     // Une pièce cachée n'est pas en vente : traitée comme inexistante
     const creations = await Creation.find({ _id: mongoose.trusted({ $in: creationIds }), hidden: mongoose.trusted({ $ne: true }) });
 

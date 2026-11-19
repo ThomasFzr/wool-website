@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { POST } from "@/app/api/auth/reset-password/route";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
@@ -28,10 +28,14 @@ describe("POST /api/auth/reset-password", () => {
   });
 
   it("exige token et mot de passe", async () => {
-    for (const body of [{}, { token: TOKEN }, { password: "nouveau1" }]) {
+    for (const [body, error] of [
+      [{}, "Lien de réinitialisation invalide."],
+      [{ token: TOKEN }, PASSWORD_MESSAGES.required],
+      [{ password: "nouveau1" }, "Lien de réinitialisation invalide."],
+    ] as const) {
       const { status, body: res } = await readJson(await post(body));
       expect(status).toBe(400);
-      expect(res.error).toBe("Token et mot de passe requis");
+      expect(res.error).toBe(error);
     }
   });
 
@@ -96,17 +100,20 @@ describe("POST /api/auth/reset-password", () => {
 
   it("refuse un token ou un mot de passe qui n'est pas une chaîne", async () => {
     await createUserWithToken();
-    for (const body of [{ token: 123, password: "nouveau1" }, { token: TOKEN, password: 1234567 }]) {
+    for (const [body, error] of [
+      [{ token: 123, password: "nouveau1" }, "Lien de réinitialisation invalide."],
+      [{ token: TOKEN, password: 1234567 }, PASSWORD_MESSAGES.required],
+    ] as const) {
       const { status, body: res } = await readJson(await post(body));
       expect(status).toBe(400);
-      expect(res.error).toBe("Token et mot de passe requis");
+      expect(res.error).toBe(error);
     }
+    expect((await findUser())!.resetToken).toBe(hash(TOKEN));
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     const { status, body } = await readJson(await post("{pas du json"));
-    expect(status).toBe(500);
-    expect(body.error).toBe("Erreur lors de la réinitialisation du mot de passe");
+    expect(status).toBe(400);
+    expect(body.error).toBe("Le corps de la requête doit être un objet JSON.");
   });
 });

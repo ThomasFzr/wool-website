@@ -216,11 +216,10 @@ describe("POST /api/creations", () => {
     expect(body.slug).toBe("bonnet-ete-1");
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await post("{pas du json");
-    expect(res.status).toBe(500);
-    expect(await res.text()).toBe("DB error");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Le corps de la requête doit être un objet JSON." });
   });
 });
