@@ -46,7 +46,9 @@ Issue : [#20](https://github.com/ThomasFzr/wool-website/issues/20)
 
 Issue : [#21](https://github.com/ThomasFzr/wool-website/issues/21)
 
-- Validation centralisée des entrées (zod) et `sanitizeFilter` de Mongoose.
+- ~~Validation centralisée des entrées (zod) et `sanitizeFilter` de Mongoose~~ : faits (PR
+  « Validation centralisée des entrées »). Reste : message générique pour les erreurs 500 de
+  `generate-description` et `admin/generate-slugs` (elles renvoient le message interne).
 - ~~Politique de mot de passe (minimum, fuites Have I Been Pwned), limite de connexion par
   compte, connexion Google obligatoire pour les administrateurs~~ : faits (PR « Durcissement de
   l'authentification »). Reste : coût bcrypt à 12, minimum à 15 caractères (NIST SP 800-63B
