@@ -8,6 +8,7 @@ import User, { IUserDocument } from "@/models/User";
 import { connectToDatabase } from "@/lib/db";
 import { clientIp, hitRateLimit, rateLimitCount } from "@/lib/rate-limit";
 import { ACCOUNT_CHECK_TTL, lookupAccount, type AccountState } from "@/lib/account-check";
+import { passwordWarning } from "@/lib/password-policy";
 
 // Le rôle stocké dans le JWT est revérifié en DB au plus toutes les ROLE_REFRESH_INTERVAL ms
 // (sinon un admin révoqué garderait son rôle jusqu'à expiration du token).
@@ -66,11 +67,16 @@ export const authOptions: NextAuthOptions = {
         const ok = await bcrypt.compare(credentials.password, user.password);
         if (!ok) return fail();
 
+        // Ancien mot de passe trop court ou compromis : connexion acceptée, mais un bandeau
+        // invite à le changer (aucune invalidation des mots de passe existants).
+        const warning = await passwordWarning(credentials.password);
+
         return {
           id: user._id.toString(),
           email: user.email,
           name: user.name ?? undefined,
           role: user.role,
+          ...(warning && { passwordWarning: warning }),
         };
       }
     }),
@@ -140,6 +146,8 @@ export const authOptions: NextAuthOptions = {
         token.roleCheckedAt = Date.now();
         // Date de connexion : une session ouverte avant un changement de mot de passe est révoquée
         token.authAt = Date.now();
+        // Recalculé à chaque connexion : disparaît après reconnexion avec un nouveau mot de passe
+        if (user.passwordWarning) token.passwordWarning = user.passwordWarning;
       }
 
       if (account) {
@@ -190,6 +198,9 @@ export const authOptions: NextAuthOptions = {
       }
       if (token?.userId) {
         session.user.id = token.userId as string;
+      }
+      if (token?.passwordWarning) {
+        session.passwordWarning = token.passwordWarning;
       }
       if (token?.role) {
         session.user.role = token.role as "user" | "admin";

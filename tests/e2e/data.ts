@@ -12,6 +12,12 @@ export const E2E_CLIENT = {
   profile: { name: "Camille Client", postalCode: "75011", city: "Paris" },
 };
 
+/** Compte créé sous l'ancienne règle (6 caractères minimum) : mot de passe trop court. */
+export const E2E_LEGACY_CLIENT = {
+  email: "ancien@maillemum.test",
+  password: "chaton",
+};
+
 export const E2E_ADMIN = {
   email: "admin@maillemum.test",
   password: "Admin-e2e-123",

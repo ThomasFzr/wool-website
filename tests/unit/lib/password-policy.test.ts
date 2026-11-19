@@ -4,6 +4,8 @@ import {
   PASSWORD_MESSAGES,
   PASSWORD_MIN_LENGTH,
   passwordLength,
+  passwordWarning,
+  PASSWORD_WARNING_MESSAGES,
 } from "@/lib/password-policy";
 import { pwnedCount } from "@/lib/hibp";
 
@@ -44,5 +46,27 @@ describe("politique de mot de passe", () => {
   it("accepte le mot de passe si l'API des fuites ne répond pas", async () => {
     vi.mocked(pwnedCount).mockResolvedValueOnce(null);
     expect(await checkNewPassword("password123")).toBeNull();
+  });
+});
+
+describe("passwordWarning (mot de passe existant, à la connexion)", () => {
+  it("signale un mot de passe de moins de 8 caractères sans interroger l'API", async () => {
+    expect(await passwordWarning("ancien1")).toBe("short");
+    expect(pwnedCount).not.toHaveBeenCalled();
+  });
+
+  it("signale un mot de passe présent dans une fuite", async () => {
+    expect(await passwordWarning("password123")).toBe("pwned");
+  });
+
+  it("ne signale rien pour un mot de passe sain, ni si l'API ne répond pas", async () => {
+    expect(await passwordWarning("tricot du mercredi")).toBeNull();
+    vi.mocked(pwnedCount).mockResolvedValueOnce(null);
+    expect(await passwordWarning("password123")).toBeNull();
+  });
+
+  it("a un message pour chaque cas", () => {
+    expect(PASSWORD_WARNING_MESSAGES.short).toMatch(/moins de 8 caractères/);
+    expect(PASSWORD_WARNING_MESSAGES.pwned).toMatch(/fuites de données/);
   });
 });

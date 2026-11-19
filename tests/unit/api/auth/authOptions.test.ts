@@ -6,6 +6,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { resetAccountCheckCache } from "@/lib/account-check";
+import { pwnedCount } from "@/lib/hibp";
 
 // Les callbacks et authorize sont appelés directement : on teste notre logique, pas next-auth.
 const callbacks = authOptions.callbacks!;
@@ -97,6 +98,37 @@ describe("authOptions", () => {
       expect(
         await authorize({ email: "client@example.com", password: "secret123" }, { "x-real-ip": "198.51.100.1" })
       ).not.toBeNull();
+    });
+
+    describe("mot de passe existant faible (aucune invalidation)", () => {
+      const createWith = async (password: string) =>
+        User.create({ email: "faible@example.com", password: await bcrypt.hash(password, 4), provider: "credentials" });
+
+      it("accepte un mot de passe de moins de 8 caractères, en le signalant", async () => {
+        await createWith("chaton");
+        const user = await authorize({ email: "faible@example.com", password: "chaton" });
+        expect(user).toMatchObject({ email: "faible@example.com", passwordWarning: "short" });
+      });
+
+      it("accepte un mot de passe présent dans une fuite, en le signalant", async () => {
+        await createWith("password123");
+        const user = await authorize({ email: "faible@example.com", password: "password123" });
+        expect(user).toMatchObject({ email: "faible@example.com", passwordWarning: "pwned" });
+      });
+
+      it("ne signale rien si l'API des fuites ne répond pas", async () => {
+        await createWith("password123");
+        vi.mocked(pwnedCount).mockResolvedValueOnce(null);
+        const user = await authorize({ email: "faible@example.com", password: "password123" });
+        expect(user).not.toBeNull();
+        expect(user).not.toHaveProperty("passwordWarning");
+      });
+
+      it("n'interroge pas l'API des fuites sur un mauvais mot de passe", async () => {
+        await createWith("password123");
+        expect(await authorize({ email: "faible@example.com", password: "mauvais-mdp" })).toBeNull();
+        expect(pwnedCount).not.toHaveBeenCalled();
+      });
     });
 
     it("renvoie name undefined quand le compte n'a pas de nom", async () => {
@@ -216,6 +248,17 @@ describe("authOptions", () => {
       });
       expect(token).toMatchObject({ userId: "u1", role: "admin", provider: "credentials" });
       expect(typeof token.roleCheckedAt).toBe("number");
+    });
+
+    it("copie l'alerte sur le mot de passe dans le token, uniquement si elle existe", async () => {
+      const weak = await jwt({
+        token: { email: "x@example.com" },
+        user: { id: "u1", passwordWarning: "pwned" } as any,
+        account: credAccount,
+      });
+      expect(weak.passwordWarning).toBe("pwned");
+      const fine = await jwt({ token: { email: "x@example.com" }, user: { id: "u1" } as any, account: credAccount });
+      expect(fine).not.toHaveProperty("passwordWarning");
     });
 
     it("donne le rôle user par défaut", async () => {
@@ -355,8 +398,13 @@ describe("authOptions", () => {
       expect(s.user).toMatchObject({ id: "u1", role: "admin", email: "client@example.com" });
     });
 
-    it("met le rôle user par défaut et n'ajoute ni provider ni id", async () => {
+    it("expose l'alerte sur le mot de passe du token", async () => {
+      expect((await session({ passwordWarning: "short" })).passwordWarning).toBe("short");
+    });
+
+    it("met le rôle user par défaut et n'ajoute ni provider, ni id, ni alerte", async () => {
       const s = await session({});
+      expect(s.passwordWarning).toBeUndefined();
       expect(s.provider).toBeUndefined();
       expect(s.user.id).toBeUndefined();
       expect(s.user.role).toBe("user");
