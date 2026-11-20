@@ -137,9 +137,11 @@ describe("PATCH /api/creations/[id]", () => {
     expect((await patch(new mongoose.Types.ObjectId().toString(), { title: "X" })).status).toBe(404);
   });
 
-  it("répond 404 pour un identifiant mal formé", async () => {
+  it("répond 400 pour un identifiant mal formé", async () => {
     asAdmin();
-    expect((await patch("pas-un-id", { title: "X" })).status).toBe(404);
+    const { status, body } = await readJson(await patch("pas-un-id", { title: "X" }));
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: "Identifiant invalide.", champ: "id" });
   });
 
   it("supprime de Cloudinary les images retirées, pas celles gardées ni celles d'une autre création", async () => {
@@ -403,19 +405,34 @@ describe("PATCH /api/creations/[id]", () => {
   it("applique les validateurs du schéma : valeur négative ou non convertible → 400", async () => {
     const c = await createCreation({ weight: 80 });
     asAdmin();
-    for (const body of [{ weight: -5 }, { yarnPrice: -1 }, { weight: "lourd" }]) {
+    for (const [body, champ] of [
+      [{ weight: -5 }, "weight"],
+      [{ yarnPrice: -1 }, "yarnPrice"],
+      [{ weight: "lourd" }, "weight"],
+    ] as const) {
       const { status, body: res } = await readJson(await patch(c._id.toString(), body));
       expect(status).toBe(400);
-      expect(res.error).toBe("Données invalides");
+      expect(res).toEqual({ error: `Champ « ${champ} » invalide.`, champ });
     }
     expect((await fresh(c._id)).weight).toBe(80);
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
+  it("garde un 400 si Mongoose refuse une valeur passée par le schéma zod (filet de sécurité)", async () => {
     const c = await createCreation();
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await patch(c._id.toString(), "{oops")).status).toBe(500);
+    vi.spyOn(Creation, "updateOne").mockRejectedValueOnce(
+      new mongoose.Error.CastError("Number", "x", "weight")
+    );
+    expect(await readJson(await patch(c._id.toString(), { weight: 80 }))).toEqual({
+      status: 400,
+      body: { error: "Données invalides" },
+    });
+  });
+
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
+    const c = await createCreation();
+    asAdmin();
+    expect((await patch(c._id.toString(), "{oops")).status).toBe(400);
   });
 });
 
@@ -558,9 +575,11 @@ describe("DELETE /api/creations/[id]", () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
-  it("répond 404 pour un identifiant mal formé", async () => {
+  it("répond 400 pour un identifiant mal formé", async () => {
     asAdmin();
-    expect((await del("pas-un-id")).status).toBe(404);
+    const { status, body } = await readJson(await del("pas-un-id"));
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: "Identifiant invalide.", champ: "id" });
   });
 
   it("répond 500 si la base échoue", async () => {

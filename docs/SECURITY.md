@@ -15,7 +15,7 @@ sessions, chacune avec ses tests de non-régression
 |---|---|
 | A01 — Contrôle d'accès défaillant | ✅ Couvert |
 | A02 — Défaillances cryptographiques | ✅ Couvert |
-| A03 — Injection (dont XSS) | ✅ Couvert — validation centralisée prévue |
+| A03 — Injection (dont XSS) | ✅ Couvert — validation zod sur chaque route, `sanitizeFilter` global |
 | A04 — Conception non sécurisée | ✅ Couvert |
 | A05 — Mauvaise configuration de sécurité | ✅ Couvert |
 | A06 — Composants vulnérables et obsolètes | ✅ Couvert — dépendances à jour, Dependabot, audit en CI |
@@ -52,14 +52,92 @@ sessions, chacune avec ses tests de non-régression
 
 ## A03 — Injection (dont XSS)
 
+Deux protections complémentaires contre l'injection d'opérateur MongoDB (un objet
+`{"$ne": null}` envoyé à la place d'une chaîne, qui élargirait un filtre à tous les
+documents) :
+
+1. **Validation centralisée par schémas zod** : chaque route qui reçoit un body, des
+   paramètres de route ou une query string les lit avec `parseBody`, `parseParams` ou
+   `parseQuery` ([`lib/validation.ts`](../lib/validation.ts#L40-L72)). Types, formats et
+   longueurs sont vérifiés avant toute requête ; les clés inconnues sont retirées. Une
+   entrée refusée donne toujours un **400 `{ error, champ }`** en français qui nomme le
+   champ, sans détail interne (ni type attendu, ni valeur reçue, ni pile d'appels).
+2. **`sanitizeFilter` de Mongoose activé globalement**
+   ([`lib/db.ts`](../lib/db.ts#L6)) : tout objet à clé `$…` arrivé dans un filtre est
+   enveloppé dans `$eq` et comparé comme une valeur ; `$where` est refusé. Les opérateurs
+   écrits volontairement dans le code sont marqués `mongoose.trusted()` (29 fichiers).
+   `aggregate()` et `bulkWrite()` ne sont pas couverts par l'option : leurs entrées passent
+   par les schémas (cas de [`creations/reorder`](../app/api/creations/reorder/route.ts#L11)).
+
 | Mesure | Code | Tests |
 |---|---|---|
-| Recherche texte : saisie échappée avant tout `$regex` MongoDB (injection regex, ReDoS) | [`lib/escape.ts`](../lib/escape.ts#L15), utilisé dans [`admin/reservations/route.ts`](../app/api/admin/reservations/route.ts#L69) et [`account/reservations/route.ts`](../app/api/account/reservations/route.ts#L48) | [`escape.test.ts`](../tests/unit/lib/escape.test.ts#L22) |
-| Types vérifiés sur les routes publiques (`typeof`, `isValidObjectId`) : pas d'objet `{"$ne": …}` injecté dans un filtre | [`register`](../app/api/register/route.ts#L31-L42), [`reset-password`](../app/api/auth/reset-password/route.ts#L13), [`availability`](../app/api/creations/availability/route.ts#L23) | [`reset-password.test.ts`](../tests/unit/api/auth/reset-password.test.ts#L97) |
-| Mise à jour par liste blanche de champs + validateurs Mongoose (pas d'affectation de masse) | [`admin/reservations/[id]/route.ts`](../app/api/admin/reservations/%5Bid%5D/route.ts#L15) | [`reservation-id.test.ts`](../tests/unit/api/admin/reservations/reservation-id.test.ts) |
-| XSS stocké : HTML des descriptions filtré par liste blanche (`sanitize-html`) à l'enregistrement **et** à l'affichage | [`lib/sanitize.ts`](../lib/sanitize.ts#L9-L20), [`creations/route.ts`](../app/api/creations/route.ts#L116), [`creations/[id]/page.tsx`](../app/creations/%5Bid%5D/page.tsx#L156), seul `dangerouslySetInnerHTML` : [`Accordion.tsx`](../components/ui/Accordion.tsx#L69) | [`sanitize.test.ts`](../tests/unit/lib/sanitize.test.ts#L10-L21) (`<script>`, `onerror`, `javascript:`, `<iframe>`, `style`…) |
+| Schéma zod sur chaque route qui reçoit des données (tableau ci-dessous), réponse 400 uniforme | [`lib/validation.ts`](../lib/validation.ts#L25-L37) | [`validation.test.ts`](../tests/unit/lib/validation.test.ts), [`input-validation.test.ts`](../tests/unit/api/input-validation.test.ts#L520) : par route, une entrée valide, une invalide et une injection `{"$ne": null}` refusée **sans aucune modification en base** |
+| `sanitizeFilter` global, opérateurs du code marqués `mongoose.trusted()` | [`lib/db.ts`](../lib/db.ts#L6) | [`db.test.ts`](../tests/unit/lib/db.test.ts#L52) |
+| Panne de la base : 500 sans le message interne | routes concernées | [`input-validation.test.ts`](../tests/unit/api/input-validation.test.ts#L558) (18 routes) |
+| Injection sur l'application lancée (routes publiques) | — | [`tests/e2e/injection.spec.ts`](../tests/e2e/injection.spec.ts) |
+| Identifiants de réservation lus dans les metadata d'une session Stripe (passés à un `$in` trusted) : validés par zod, sinon recherche par identifiant de session | [`checkout-fulfillment.ts`](../lib/checkout-fulfillment.ts#L24) | [`checkout-fulfillment.test.ts`](../tests/unit/lib/checkout-fulfillment.test.ts#L801) |
+| Connexion par email : identifiants validés, une injection est un refus de connexion sans requête en base | [`authOptions.ts`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L18) | [`authOptions.test.ts`](../tests/unit/api/auth/authOptions.test.ts#L63) |
+| Recherche texte : saisie échappée avant tout `$regex` MongoDB (injection regex, ReDoS) | [`lib/escape.ts`](../lib/escape.ts#L15), utilisé dans [`admin/reservations/route.ts`](../app/api/admin/reservations/route.ts#L75) et [`account/reservations/route.ts`](../app/api/account/reservations/route.ts#L50) | [`escape.test.ts`](../tests/unit/lib/escape.test.ts#L22) |
+| Mise à jour par liste blanche de champs + validateurs Mongoose en second filet (pas d'affectation de masse) | [`admin/reservations/[id]/route.ts`](../app/api/admin/reservations/%5Bid%5D/route.ts#L19) | [`reservation-id.test.ts`](../tests/unit/api/admin/reservations/reservation-id.test.ts) |
+| XSS stocké : HTML des descriptions filtré par liste blanche (`sanitize-html`) à l'enregistrement **et** à l'affichage | [`lib/sanitize.ts`](../lib/sanitize.ts#L9-L20), [`creations/route.ts`](../app/api/creations/route.ts#L88), [`creations/[id]/page.tsx`](../app/creations/%5Bid%5D/page.tsx#L156), seul `dangerouslySetInnerHTML` : [`Accordion.tsx`](../components/ui/Accordion.tsx#L69) | [`sanitize.test.ts`](../tests/unit/lib/sanitize.test.ts#L10-L21) (`<script>`, `onerror`, `javascript:`, `<iframe>`, `style`…) |
 | Données utilisateur échappées dans les emails HTML ; React échappe tout le reste | [`lib/escape.ts`](../lib/escape.ts#L3) | [`escape.test.ts`](../tests/unit/lib/escape.test.ts#L10) |
-| Prix relus en base, jamais pris dans la requête du client | [`create-checkout-session/route.ts`](../app/api/stripe/create-checkout-session/route.ts#L104) et [L312](../app/api/stripe/create-checkout-session/route.ts#L312) | [`create-checkout-session.test.ts`](../tests/unit/api/stripe/create-checkout-session.test.ts) |
+| Prix relus en base, jamais pris dans la requête du client (le schéma du panier ne lit que l'identifiant) | [`create-checkout-session/route.ts`](../app/api/stripe/create-checkout-session/route.ts#L109) et [L317](../app/api/stripe/create-checkout-session/route.ts#L317) | [`create-checkout-session.test.ts`](../tests/unit/api/stripe/create-checkout-session.test.ts) |
+
+### Routes et schémas
+
+Briques communes ([`lib/validation.ts`](../lib/validation.ts#L74-L131)) : `objectId`
+(24 caractères hexadécimaux, plus strict que `mongoose.isValidObjectId` qui accepte toute
+chaîne de 12 caractères), `email` (normalisé : espaces retirés, minuscules), `password`
+(chaîne bornée ; la politique A07 est appliquée ensuite), `text` / `requiredText`
+(longueur maximale), `pageNumber`, `idList`. Énumérations partagées avec les modèles
+(`RESERVATION_STATUSES`, `DELIVERY_MODES`, `CONTACT_STATUSES`, `USER_ROLES`).
+
+| Route | Entrées | Schéma | Points notables |
+|---|---|---|---|
+| **Public** | | | |
+| `POST /api/register` | body | [`registerSchema`](../app/api/register/route.ts#L10) | email normalisé, nom ≤ 100 |
+| `POST /api/auth/forgot-password` | body | [`forgotPasswordSchema`](../app/api/auth/forgot-password/route.ts#L13) | email |
+| `POST /api/auth/reset-password` | body | [`resetPasswordSchema`](../app/api/auth/reset-password/route.ts#L12) | jeton : 64 caractères hexadécimaux |
+| `POST /api/auth/callback/credentials` (next-auth) | body | [`credentialsSchema`](../app/api/auth/%5B...nextauth%5D/authOptions.ts#L18) | entrée invalide = refus de connexion |
+| `POST /api/contact` | body | [`contactSchema`](../app/api/contact/route.ts#L22) | longueurs bornées, 20 créations max, honeypot |
+| `GET /api/creations/[id]` | paramètre | [`creationRefParams`](../lib/schemas/creation.ts#L49) | identifiant ou slug ; autre format → 404 |
+| `GET /api/creations/availability` | `?ids=` | [`idsQuery`](../app/api/creations/availability/route.ts#L9) | entrées mal formées ignorées |
+| `GET /api/creations/related` | `?ids=` | [`idsQuery`](../app/api/creations/related/route.ts#L9) | entrées mal formées ignorées |
+| **Compte client** | | | |
+| `PATCH /api/account/profile` | body | [`profileSchema`](../app/api/account/profile/route.ts#L10) | seuls les champs connus atteignent `$set` |
+| `PATCH /api/account/preferences` | body | [`preferencesSchema`](../app/api/account/preferences/route.ts#L9) | booléen |
+| `PATCH /api/account/password` | body | [`passwordChangeSchema`](../app/api/account/password/route.ts#L11) | |
+| `GET /api/account/reservations` | query | [`querySchema`](../app/api/account/reservations/route.ts#L16) | statut dans la liste, `limit` ≤ 100, recherche ≤ 100 |
+| `PATCH /api/account/reservations/[id]/cancel` | paramètre, body | `idParams`, [`cancelSchema`](../app/api/account/reservations/%5Bid%5D/cancel/route.ts#L16) | raison ≤ 1000 |
+| **Paiement** | | | |
+| `POST /api/stripe/create-checkout-session` | body | [`checkoutSchema`](../app/api/stripe/create-checkout-session/route.ts#L21) | 1 à 50 articles, seul l'identifiant est lu |
+| `GET /api/stripe/verify-session` | `?session_id=` | [`verifySchema`](../app/api/stripe/verify-session/route.ts#L13) | format `cs_…` |
+| **Administration** | | | |
+| `POST /api/creations` | body | [`createCreationSchema`](../lib/schemas/creation.ts#L31) | titre, type, couleur, prix > 0 |
+| `PATCH /api/creations/[id]` | paramètre, body | `idParams`, [`updateCreationSchema`](../lib/schemas/creation.ts#L37) | champs obligatoires revérifiés sur les valeurs finales |
+| `DELETE /api/creations/[id]` | paramètre | `idParams` | |
+| `POST /api/creations/reorder` | body | [`reorderSchema`](../app/api/creations/reorder/route.ts#L11) | `bulkWrite`, hors `sanitizeFilter` |
+| `POST /api/generate-description` | body | [`descriptionSchema`](../app/api/generate-description/route.ts#L10) | valeurs envoyées à Gemini bornées |
+| `POST /api/settings` | body | [`settingsSchema`](../app/api/settings/route.ts#L14) | listes et textes bornés |
+| `POST /api/admin/cloudinary-cleanup` | body | [`cleanupSchema`](../app/api/admin/cloudinary-cleanup/route.ts#L10) | 100 identifiants max |
+| `GET /api/admin/contact` | query | [`querySchema`](../app/api/admin/contact/route.ts#L10) | statut dans la liste |
+| `PATCH /api/admin/contact/[id]` | paramètre, body | `idParams`, [`statusSchema`](../app/api/admin/contact/%5Bid%5D/route.ts#L9) | |
+| `DELETE /api/admin/contact/[id]` | paramètre | `idParams` | |
+| `GET /api/admin/reservations` | query | [`querySchema`](../app/api/admin/reservations/route.ts#L17) | |
+| `POST /api/admin/reservations` | body | [`createSchema`](../app/api/admin/reservations/route.ts#L26) | `userId` et `creationIds` utilisés dans des filtres |
+| `PATCH /api/admin/reservations/[id]` | paramètre, body | `idParams`, [`patchSchema`](../app/api/admin/reservations/%5Bid%5D/route.ts#L33) | |
+| `DELETE /api/admin/reservations/[id]` | paramètre, query | `idParams`, [`deleteQuery`](../app/api/admin/reservations/%5Bid%5D/route.ts#L48) | |
+| `GET /api/admin/reservations/[id]/shipping-label` | paramètre | `idParams` | |
+| `POST /api/admin/users` | body | [`createUserSchema`](../lib/schemas/user.ts#L21) | audit : l'email allait tel quel dans `User.findOne` |
+| `PATCH /api/admin/users/[id]` | paramètre, body | `idParams`, [`updateUserSchema`](../lib/schemas/user.ts#L23) | idem ; rôle dans `USER_ROLES` |
+| `DELETE /api/admin/users/[id]` | paramètre | `idParams` | répondait 500 sur un id mal formé |
+| `POST /api/admin/yarn-brands/manage` | body | [`brandSchema`](../app/api/admin/yarn-brands/manage/route.ts#L11) | |
+| `DELETE /api/admin/yarn-brands/manage` | `?id=` | `idParams` | |
+
+Non concernées : les routes sans entrée (lectures `GET` de l'admin, des réglages et du
+catalogue, signature Cloudinary, génération des slugs, annulation de session Stripe, outils
+de debug), le **webhook Stripe** (corps brut dont la signature est vérifiée par
+`constructEvent` avant lecture) et le **cron** (seul un secret en en-tête est lu).
 
 ## A04 — Conception non sécurisée
 
@@ -170,9 +248,10 @@ routes par jeton CSRF. Aucune route `GET` ne modifie de données (le cron exige 
 
 Identifiées lors de l'audit de pré-publication, prévues dans une prochaine pull request :
 
-- **A03** — Validation centralisée des entrées par schémas (zod) sur toutes les routes, et option
-  `sanitizeFilter` de Mongoose activée globalement (aujourd'hui la validation est faite route par
-  route ; quelques routes admin ne vérifient pas encore le type de chaque champ).
+- **A03** — Deux routes admin renvoient encore le message d'une erreur interne en 500
+  ([`generate-description`](../app/api/generate-description/route.ts),
+  [`admin/generate-slugs`](../app/api/admin/generate-slugs/route.ts)) : réservé aux admins,
+  à remplacer par un message générique.
 - **A07** — Coût bcrypt porté à 12 (10 aujourd'hui). Longueur minimale à relever à
   15 caractères pour suivre la révision 4 du NIST SP 800-63B (voir A07). L'écran admin permet
   encore de poser un mot de passe sur un compte administrateur : sans effet (refusé à la

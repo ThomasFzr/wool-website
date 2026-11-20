@@ -6,6 +6,13 @@ import { connectToDatabase } from "@/lib/db";
 import { getStripeInstance } from "@/lib/stripe";
 import { getEmailBaseUrl } from "@/lib/url";
 import { fulfillCheckoutSession } from "@/lib/checkout-fulfillment";
+import { z } from "zod";
+import { parseQuery } from "@/lib/validation";
+
+// Identifiant de session Checkout renvoyé par Stripe dans success_url (cs_test_… / cs_live_…)
+const verifySchema = z.object({
+  session_id: z.string("Session de paiement manquante.").regex(/^cs_[A-Za-z0-9_]{1,250}$/, "Session de paiement invalide."),
+});
 
 /**
  * GET /api/stripe/verify-session?session_id=...
@@ -36,12 +43,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ valid: false }, { status: 401 });
     }
 
-    const searchParams = req.nextUrl.searchParams;
-    const sessionId = searchParams.get("session_id");
-
-    if (!sessionId) {
-      return NextResponse.json({ valid: false }, { status: 400 });
-    }
+    const parsed = parseQuery(req.nextUrl.searchParams, verifySchema);
+    if (!parsed.ok) return parsed.response;
+    const sessionId = parsed.data.session_id;
 
     // Récupérer la session Stripe complète avec toutes les informations
     let checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);

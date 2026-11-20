@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Reservation from "@/models/Reservation";
@@ -12,7 +13,7 @@ const TIMEZONE = "Europe/Paris";
 const ORDER_FILTER = {
   $or: [
     { paymentStatus: "paid" },
-    { stripeCheckoutSessionId: { $exists: false } },
+    { stripeCheckoutSessionId: mongoose.trusted({ $exists: false }) },
     { stripeCheckoutSessionId: null },
   ],
 };
@@ -116,8 +117,8 @@ export async function GET() {
           .lean<OrderReservation[]>(),
         Creation.countDocuments(),
         Creation.countDocuments({ sold: true }),
-        Creation.countDocuments({ sold: { $ne: true } }),
-        Creation.find({ createdAt: { $gte: costsSince } })
+        Creation.countDocuments({ sold: mongoose.trusted({ $ne: true }) }),
+        Creation.find({ createdAt: mongoose.trusted({ $gte: costsSince }) })
           .select("createdAt weight yarnPrice")
           .lean<(CreationInfo & { createdAt: Date })[]>(),
       ]);

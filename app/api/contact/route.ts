@@ -9,13 +9,27 @@ import { emailTemplate } from "@/lib/emailTemplate";
 import { escapeHtml } from "@/lib/escape";
 import { clientIp, hitRateLimit } from "@/lib/rate-limit";
 import mongoose from "mongoose";
+import { z } from "zod";
+import { email as emailField, objectIdOf, parseBody, requiredText } from "@/lib/validation";
 
 // Messages par IP (stockage partagé, cf. lib/rate-limit.ts)
 const CONTACT_MAX_PER_IP = 5;
 const CONTACT_WINDOW_MS = 10 * 60_000;
 const MAX_CREATIONS = 20;
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const REQUIRED = "Tous les champs sont requis.";
+const creationRef = objectIdOf("Création invalide.");
+const contactSchema = z.object({
+  name: requiredText(100, REQUIRED),
+  email: emailField.pipe(z.string().max(100, "L'adresse email dépasse la longueur maximale autorisée.")),
+  subject: requiredText(200, REQUIRED),
+  message: requiredText(2000, REQUIRED),
+  // Créations concernées : identifiants valides, en nombre borné
+  creationId: z.union([creationRef, z.literal(""), z.null()], "Création invalide.").optional(),
+  creationIds: z.array(creationRef, "Création invalide.").max(MAX_CREATIONS, "Création invalide.").nullish(),
+  // Honeypot : champ caché du formulaire, rempli seulement par les robots
+  website: z.string().max(500).optional(),
+});
 
 // Frontières de mot Unicode : \b ne connaît que [A-Za-z0-9_], si bien que « con » était
 // trouvé dans « conçu » (le ç n'étant pas une lettre pour \b).
@@ -49,47 +63,17 @@ function containsOffensiveContent(text: string): boolean {
   return offensiveWords.some(pattern => pattern.test(text));
 }
 
-const isNonEmptyString = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
-
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     await connectToDatabase();
 
-    const body = await req.json();
-    const { name, email, subject, message, creationId, creationIds, website } = body ?? {};
+    const parsed = await parseBody(req, contactSchema);
+    if (!parsed.ok) return parsed.response;
+    const { name, email, subject, message, creationId, creationIds, website } = parsed.data;
 
-    // Validation de base
-    if (![name, email, subject, message].every(isNonEmptyString)) {
-      return NextResponse.json(
-        { error: "Tous les champs sont requis." },
-        { status: 400 }
-      );
-    }
-
-    // Validation longueur
-    if (name.length > 100 || email.length > 100 || subject.length > 200 || message.length > 2000) {
-      return NextResponse.json(
-        { error: "Un ou plusieurs champs dépassent la longueur maximale autorisée." },
-        { status: 400 }
-      );
-    }
-
-    if (!EMAIL_REGEX.test(email.trim())) {
-      return NextResponse.json({ error: "Adresse email invalide." }, { status: 400 });
-    }
-
-    // Créations concernées : identifiants valides, en nombre borné
-    const isId = (id: unknown) => typeof id === "string" && mongoose.isObjectIdOrHexString(id);
-    if (
-      (creationId != null && creationId !== "" && !isId(creationId)) ||
-      (creationIds != null &&
-        (!Array.isArray(creationIds) || creationIds.length > MAX_CREATIONS || !creationIds.every(isId)))
-    ) {
-      return NextResponse.json({ error: "Création invalide." }, { status: 400 });
-    }
     let finalCreationIds: string[] = [];
-    if (Array.isArray(creationIds) && creationIds.length > 0) {
+    if (creationIds && creationIds.length > 0) {
       finalCreationIds = [...new Set<string>(creationIds)];
     } else if (creationId) {
       finalCreationIds = [creationId];
@@ -153,7 +137,7 @@ export async function POST(req: NextRequest) {
       
       if (finalCreationIds.length > 0) {
         try {
-          const creations = await Creation.find({ _id: { $in: finalCreationIds } });
+          const creations = await Creation.find({ _id: mongoose.trusted({ $in: finalCreationIds }) });
           if (creations.length > 0) {
             const creationsHtml = creations.map((creation) => {
               const imageUrl = creation.imageUrl || (creation.images && creation.images[0]) || '';

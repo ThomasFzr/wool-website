@@ -1,5 +1,8 @@
 import mongoose, { Schema, model, models, type Document, type Model } from "mongoose";
 
+// Rôles autorisés, partagés avec les schémas de validation des routes (lib/validation)
+export const USER_ROLES = ["user", "admin"] as const;
+
 //
 // 1) Interface TypeScript pour l'utilisateur
 //
@@ -40,7 +43,7 @@ const userSchema = new Schema<IUserDocument>(
     provider: { type: String, default: "credentials" },
     // select: false — champs sensibles jamais renvoyés par défaut, faire .select("+password") explicitement
     password: { type: String, select: false }, // utilisée avec Credentials
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    role: { type: String, enum: USER_ROLES, default: "user" },
     resetToken: { type: String, select: false },
     resetTokenExpiry: { type: Date, select: false },
     phone: { type: String },

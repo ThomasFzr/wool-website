@@ -3,6 +3,14 @@ import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
 import { revalidateCatalog } from "@/lib/revalidate";
+import { z } from "zod";
+import { objectId, parseBody } from "@/lib/validation";
+
+// bulkWrite n'applique pas sanitizeFilter : sans ce schéma, un id `{"$ne": null}`
+// réordonnait toutes les créations d'un coup
+const reorderSchema = z.object({
+  orderedIds: z.array(objectId, "orderedIds doit être une liste.").max(1000, "Trop de créations."),
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,13 +19,11 @@ export async function POST(req: NextRequest) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    await connectToDatabase();
-    const body = await req.json();
-    const { orderedIds } = body; // Array d'IDs dans le nouvel ordre
+    const parsed = await parseBody(req, reorderSchema);
+    if (!parsed.ok) return parsed.response;
+    const { orderedIds } = parsed.data; // IDs dans le nouvel ordre
 
-    if (!Array.isArray(orderedIds)) {
-      return new NextResponse("orderedIds must be an array", { status: 400 });
-    }
+    await connectToDatabase();
 
     // Mettre à jour l'ordre d'affichage (displayOrder décroissant depuis la longueur)
     // Le premier élément aura le displayOrder le plus élevé

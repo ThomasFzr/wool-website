@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { checkAdminAuth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
@@ -14,8 +15,8 @@ export async function GET() {
 
     // Récupérer toutes les créations avec marque de fil et prix
     const creations = await Creation.find({
-      yarnBrand: { $exists: true, $ne: null },
-      yarnPrice: { $exists: true, $ne: null },
+      yarnBrand: mongoose.trusted({ $exists: true, $ne: null }),
+      yarnPrice: mongoose.trusted({ $exists: true, $ne: null }),
     })
       .select("yarnBrand yarnPrice")
       .lean();

@@ -1,4 +1,4 @@
-import type { Types } from "mongoose";
+import mongoose, { type Types } from "mongoose";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 
@@ -22,7 +22,7 @@ export async function releaseCreationLock(creationId: Id, reservationId: Id): Pr
   const result = await Creation.updateOne(
     {
       _id: creationId,
-      sold: { $ne: true },
+      sold: mongoose.trusted({ $ne: true }),
       reserved: true,
       reservedByReservationId: reservationId,
     },
@@ -50,10 +50,10 @@ export async function releaseCreationLocks(
  */
 export async function releaseSoldCreation(creationId: Id, reservationId: Id): Promise<boolean> {
   const soldElsewhere = await Reservation.exists({
-    _id: { $ne: reservationId },
+    _id: mongoose.trusted({ $ne: reservationId }),
     creationId,
     paymentStatus: "paid",
-    status: { $ne: "cancelled" },
+    status: mongoose.trusted({ $ne: "cancelled" }),
   });
   if (soldElsewhere) return false;
 

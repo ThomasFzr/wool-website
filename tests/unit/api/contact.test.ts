@@ -275,8 +275,7 @@ describe("POST /api/contact — enregistrement et emails", () => {
     expect(err).toHaveBeenCalledWith("[contact] Email non envoyé:", expect.any(Error));
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await post("{oops")).status).toBe(500);
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
+    expect((await post("{oops")).status).toBe(400);
   });
 });

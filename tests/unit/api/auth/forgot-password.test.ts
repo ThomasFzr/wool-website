@@ -28,7 +28,7 @@ describe("POST /api/auth/forgot-password", () => {
     for (const body of [{}, { email: "" }, { email: 42 }]) {
       const { status, body: res } = await readJson(await post(body));
       expect(status).toBe(400);
-      expect(res.error).toBe("Email requis");
+      expect(res.error).toBe("Adresse email requise.");
     }
   });
 
@@ -131,8 +131,7 @@ describe("POST /api/auth/forgot-password", () => {
     expect(spy).toHaveBeenCalledWith("[forgot-password] Envoi de l'email impossible:", expect.any(Error));
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await post("{pas du json")).status).toBe(500);
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
+    expect((await post("{pas du json")).status).toBe(400);
   });
 });

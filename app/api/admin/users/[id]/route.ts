@@ -6,6 +6,8 @@ import User from "@/models/User";
 import { checkAdminAuth } from "@/lib/auth";
 import { isInvalidInput } from "@/lib/validation-error";
 import { checkNewPassword } from "@/lib/password-policy";
+import { idParams, parseBody, parseParams } from "@/lib/validation";
+import { updateUserSchema } from "@/lib/schemas/user";
 
 /**
  * PATCH /api/admin/users/[id]
@@ -24,13 +26,18 @@ export async function PATCH(
       );
     }
 
-    const body = await req.json();
-    const { name, email, role, password, phone, address, city, postalCode, emailNotifications } = body;
+    const parsedParams = await parseParams(params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
+
+    // Audit A03 : email et autres champs validés avant d'atteindre User.findOne / $set
+    const parsed = await parseBody(req, updateUserSchema);
+    if (!parsed.ok) return parsed.response;
+    const { name, email, role, password, phone, address, city, postalCode, emailNotifications } = parsed.data;
 
     await connectToDatabase();
 
-    const { id } = await params;
-    const user = mongoose.isValidObjectId(id) ? await User.findById(id) : null;
+    const user = await User.findById(id);
     if (!user) {
       return NextResponse.json(
         { error: "Utilisateur non trouvé" },
@@ -40,8 +47,8 @@ export async function PATCH(
 
     // Vérifier si l'email est déjà utilisé par un autre utilisateur (le schéma met les
     // emails en minuscules : on compare de même, et on ignore le compte lui-même)
-    if (email && String(email).trim().toLowerCase() !== user.email) {
-      const existingUser = await User.findOne({ email: String(email).trim().toLowerCase(), _id: { $ne: user._id } });
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email, _id: mongoose.trusted({ $ne: user._id }) });
       if (existingUser) {
         return NextResponse.json(
           { error: "Cet email est déjà utilisé" },
@@ -51,7 +58,7 @@ export async function PATCH(
     }
 
     // Mettre à jour les champs avec findOneAndUpdate pour éviter les problèmes de validation
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
     if (email) updateData.email = email;
     if (role) updateData.role = role;
@@ -122,9 +129,12 @@ export async function DELETE(
       );
     }
 
+    const parsedParams = await parseParams(params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
+
     await connectToDatabase();
 
-    const { id } = await params;
     const user = await User.findById(id);
     if (!user) {
       return NextResponse.json(

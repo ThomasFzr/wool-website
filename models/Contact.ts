@@ -1,5 +1,8 @@
 import mongoose, { Schema, model, models, type Document, type Model } from "mongoose";
 
+// Valeurs autorisées, partagées avec les schémas de validation des routes (lib/validation)
+export const CONTACT_STATUSES = ["new", "read", "replied", "archived"] as const;
+
 export interface IContact {
   name: string;
   email: string;
@@ -25,7 +28,7 @@ const contactSchema = new Schema<IContactDocument>(
     creationId: { type: Schema.Types.ObjectId, ref: "Creation", default: null },
     creationIds: [{ type: Schema.Types.ObjectId, ref: "Creation" }],
     userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
-    status: { type: String, enum: ["new", "read", "replied", "archived"], default: "new" },
+    status: { type: String, enum: CONTACT_STATUSES, default: "new" },
   },
   { timestamps: true }
 );

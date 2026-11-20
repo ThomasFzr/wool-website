@@ -107,10 +107,9 @@ describe("POST /api/admin/yarn-brands/manage", () => {
     expect((await YarnBrand.findOne({ brand: "Katia" }))!.pricePerHundredGrams).toBe(6);
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await post("{pas du json")).status).toBe(500);
+    expect((await post("{pas du json")).status).toBe(400);
   });
 });
 
@@ -123,7 +122,7 @@ describe("DELETE /api/admin/yarn-brands/manage", () => {
     asAdmin();
     const { status, body } = await readJson(await del(query));
     expect(status).toBe(400);
-    expect(body.error).toBe("ID invalide");
+    expect(body).toEqual({ error: "Identifiant invalide.", champ: "id" });
   });
 
   it("répond 404 pour une marque inexistante", async () => {

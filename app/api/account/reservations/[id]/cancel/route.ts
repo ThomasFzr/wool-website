@@ -10,30 +10,32 @@ import { emailTemplate } from "@/lib/emailTemplate";
 import { escapeHtml } from "@/lib/escape";
 import { releaseCreationLock } from "@/lib/creation-lock";
 import mongoose from "mongoose";
+import { z } from "zod";
+import { idParams, parseBody, parseParams, text } from "@/lib/validation";
+
+const cancelSchema = z.object({
+  reason: text(1000).nullish(),
+});
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-
     const session = await getServerSession(authOptions);
     if (!session || !session.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const parsedParams = await parseParams(params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
+
+    const parsed = await parseBody(req, cancelSchema);
+    if (!parsed.ok) return parsed.response;
+    const reason = parsed.data.reason ?? "";
+
     await connectToDatabase();
-
-    if (!mongoose.isValidObjectId(id)) {
-      return NextResponse.json({ error: "Reservation not found" }, { status: 404 });
-    }
-
-    const { reason: rawReason } = await req.json();
-    if (rawReason !== undefined && rawReason !== null && typeof rawReason !== "string") {
-      return NextResponse.json({ error: "Raison invalide" }, { status: 400 });
-    }
-    const reason = (rawReason ?? "").trim().slice(0, 1000);
 
     // 1️⃣ On récupère la réservation par ID
     const reservation = await Reservation.findById(id);
@@ -62,7 +64,7 @@ export async function PATCH(
     // une commande payée/expédiée se rembourse via la boutique, et une réservation
     // déjà annulée ne peut pas être ré-annulée (ni relibérer la pièce).
     const cancelled = await Reservation.findOneAndUpdate(
-      { _id: reservation._id, status: "pending", paymentStatus: { $ne: "paid" } },
+      { _id: reservation._id, status: "pending", paymentStatus: mongoose.trusted({ $ne: "paid" }) },
       { $set: { status: "cancelled", cancelReason: reason, cancelledBy: "user" } },
       { new: true }
     );

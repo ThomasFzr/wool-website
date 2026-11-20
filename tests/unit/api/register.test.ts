@@ -17,10 +17,13 @@ describe("POST /api/register", () => {
   });
 
   it("exige email et mot de passe", async () => {
-    for (const body of [{ password: "secret123" }, { email: "a@b.fr" }]) {
+    for (const [body, error] of [
+      [{ password: "secret123" }, "Adresse email requise."],
+      [{ email: "a@b.fr" }, PASSWORD_MESSAGES.required],
+    ] as const) {
       const { status, body: res } = await readJson(await post(body));
       expect(status).toBe(400);
-      expect(res.error).toBe("Email et mot de passe requis");
+      expect(res.error).toBe(error);
     }
   });
 
@@ -28,7 +31,7 @@ describe("POST /api/register", () => {
     for (const email of ["pas-un-email", "a @b.fr", 42]) {
       const { status, body } = await readJson(await post({ ...valid, email }));
       expect(status).toBe(400);
-      expect(body.error).toBe("Email invalide");
+      expect(body.error).toMatch(/^Adresse email (invalide|requise)\.$/);
     }
   });
 
@@ -63,7 +66,8 @@ describe("POST /api/register", () => {
     for (const name of ["x".repeat(101), 42]) {
       const { status, body } = await readJson(await post({ ...valid, name }));
       expect(status).toBe(400);
-      expect(body.error).toBe("Nom invalide");
+      expect(body.error).toMatch(/longueur maximale|Champ « name » invalide/);
+      expect(body.champ).toBe("name");
     }
   });
 
@@ -111,10 +115,9 @@ describe("POST /api/register", () => {
     expect((await post({ ...valid, email: "client6@example.com" }, { "x-real-ip": "198.51.100.1" })).status).toBe(200);
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     const { status, body } = await readJson(await post("{pas du json"));
-    expect(status).toBe(500);
-    expect(body.error).toBe("Erreur serveur, réessayez plus tard");
+    expect(status).toBe(400);
+    expect(body.error).toBe("Le corps de la requête doit être un objet JSON.");
   });
 });

@@ -3,6 +3,17 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
+import { z } from "zod";
+import { parseBody, text } from "@/lib/validation";
+
+// Uniquement des chaînes de taille raisonnable ; un champ absent n'est pas modifié
+const profileSchema = z.object({
+  name: text(100).optional(),
+  phone: text(30).optional(),
+  address: text(200).optional(),
+  city: text(100).optional(),
+  postalCode: text(10).optional(),
+});
 
 /**
  * PATCH /api/account/profile
@@ -18,29 +29,10 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { name, phone, address, city, postalCode } = body;
-
-    // Validation : uniquement des chaînes de taille raisonnable
-    const fields: Record<string, { value: unknown; max: number }> = {
-      name: { value: name, max: 100 },
-      phone: { value: phone, max: 30 },
-      address: { value: address, max: 200 },
-      city: { value: city, max: 100 },
-      postalCode: { value: postalCode, max: 10 },
-    };
-
-    const updateData: Record<string, string> = {};
-    for (const [key, { value, max }] of Object.entries(fields)) {
-      if (value === undefined) continue;
-      if (typeof value !== "string" || value.length > max) {
-        return NextResponse.json(
-          { error: `Champ "${key}" invalide` },
-          { status: 400 }
-        );
-      }
-      updateData[key] = value;
-    }
+    const parsed = await parseBody(req, profileSchema);
+    if (!parsed.ok) return parsed.response;
+    // zod ne garde que les champs connus et présents : aucune autre clé n'atteint $set
+    const updateData = parsed.data;
 
     await connectToDatabase();
 

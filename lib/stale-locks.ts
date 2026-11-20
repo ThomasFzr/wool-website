@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { getStripeInstance } from "@/lib/stripe";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { LOCK_FIELDS_UNSET, releaseCreationLock } from "@/lib/creation-lock";
@@ -41,8 +42,8 @@ export async function releaseStaleLocks(now = new Date()): Promise<StaleLocksRep
 
   const creations = await Creation.find({
     reserved: true,
-    sold: { $ne: true },
-    reservedAt: { $lt: new Date(now.getTime() - STALE_LOCK_AFTER_MS) },
+    sold: mongoose.trusted({ $ne: true }),
+    reservedAt: mongoose.trusted({ $lt: new Date(now.getTime() - STALE_LOCK_AFTER_MS) }),
   })
     .select("_id reservedByReservationId")
     .lean<any[]>();
@@ -57,14 +58,14 @@ export async function releaseStaleLocks(now = new Date()): Promise<StaleLocksRep
         : await Reservation.find({
             creationId: creation._id,
             paymentStatus: "pending",
-            stripeCheckoutSessionId: { $exists: true, $ne: null },
+            stripeCheckoutSessionId: mongoose.trusted({ $exists: true, $ne: null }),
           }).lean();
 
       for (const reservation of candidates) {
         if (reservation.paymentStatus === "paid" && reservation.status !== "cancelled") {
           // Paiement enregistré mais vente non marquée (traitement interrompu)
           const result = await Creation.updateOne(
-            { _id: creation._id, sold: { $ne: true } },
+            { _id: creation._id, sold: mongoose.trusted({ $ne: true }) },
             { $set: { sold: true, reserved: false }, $unset: LOCK_FIELDS_UNSET, $inc: { salesCount: 1 } }
           );
           if (result.modifiedCount > 0) report.sold++;
@@ -92,12 +93,12 @@ export async function releaseStaleLocks(now = new Date()): Promise<StaleLocksRep
       // détenteur) : levé une fois tous ses checkouts clos
       if (!creation.reservedByReservationId && candidates.length > 0) {
         const stillPending = await Reservation.exists({
-          _id: { $in: candidates.map((r) => r._id) },
+          _id: mongoose.trusted({ $in: candidates.map((r) => r._id) }),
           paymentStatus: "pending",
         });
         if (!stillPending) {
           const result = await Creation.updateOne(
-            { _id: creation._id, sold: { $ne: true }, reserved: true, reservedByReservationId: { $exists: false } },
+            { _id: creation._id, sold: mongoose.trusted({ $ne: true }), reserved: true, reservedByReservationId: mongoose.trusted({ $exists: false }) },
             { $set: { reserved: false }, $unset: LOCK_FIELDS_UNSET }
           );
           if (result.modifiedCount > 0) report.released++;

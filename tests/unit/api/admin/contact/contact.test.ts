@@ -118,10 +118,11 @@ describe("PATCH /api/admin/contact/[id]", () => {
     expect((await Contact.findById(contact.id))!.status).toBe("replied");
   });
 
-  it("répond 500 pour un identifiant invalide", async () => {
+  it("répond 400 pour un identifiant mal formé", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await patch("pas-un-id", { status: "read" })).status).toBe(500);
+    const { status, body } = await readJson(await patch("pas-un-id", { status: "read" }));
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: "Identifiant invalide.", champ: "id" });
   });
 });
 

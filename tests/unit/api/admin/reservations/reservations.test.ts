@@ -111,7 +111,7 @@ describe("GET /api/admin/reservations", () => {
     expect(body.reservations.map((r: any) => r.name)).toEqual(["Cible"]);
 
     const invalid = await readJson(await list("?creationId=pas-un-id"));
-    expect(invalid.body).toEqual({ reservations: [], page: 1, totalPages: 0, total: 0 });
+    expect(invalid).toEqual({ status: 400, body: { error: "Identifiant invalide.", champ: "creationId" } });
   });
 
   it("recherche aussi dans le nom et le contact, sans tenir compte de la casse", async () => {
@@ -241,12 +241,11 @@ describe("POST /api/admin/reservations", () => {
     expect((await Reservation.findOne().lean<any>()).name).toBe("client@example.com");
   });
 
-  it("répond 500 pour un identifiant utilisateur invalide", async () => {
+  it("répond 400 pour un identifiant utilisateur mal formé", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const { status, body } = await readJson(await create({ userId: "pas-un-id", creationIds: ["x"] }));
-    expect(status).toBe(500);
-    expect(body.error).toBe("Erreur serveur");
+    const { status, body } = await readJson(await create({ userId: "pas-un-id", creationIds: [unknownId()] }));
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: "L'utilisateur est requis", champ: "userId" });
   });
 });
 

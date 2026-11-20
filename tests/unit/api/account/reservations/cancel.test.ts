@@ -242,7 +242,7 @@ describe("PATCH /api/account/reservations/[id]/cancel", () => {
     asUser();
     const { status, body } = await cancel(r._id, { reason });
     expect(status).toBe(400);
-    expect(body.error).toBe("Raison invalide");
+    expect(body).toEqual({ error: "Champ « reason » invalide.", champ: "reason" });
     expect((await Reservation.findById(r._id)).status).toBe("pending");
     expect(((await Creation.findById(creation._id).lean()) as any).reserved).toBe(true);
     expect(sendEmail).not.toHaveBeenCalled();
@@ -307,11 +307,11 @@ describe("PATCH /api/account/reservations/[id]/cancel", () => {
     expect(spy).toHaveBeenCalledWith("[cancel] Email non envoyé:", expect.any(Error));
   });
 
-  it("répond 404 pour un identifiant invalide", async () => {
+  it("répond 400 pour un identifiant mal formé", async () => {
     asUser();
     const { status, body } = await cancel("pas-un-id");
-    expect(status).toBe(404);
-    expect(body.error).toBe("Reservation not found");
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: "Identifiant invalide.", champ: "id" });
   });
 
   it("répond 500 quand la base est indisponible", async () => {

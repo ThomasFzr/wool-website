@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import {
+  reservationIdsFromMetadata,
   fulfillCheckoutSession,
   releaseExpiredCheckoutSession,
 } from "@/lib/checkout-fulfillment";
@@ -507,7 +508,7 @@ describe("fulfillCheckoutSession", () => {
       await expect(fulfillCheckoutSession(paidSession())).rejects.toThrow("db down");
       expect(sendEmail).not.toHaveBeenCalled();
       // fulfillingAt est levé même en cas d'échec : le nouvel essai n'attend pas
-      expect(await Reservation.countDocuments({ fulfillingAt: { $exists: true } })).toBe(0);
+      expect(await Reservation.countDocuments({ fulfillingAt: mongoose.trusted({ $exists: true }) })).toBe(0);
 
       await fulfillCheckoutSession(paidSession());
       expect(emailTo("client@example.com")).toHaveLength(1);
@@ -794,5 +795,26 @@ describe("releaseExpiredCheckoutSession", () => {
     const result = await releaseExpiredCheckoutSession(paidSession());
     expect(result.cancelledCount).toBe(1);
     expect(revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("reservationIdsFromMetadata (A03 : valeurs passées à un $in trusted)", () => {
+  const ID = "65a1b2c3d4e5f60718293a4b";
+  const read = (reservationIds?: string) =>
+    reservationIdsFromMetadata({ id: "cs_test_meta", metadata: reservationIds === undefined ? {} : { reservationIds } });
+
+  it("renvoie les identifiants valides", () => {
+    expect(read(JSON.stringify([ID]))).toEqual([ID]);
+  });
+
+  it.each([
+    ["absentes", undefined],
+    ["JSON illisible", "{pas du json"],
+    ["pas un tableau", JSON.stringify(ID)],
+    ["identifiant mal formé", JSON.stringify(["pas-un-id"])],
+    ["injection d'opérateur", JSON.stringify([{ $ne: null }])],
+  ])("renvoie [] (recherche par session) pour des metadata %s", (_label, raw) => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(read(raw)).toEqual([]);
   });
 });

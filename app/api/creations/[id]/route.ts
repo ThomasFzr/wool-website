@@ -9,13 +9,18 @@ import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
 import { sanitizeDescriptionHtml } from "@/lib/sanitize";
 import { isInvalidInput } from "@/lib/validation-error";
+import { idParams, parseBody, parseInput, parseParams } from "@/lib/validation";
+import { creationRefParams, requiredCreationFields, updateCreationSchema } from "@/lib/schemas/creation";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    // Identifiant MongoDB ou slug : un autre format ne peut correspondre à aucune création
+    const parsedParams = await parseParams(params, creationRefParams);
+    if (!parsedParams.ok) return new NextResponse("Not found", { status: 404 });
+    const { id } = parsedParams.data;
     await connectToDatabase();
     
     // Vérifier si l'utilisateur est admin pour voir les créations cachées
@@ -23,7 +28,7 @@ export async function GET(
     const isAdmin = session !== null;
     
     // Construire la requête avec ou sans filtre hidden selon le rôle
-    const baseQuery = isAdmin ? {} : { hidden: { $ne: true } };
+    const baseQuery = isAdmin ? {} : { hidden: mongoose.trusted({ $ne: true }) };
     
     // Récupérer la création par ID ou slug avec les articles liés
     // (un id non-ObjectId ferait lever un CastError sur _id, d'où le test explicite)
@@ -75,54 +80,39 @@ export async function PATCH(
     const session = await checkAdminAuth();
     if (!session) return new NextResponse("Unauthorized", { status: 401 });
 
-    const { id } = await params;
-    if (!mongoose.isValidObjectId(id)) return new NextResponse("Not found", { status: 404 });
-    await connectToDatabase();
-    const body = await req.json();
+    const parsedParams = await parseParams(params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
 
-    // Récupérer la création existante pour valider les champs obligatoires
+    // Un champ obligatoire (titre, type, prix, couleur) envoyé vide est refusé par le schéma ;
+    // absent, il garde sa valeur actuelle. Les clés inconnues du body sont ignorées.
+    const parsed = await parseBody(req, updateCreationSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
+
+    await connectToDatabase();
+
     const existingCreation = await Creation.findById(id);
     if (!existingCreation) {
       return new NextResponse("Not found", { status: 404 });
     }
 
-    // Validation des champs obligatoires (vérifier les valeurs finales après mise à jour)
-    const finalTitle = body.title !== undefined ? body.title : existingCreation.title;
-    const finalType = body.type !== undefined ? body.type : existingCreation.type;
-    const finalPrice = body.price !== undefined ? body.price : existingCreation.price;
-    const finalColor = body.color !== undefined ? body.color : existingCreation.color;
-
-    if (!finalTitle || typeof finalTitle !== 'string' || finalTitle.trim() === '') {
-      return NextResponse.json(
-        { error: "Le titre est obligatoire." },
-        { status: 400 }
-      );
-    }
-    if (!finalType || typeof finalType !== 'string' || finalType.trim() === '') {
-      return NextResponse.json(
-        { error: "Le type d'article est obligatoire." },
-        { status: 400 }
-      );
-    }
-    if (!finalPrice || typeof finalPrice !== 'number' || finalPrice <= 0) {
-      return NextResponse.json(
-        { error: "Le prix est obligatoire et doit être supérieur à 0." },
-        { status: 400 }
-      );
-    }
-    if (!finalColor || typeof finalColor !== 'string' || finalColor.trim() === '') {
-      return NextResponse.json(
-        { error: "La couleur est obligatoire." },
-        { status: 400 }
-      );
-    }
+    // Valeurs finales des champs obligatoires : une ancienne création incomplète en base
+    // doit être corrigée avant toute autre modification
+    const required = parseInput(requiredCreationFields, {
+      title: body.title ?? existingCreation.title,
+      type: body.type ?? existingCreation.type,
+      price: body.price ?? existingCreation.price,
+      color: body.color ?? existingCreation.color,
+    });
+    if (!required.ok) return required.response;
 
     // Construire l'objet de mise à jour avec les opérateurs MongoDB
     const setData: any = {};
     const unsetData: any = {};
 
     if (body.title !== undefined) {
-      setData.title = body.title.trim();
+      setData.title = body.title;
       // Régénérer le slug si le titre change ; l'ancien reste une adresse valide
       // (redirection 301 depuis la fiche) pour ne pas casser les liens partagés.
       const slug = await generateUniqueSlug(body.title, id);
@@ -150,13 +140,13 @@ export async function PATCH(
       setData.imagePublicIds = body.imagePublicIds;
     }
     if (body.price !== undefined) setData.price = body.price;
-    if (body.color !== undefined) setData.color = body.color.trim();
+    if (body.color !== undefined) setData.color = body.color;
     if (body.yarnBrand !== undefined) setData.yarnBrand = body.yarnBrand;
     if (body.weight !== undefined) setData.weight = body.weight;
     if (body.yarnPrice !== undefined) setData.yarnPrice = body.yarnPrice;
     if (body.type !== undefined) {
       // Le type est maintenant obligatoire, on ne peut plus le supprimer
-      setData.type = body.type.trim();
+      setData.type = body.type;
     }
 
     if (body.reserved !== undefined) setData.reserved = body.reserved;
@@ -262,8 +252,9 @@ export async function DELETE(
     const session = await checkAdminAuth();
     if (!session) return new NextResponse("Unauthorized", { status: 401 });
 
-    const { id } = await params;
-    if (!mongoose.isValidObjectId(id)) return new NextResponse("Not found", { status: 404 });
+    const parsedParams = await parseParams(params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
     await connectToDatabase();
 
     const creation = await Creation.findById(id);

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
         .select('brand pricePerHundredGrams')
         .lean(),
       Creation.distinct('yarnBrand', {
-        yarnBrand: { $exists: true, $nin: [null, ""] }
+        yarnBrand: mongoose.trusted({ $exists: true, $nin: [null, ""] })
       }),
     ]);
 

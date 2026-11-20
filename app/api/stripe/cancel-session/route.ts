@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
@@ -27,7 +28,7 @@ export async function POST() {
     const sessionIds: string[] = await Reservation.distinct("stripeCheckoutSessionId", {
       contact: session.user.email,
       paymentStatus: "pending",
-      stripeCheckoutSessionId: { $nin: [null, ""] },
+      stripeCheckoutSessionId: mongoose.trusted({ $nin: [null, ""] }),
     });
 
     const stripe = getStripeInstance();

@@ -30,9 +30,9 @@ describe("POST /api/creations/reorder", () => {
 
   it("répond 400 si orderedIds n'est pas un tableau", async () => {
     asAdmin();
-    const res = await post({ orderedIds: "a,b" });
-    expect(res.status).toBe(400);
-    expect(await res.text()).toMatch(/array/);
+    const { status, body } = await readJson(await post({ orderedIds: "a,b" }));
+    expect(status).toBe(400);
+    expect(body).toEqual({ error: "orderedIds doit être une liste.", champ: "orderedIds" });
   });
 
   it("donne le displayOrder le plus élevé au premier élément", async () => {
@@ -56,11 +56,10 @@ describe("POST /api/creations/reorder", () => {
     expect((await post({ orderedIds: [] })).status).toBe(200);
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     asAdmin();
-    vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await post("{oops");
-    expect(res.status).toBe(500);
-    expect(await res.text()).toBe("DB error");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Le corps de la requête doit être un objet JSON." });
   });
 });

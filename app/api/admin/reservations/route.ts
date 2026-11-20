@@ -8,15 +8,29 @@ import "@/models/Creation";
 import { checkAdminAuth } from "@/lib/auth";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { escapeRegex } from "@/lib/escape";
+import { z } from "zod";
+import { objectId, objectIdOf, pageNumber, parseBody, parseQuery, text } from "@/lib/validation";
+import { RESERVATION_STATUSES } from "@/models/Reservation";
 
 const MAX_LIMIT = 100;
 
-/** Entier strictement positif lu dans l'URL, sinon la valeur par défaut ; borné à max. */
-function positiveInt(value: string | null, fallback: number, max = Infinity) {
-    const n = Number(value);
-    if (!Number.isInteger(n) || n < 1) return fallback;
-    return Math.min(n, max);
-}
+const querySchema = z.object({
+    page: pageNumber(1),
+    limit: pageNumber(10, MAX_LIMIT),
+    status: z.enum(RESERVATION_STATUSES, "Statut invalide.").optional(),
+    creationId: objectId.optional(),
+    search: text(100).optional(),
+});
+
+// Commande saisie par l'admin : userId et creationIds passent dans des filtres MongoDB
+const createSchema = z.object({
+    userId: objectIdOf("L'utilisateur est requis"),
+    creationIds: z.array(objectId, "Au moins une création est requise").min(1, "Au moins une création est requise").max(50, "Trop de créations."),
+    name: text(200).optional(),
+    contact: text(200).optional(),
+    message: text(2000).optional(),
+    status: z.enum(RESERVATION_STATUSES, "Statut invalide.").default("preparing"),
+});
 
 /**
  * GET /api/admin/reservations
@@ -34,20 +48,16 @@ export async function GET(req: Request) {
 
         await connectToDatabase();
 
-        const { searchParams } = new URL(req.url);
-
-        const page = positiveInt(searchParams.get("page"), 1);
-        const limit = positiveInt(searchParams.get("limit"), 10, MAX_LIMIT);
-        const status = searchParams.get("status");
-        const creationId = searchParams.get("creationId");
-        const search = searchParams.get("search");
+        const parsed = parseQuery(new URL(req.url).searchParams, querySchema);
+        if (!parsed.ok) return parsed.response;
+        const { page, limit, status, creationId, search } = parsed.data;
 
         // ⚠️ FILTRE CRITIQUE : Ne montrer que les réservations payées ou les réservations manuelles (sans Stripe)
         // Les réservations avec stripeCheckoutSessionId mais paymentStatus !== "paid" sont des paiements annulés
         const paymentFilter = {
             $or: [
                 { paymentStatus: "paid" }, // Paiements validés
-                { stripeCheckoutSessionId: { $exists: false } }, // Réservations manuelles (sans Stripe)
+                { stripeCheckoutSessionId: mongoose.trusted({ $exists: false }) }, // Réservations manuelles (sans Stripe)
                 { stripeCheckoutSessionId: null }, // Réservations manuelles (sans Stripe)
             ],
         };
@@ -57,16 +67,12 @@ export async function GET(req: Request) {
         
         if (status) conditions.push({ status });
         if (creationId) {
-            // Un id invalide ne correspond à aucune commande
-            if (!mongoose.isValidObjectId(creationId)) {
-                return NextResponse.json({ reservations: [], page, totalPages: 0, total: 0 });
-            }
             // $match d'agrégation : pas de conversion automatique en ObjectId
             conditions.push({ creationId: new mongoose.Types.ObjectId(creationId) });
         }
         
         if (search) {
-            const regex = { $regex: escapeRegex(search), $options: "i" };
+            const regex = mongoose.trusted({ $regex: escapeRegex(search), $options: "i" });
             conditions.push({
                 $or: [
                     { name: regex },
@@ -105,8 +111,8 @@ export async function GET(req: Request) {
                 paymentFilter,
                 {
                     $or: [
-                        { stripeCheckoutSessionId: { $in: keys } },
-                        { _id: { $in: keys.filter((k) => mongoose.isValidObjectId(k)) } },
+                        { stripeCheckoutSessionId: mongoose.trusted({ $in: keys }) },
+                        { _id: mongoose.trusted({ $in: keys.filter((k) => mongoose.isValidObjectId(k)) }) },
                     ],
                 },
             ],
@@ -138,25 +144,11 @@ export async function POST(req: Request) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
+        const parsed = await parseBody(req, createSchema);
+        if (!parsed.ok) return parsed.response;
+        const { userId, creationIds, name, contact, message, status } = parsed.data;
+
         await connectToDatabase();
-
-        const body = await req.json();
-        const { userId, creationIds, name, contact, message, status = "preparing" } = body;
-
-        // Validation
-        if (!userId) {
-            return NextResponse.json(
-                { error: "L'utilisateur est requis" },
-                { status: 400 }
-            );
-        }
-
-        if (!creationIds || !Array.isArray(creationIds) || creationIds.length === 0) {
-            return NextResponse.json(
-                { error: "Au moins une création est requise" },
-                { status: 400 }
-            );
-        }
 
         // Vérifier que l'utilisateur existe
         const user = await User.findById(userId);
@@ -168,7 +160,7 @@ export async function POST(req: Request) {
         }
 
         // Vérifier que les créations existent
-        const creations = await Creation.find({ _id: { $in: creationIds } });
+        const creations = await Creation.find({ _id: mongoose.trusted({ $in: creationIds }) });
         if (creations.length !== creationIds.length) {
             return NextResponse.json(
                 { error: "Certaines créations n'existent pas" },

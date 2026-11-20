@@ -5,6 +5,13 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import { checkNewPassword } from "@/lib/password-policy";
+import { z } from "zod";
+import { parseBody, password } from "@/lib/validation";
+
+const passwordChangeSchema = z.object({
+  currentPassword: password,
+  newPassword: password,
+});
 
 /**
  * PATCH /api/account/password
@@ -20,20 +27,9 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { currentPassword, newPassword } = body;
-
-    if (
-      typeof currentPassword !== "string" ||
-      typeof newPassword !== "string" ||
-      !currentPassword ||
-      !newPassword
-    ) {
-      return NextResponse.json(
-        { error: "Mots de passe requis" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(req, passwordChangeSchema);
+    if (!parsed.ok) return parsed.response;
+    const { currentPassword, newPassword } = parsed.data;
 
     await connectToDatabase();
 

@@ -65,7 +65,14 @@ export default function CartPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
+        // Texte brut, ou JSON `{ error }` pour une entrée refusée par la validation (400)
+        const rawError = await response.text();
+        let errorText = rawError;
+        try {
+          errorText = JSON.parse(rawError).error ?? rawError;
+        } catch {
+          // pas du JSON : message texte
+        }
         let errorMessage = "Erreur lors de la création de la session de paiement";
         
         // Messages d'erreur plus clairs

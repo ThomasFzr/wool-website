@@ -24,7 +24,8 @@ describe("PATCH /api/account/preferences", () => {
     asUser();
     const { status, body } = await readJson(await patch({ emailNotifications: "non" }));
     expect(status).toBe(400);
-    expect(body.error).toMatch(/booléen/);
+    expect(body.error).toBe("Préférence d'email invalide.");
+    expect(body.champ).toBe("emailNotifications");
   });
 
   it("répond 404 si l'utilisateur n'existe plus", async () => {
@@ -48,9 +49,8 @@ describe("PATCH /api/account/preferences", () => {
     expect(body.preferences.emailNotifications).toBe(true);
   });
 
-  it("répond 500 sur un corps JSON invalide", async () => {
+  it("répond 400 sur un corps qui n'est pas du JSON", async () => {
     asUser();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await patch("{pas du json")).status).toBe(500);
+    expect((await patch("{pas du json")).status).toBe(400);
   });
 });

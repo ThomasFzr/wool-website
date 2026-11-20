@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Contact from "@/models/Contact";
 import { checkAdminAuth } from "@/lib/auth";
+import { z } from "zod";
+import { idParams, parseBody, parseParams } from "@/lib/validation";
+import { CONTACT_STATUSES } from "@/models/Contact";
+
+const statusSchema = z.object({
+  status: z.enum(CONTACT_STATUSES, "Statut invalide"),
+});
 
 type AdminContactRouteContext = {
   params: Promise<{ id: string }>;
@@ -15,17 +22,15 @@ export async function PATCH(req: NextRequest, context: AdminContactRouteContext)
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    const parsedParams = await parseParams(context.params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
+
+    const parsed = await parseBody(req, statusSchema);
+    if (!parsed.ok) return parsed.response;
+    const { status } = parsed.data;
+
     await connectToDatabase();
-
-    const { id } = await context.params;
-    const { status } = await req.json();
-
-    if (!["new", "read", "replied", "archived"].includes(status)) {
-      return NextResponse.json(
-        { error: "Statut invalide" },
-        { status: 400 }
-      );
-    }
 
     const contact = await Contact.findByIdAndUpdate(
       id,
@@ -52,9 +57,11 @@ export async function DELETE(req: NextRequest, context: AdminContactRouteContext
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    await connectToDatabase();
+    const parsedParams = await parseParams(context.params, idParams);
+    if (!parsedParams.ok) return parsedParams.response;
+    const { id } = parsedParams.data;
 
-    const { id } = await context.params;
+    await connectToDatabase();
 
     const contact = await Contact.findByIdAndDelete(id);
 

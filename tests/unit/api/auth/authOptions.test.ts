@@ -60,6 +60,18 @@ describe("authOptions", () => {
       expect(await authorize({ email: "client@example.com", password: "" })).toBeNull();
     });
 
+    it("refuse une injection d'opérateur ou un type inattendu, sans requête en base", async () => {
+      const findOne = vi.spyOn(User, "findOne");
+      for (const creds of [
+        { email: { $ne: null }, password: "secret123" },
+        { email: "client@example.com", password: { $ne: null } },
+        { email: "pas-un-email", password: "secret123" },
+      ]) {
+        expect(await authorize(creds as unknown as Record<string, string>)).toBeNull();
+      }
+      expect(findOne).not.toHaveBeenCalled();
+    });
+
     it("refuse un email inconnu", async () => {
       expect(await authorize({ email: "inconnu@example.com", password: "secret123" })).toBeNull();
     });

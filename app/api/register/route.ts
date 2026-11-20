@@ -4,8 +4,14 @@ import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import { clientIp, hitRateLimit } from "@/lib/rate-limit";
 import { checkNewPassword } from "@/lib/password-policy";
+import { z } from "zod";
+import { email, parseBody, password, text } from "@/lib/validation";
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const registerSchema = z.object({
+  name: text(100).optional(),
+  email,
+  password,
+});
 
 // Inscriptions par IP et par heure (création de comptes en masse)
 const REGISTER_MAX_PER_IP = 5;
@@ -22,26 +28,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, email, password } = await req.json();
-
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email et mot de passe requis" }, { status: 400 });
-    }
-
-    if (typeof email !== "string" || !EMAIL_REGEX.test(email.trim())) {
-      return NextResponse.json({ error: "Email invalide" }, { status: 400 });
-    }
-
-    if (name && (typeof name !== "string" || name.length > 100)) {
-      return NextResponse.json({ error: "Nom invalide" }, { status: 400 });
-    }
+    const parsed = await parseBody(req, registerSchema);
+    if (!parsed.ok) return parsed.response;
+    const { name, email: normalizedEmail, password } = parsed.data;
 
     const passwordError = await checkNewPassword(password);
     if (passwordError) {
       return NextResponse.json({ error: passwordError }, { status: 400 });
     }
-
-    const normalizedEmail = email.toLowerCase().trim();
 
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
@@ -51,7 +45,7 @@ export async function POST(req: NextRequest) {
     const hashed = await bcrypt.hash(password, 10);
 
     await User.create({
-      name,
+      name: name || undefined,
       email: normalizedEmail,
       password: hashed,
       provider: "credentials",

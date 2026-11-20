@@ -11,7 +11,7 @@ async function fixSalesCount() {
     const soldCreations = await Creation.find({
       sold: true,
       $or: [
-        { salesCount: { $exists: false } },
+        { salesCount: mongoose.trusted({ $exists: false }) },
         { salesCount: null },
         { salesCount: 0 }
       ]
