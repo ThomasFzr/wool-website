@@ -8,7 +8,7 @@
 | Composant | Admin des créations : suppression (`DELETE /api/creations/[id]`) et formulaire (`app/admin/creations/page.tsx`) |
 | Gravité | Moyenne : photo perdue sur une création (à ré-envoyer), pas de fuite de données |
 | Priorité | Haute : perte de données silencieuse, reproductible par une manipulation courante |
-| Statut | Ouverte : deux chemins de suppression durcis (§ 6), cause de cette perte non identifiée (§ 5.2) |
+| Statut | Ouverte : deux chemins de suppression durcis et suppressions journalisées (§ 6), cause de cette perte non identifiée (§ 5.2) |
 | Branche | `fix/suppression-images` |
 
 ## 1. Symptômes
@@ -72,7 +72,8 @@ désactivé pendant l'enregistrement, et `handleSubmit` n'avait aucun verrou.
 - Une fois l'image enregistrée sur la création (15:01), seuls `DELETE` et un double envoi
   (§ 5.1) peuvent l'effacer : `destroyUnusedImages` la protège sur les autres chemins. Entre
   14:53 et 15:01, l'image n'étant pas encore en base, tout nettoyage qui la cite l'efface.
-- Sans logs (plan Hobby), impossible de dater la suppression ni d'en connaître l'appelant.
+- Sans logs (plan Hobby), impossible de dater la suppression ni d'en connaître l'appelant. Le
+  journal des suppressions (§ 6) comble ce manque pour la prochaine occurrence.
 
 Le double envoi suivi de la suppression d'un doublon reste un chemin possible, mais il ne colle
 pas avec le témoignage de l'administratrice. Les chemins de § 5.1 sont corrigés parce qu'ils
@@ -85,6 +86,7 @@ sont fautifs, pas parce qu'ils sont prouvés à l'origine de cette perte.
 | `app/api/creations/[id]/route.ts` | `DELETE` supprime d'abord les réservations et la création, puis seulement ses images, par `destroyUnusedImages` (une image encore référencée est gardée). Pour les anciennes créations sans `imagePublicIds`, `destroyLegacyImages` garde les URL encore affichées par une autre création |
 | `app/admin/creations/page.tsx` | Verrou d'enregistrement (`savingRef`, effectif avant le nouveau rendu) et état `saving` ; erreur réseau affichée au lieu d'une exception non gérée |
 | `components/admin/CreationFormModal.tsx` | Bouton d'envoi désactivé et libellé « ⏳ Enregistrement... » pendant l'enregistrement ; la prop `uploading`, jamais lue, est remplacée par `saving` |
+| `lib/cloudinary-images.ts`, `models/ImageDeletion.ts` | Journal des suppressions : chaque image candidate (supprimée, déjà absente, gardée car utilisée, échec), avec le chemin appelant (`creation-delete`, `creation-update`, `form-cleanup`), la création, l'email de l'admin et son navigateur. Conservé un an. Toutes les suppressions passent par ce module (la route `DELETE` n'appelle plus Cloudinary directement) |
 
 Donnée de production : la photo est perdue (pas de sauvegarde Cloudinary activée) ; elle doit être
 ré-envoyée depuis « Modifier la création ».
@@ -95,6 +97,7 @@ ré-envoyée depuis « Modifier la création ».
 |---|---|
 | `tests/unit/api/creations/id.test.ts` — « garde les images encore utilisées par une autre création » | Supprimer un doublon ne détruit que l'image qui lui est propre |
 | `tests/unit/api/creations/id.test.ts` — « garde l'image d'une ancienne création si une autre création affiche encore son URL » | Même garantie pour les créations sans `imagePublicIds` |
+| `tests/unit/lib/cloudinary-images.test.ts` et tests des trois routes | Chaque image candidate est journalisée avec son issue, le chemin appelant, l'admin et l'appareil ; un journal indisponible ne bloque pas la suppression |
 | `tests/e2e/admin.spec.ts` — « un double clic sur « Créer » n'enregistre la création qu'une fois » | Réponse ralentie à 500 ms, double clic : un seul `POST` |
 
 ## 8. Risque restant

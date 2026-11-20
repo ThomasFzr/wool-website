@@ -146,8 +146,9 @@ temporaire : la connexion Google et « mot de passe oublié » restent possibles
 |---|---|
 | Erreurs serveur journalisées (`console.error`, conservées par Vercel), sans données personnelles dans les journaux | routes de [`app/api/`](../app/api) ; `console.log` retirés en production : [`next.config.js`](../next.config.js#L47-L51) |
 | Alertes email à la vendeuse sur les incidents de paiement (double vente, paiement sans réservation) | [`lib/checkout-fulfillment.ts`](../lib/checkout-fulfillment.ts) |
+| Journal des suppressions d'images Cloudinary (image, issue, chemin appelant, création, admin, appareil), conservé un an en base car les logs Vercel du plan Hobby ne durent qu'une heure (ANO-2026-11-03) | [`lib/cloudinary-images.ts`](../lib/cloudinary-images.ts), [`models/ImageDeletion.ts`](../models/ImageDeletion.ts) |
 
-Limite : pas encore de journal d'audit des actions admin ni des échecs de connexion (voir plus bas).
+Limite : pas encore de journal d'audit des autres actions admin ni des échecs de connexion (voir plus bas) ; seules les suppressions d'images sont journalisées.
 
 ## A10 — Falsification de requête côté serveur (SSRF)
 
