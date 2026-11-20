@@ -132,17 +132,42 @@ describe("POST /api/settings", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
   });
 
-  it("complète des conditions de retrait partielles", async () => {
+  it("complète des conditions de retrait partielles avec les valeurs par défaut", async () => {
     asAdmin();
     await post({ title: "x", pickupConditions: {} });
     const doc = (await Settings.findById("main").lean()) as any;
     expect(doc.pickupConditions).toEqual(DEFAULT_PICKUP);
   });
 
-  it("remet les conditions de retrait par défaut si elles sont absentes", async () => {
+  it("garde les réglages absents de la requête", async () => {
+    // Un appel partiel effaçait les conditions de retrait (remises par défaut)
+    const pickup = { enabled: true, minimumAmount: 50, allowedPostalCodes: ["69001"], message: "Lyon" };
+    await Settings.create({ _id: "main", title: "Avant", shippingCost: 7, pickupConditions: pickup });
+    asAdmin();
+
+    expect((await post({ title: "Après" })).status).toBe(200);
+
+    const doc = (await Settings.findById("main").lean()) as any;
+    expect(doc).toMatchObject({ title: "Après", shippingCost: 7, pickupConditions: pickup });
+  });
+
+  it("ne modifie que les conditions de retrait envoyées", async () => {
+    await Settings.create({
+      _id: "main",
+      pickupConditions: { enabled: true, minimumAmount: 50, allowedPostalCodes: ["69001"], message: "Lyon" },
+    });
+    asAdmin();
+
+    await post({ pickupConditions: { minimumAmount: 20 } });
+
+    const doc = (await Settings.findById("main").lean()) as any;
+    expect(doc.pickupConditions).toEqual({ enabled: true, minimumAmount: 20, allowedPostalCodes: ["69001"], message: "Lyon" });
+  });
+
+  it("remet les conditions de retrait par défaut quand elles valent null", async () => {
     await Settings.create({ _id: "main", pickupConditions: { enabled: true, minimumAmount: 50 } });
     asAdmin();
-    await post({ title: "x" });
+    await post({ title: "x", pickupConditions: null });
     const doc = (await Settings.findById("main").lean()) as any;
     expect(doc.pickupConditions).toEqual(DEFAULT_PICKUP);
   });

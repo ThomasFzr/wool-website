@@ -9,7 +9,7 @@ import { parseBody, text } from "@/lib/validation";
 
 const labels = z.array(text(50)).max(200, "Liste trop longue.");
 
-// Réglages envoyés par la page d'admin (objet complet, champs facultatifs) ;
+// Réglages envoyés par la page d'admin (objet complet, champs facultatifs : absent = inchangé) ;
 // les autres clés du body (dont `_id`) sont ignorées
 const settingsSchema = z.object({
   title: text(200).optional(),
@@ -123,26 +123,29 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    // Préparer les données de mise à jour
-    const updateData: any = {
-      title: body.title,
-      subtitle: body.subtitle,
-      colors: body.colors,
-      types: body.types,
-      shippingCost: body.shippingCost,
-      systemPrompt: body.systemPrompt,
-    };
+    // Seuls les champs envoyés sont modifiés : un champ absent garde sa valeur enregistrée
+    // (un appel partiel ne doit pas effacer les autres réglages).
+    const { pickupConditions, ...fields } = body;
+    const updateData: Record<string, unknown> = Object.fromEntries(
+      Object.entries(fields).filter(([, value]) => value !== undefined)
+    );
 
-    // Gérer pickupConditions séparément pour s'assurer que tous les champs sont bien sauvegardés
-    if (body.pickupConditions) {
-      updateData.pickupConditions = {
-        enabled: body.pickupConditions.enabled ?? false,
-        minimumAmount: body.pickupConditions.minimumAmount ?? 0,
-        allowedPostalCodes: body.pickupConditions.allowedPostalCodes ?? [],
-        message: body.pickupConditions.message ?? "",
-      };
-    } else {
+    // Conditions de retrait : `null` les remet par défaut ; un objet partiel complète les
+    // conditions enregistrées (ou celles par défaut), sans effacer les sous-champs absents.
+    if (pickupConditions === null) {
       updateData.pickupConditions = DEFAULT_SETTINGS.pickupConditions;
+    } else if (pickupConditions) {
+      const current = (await Settings.findById("main").select("pickupConditions").lean()) as {
+        pickupConditions?: Partial<typeof DEFAULT_SETTINGS.pickupConditions>;
+      } | null;
+      const provided = Object.fromEntries(
+        Object.entries(pickupConditions).filter(([, value]) => value !== undefined)
+      );
+      updateData.pickupConditions = {
+        ...DEFAULT_SETTINGS.pickupConditions,
+        ...current?.pickupConditions,
+        ...provided,
+      };
     }
 
     const updated = await Settings.findByIdAndUpdate(
