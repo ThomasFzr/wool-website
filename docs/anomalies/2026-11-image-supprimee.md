@@ -106,7 +106,7 @@ Le compte Cloudinary est partagé par la production, staging et le développemen
 chaque environnement a sa propre base. `destroyUnusedImages` ne voit que la base de son
 environnement : supprimer sur staging une création qui référence une image de production (base
 copiée depuis la production, par exemple) effacerait cette image en production. Piste : un
-compte ou un dossier Cloudinary par environnement (à inscrire au backlog).
+compte ou un dossier Cloudinary par environnement, suivi dans l'issue [#24](https://github.com/ThomasFzr/wool-website/issues/24) (`docs/BACKLOG.md`).
 
 ## 9. Leçons retenues
 

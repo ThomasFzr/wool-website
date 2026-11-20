@@ -123,6 +123,17 @@ prend alors l'hôte de la requête). Restent partagées avec la production :
 - **Connexion Google** : non testable sur une preview tant que son URL n'est pas déclarée dans
   les URI de redirection du client OAuth Google. À vérifier en production après fusion, ou
   déclarer l'alias stable d'une branche de recette.
+- **Cloudinary** (`NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,
+  `CLOUDINARY_API_SECRET`) : un seul compte (`dddkuorlj`) pour la production, la Preview et le
+  développement local, alors que chaque environnement a sa propre base. Avant de supprimer une
+  image, `destroyUnusedImages` vérifie qu'aucune création ne l'utilise, mais seulement dans la
+  base de son environnement : supprimer sur staging une création qui référence une image de
+  production (base copiée depuis la production, par exemple) efface cette image en production.
+  Constaté lors de l'anomalie [ANO-2026-11-03](anomalies/2026-11-image-supprimee.md). Pistes : un
+  environnement de produit Cloudinary séparé pour la Preview et le local (l'offre gratuite n'en
+  donne qu'un, l'environnement « Production » du compte est payant), ou un dossier par
+  environnement (`folder` imposé dans la signature d'envoi) avec un refus de supprimer une image
+  hors du dossier de l'environnement.
 
 ## [PREVIEW] dans le sujet des emails hors production
 
