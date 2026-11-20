@@ -3,6 +3,7 @@ import { POST } from "@/app/api/admin/cloudinary-cleanup/route";
 import { cloudinary } from "@/lib/cloudinary";
 import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
+import ImageDeletion from "@/models/ImageDeletion";
 import { makeRequest, readJson } from "../../../../helpers/http";
 import { asAdmin, asUser } from "../../../../helpers/session";
 import { expectAdminOnly, failSession } from "../../../../helpers/admin-fixtures";
@@ -12,7 +13,7 @@ vi.mock("@/lib/cloudinary", () => ({ cloudinary: { uploader: { destroy: vi.fn() 
 const destroy = vi.mocked(cloudinary.uploader.destroy);
 
 const post = (body: unknown) =>
-  POST(makeRequest("/api/admin/cloudinary-cleanup", { method: "POST", body }));
+  POST(makeRequest("/api/admin/cloudinary-cleanup", { method: "POST", body, headers: { "user-agent": "Tablette" } }));
 
 describe("POST /api/admin/cloudinary-cleanup", () => {
   it("est réservé aux admins", async () => {
@@ -33,6 +34,12 @@ describe("POST /api/admin/cloudinary-cleanup", () => {
     const { status, body } = await readJson(await post({ publicIds: ["abandonnee", "gardee"] }));
     expect(status).toBe(200);
     expect(body).toEqual({ deleted: ["abandonnee"] });
+    // Journal : l'admin et son appareil, pour expliquer une image disparue
+    const rows = await ImageDeletion.find().sort({ publicId: 1 }).lean<any[]>();
+    expect(rows.map((r) => [r.publicId, r.outcome, r.source, r.by, r.userAgent])).toEqual([
+      ["abandonnee", "deleted", "form-cleanup", "admin@example.com", "Tablette"],
+      ["gardee", "kept", "form-cleanup", "admin@example.com", "Tablette"],
+    ]);
   });
 
   it("refuse une liste absente ou trop longue", async () => {

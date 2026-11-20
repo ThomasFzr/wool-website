@@ -112,7 +112,8 @@ interface CreationFormModalProps {
   onFormChange: (form: CreationFormData) => void;
   onSubmit: (e: FormEvent) => void;
   onCancel: () => void;
-  uploading: boolean;
+  /** Enregistrement en cours : bloque un second envoi (doublon de création). */
+  saving: boolean;
   availableColors: string[];
   availableTypes: string[];
   availableCreations?: Creation[];
@@ -128,7 +129,7 @@ export function CreationFormModal({
   onFormChange,
   onSubmit,
   onCancel,
-  uploading,
+  saving,
   availableColors,
   availableTypes,
   availableCreations = [],
@@ -845,6 +846,7 @@ export function CreationFormModal({
               type="submit" 
               disabled={
                 isUploading || 
+                saving || 
                 !form.title.trim() || 
                 !form.type || 
                 !form.price || 
@@ -854,7 +856,7 @@ export function CreationFormModal({
               } 
               className="flex-1 cursor-pointer"
             >
-              {isUploading ? "⏳ Upload..." : (isEdit ? "💾 Mettre à jour" : "➕ Créer")}
+              {isUploading ? "⏳ Upload..." : saving ? "⏳ Enregistrement..." : (isEdit ? "💾 Mettre à jour" : "➕ Créer")}
             </Button>
             <Button type="button" variant="secondary" onClick={onCancel} className="cursor-pointer">
               Annuler

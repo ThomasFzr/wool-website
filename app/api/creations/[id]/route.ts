@@ -4,17 +4,11 @@ import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
-import { cloudinary } from "@/lib/cloudinary";
-import { destroyUnusedImages } from "@/lib/cloudinary-images";
+import { deletionContext, destroyUnusedImages, destroyUnusedLegacyImages } from "@/lib/cloudinary-images";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
 import { sanitizeDescriptionHtml } from "@/lib/sanitize";
 import { isInvalidInput } from "@/lib/validation-error";
-
-async function checkAuth(req: NextRequest) {
-  const session = await checkAdminAuth();
-  return session !== null;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -78,8 +72,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ok = await checkAuth(req);
-    if (!ok) return new NextResponse("Unauthorized", { status: 401 });
+    const session = await checkAdminAuth();
+    if (!session) return new NextResponse("Unauthorized", { status: 401 });
 
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) return new NextResponse("Not found", { status: 404 });
@@ -244,7 +238,7 @@ export async function PATCH(
       const kept = new Set(body.imagePublicIds);
       // Tableau toujours présent sur un document Mongoose (vide par défaut)
       const removed = existingCreation.imagePublicIds.filter((pid: string) => !kept.has(pid));
-      await destroyUnusedImages(removed);
+      await destroyUnusedImages(removed, deletionContext("creation-update", session, req, id));
     }
 
     // 🔄 Invalider le cache après modification
@@ -261,7 +255,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -292,53 +286,20 @@ export async function DELETE(
       );
     }
 
-    // 🔥 1) Supprimer les images Cloudinary par leurs public_id stockés (en parallèle)
-    if (Array.isArray(creation.imagePublicIds)) {
-      await Promise.allSettled(
-        creation.imagePublicIds
-          .filter(Boolean)
-          .map((publicId: string) =>
-            cloudinary.uploader
-              .destroy(publicId, { invalidate: true })
-              .catch((err: unknown) =>
-                console.error("Cloudinary destroy error for", publicId, err)
-              )
-          )
-      );
-    }
-
-    // 🔁 2) Fallback pour les anciennes créations sans imagePublicIds :
-    // on essaye de déduire le public_id depuis imageUrl/images.
-    if (
-      (!creation.imagePublicIds ||
-        creation.imagePublicIds.length === 0) &&
-      (creation.imageUrl || (creation.images && creation.images.length > 0))
-    ) {
-      const urls: string[] = [
-        creation.imageUrl,
-        ...(creation.images || []),
-      ].filter(Boolean) as string[];
-
-      await Promise.allSettled(
-        urls.map((url) => {
-          const match = url.match(/upload\/(?:v\d+\/)?([^\.]+)/);
-          const publicIdFromUrl = match?.[1]; // => "s6qunadqjbpmj6eeif2e"
-          if (!publicIdFromUrl) return Promise.resolve();
-
-          return cloudinary.uploader
-            .destroy(publicIdFromUrl, { invalidate: true })
-            .catch((err: unknown) =>
-              console.error("Cloudinary destroy fallback error for", url, err)
-            );
-        })
-      );
-    }
-
-    // 3) Supprimer les réservations liées (aucune n'est payée, cf. plus haut)
+    // 1) Supprimer les réservations liées (aucune n'est payée, cf. plus haut), puis la création
     await Reservation.deleteMany({ creationId: id });
-
-    // 4) Enfin, supprimer la création de la base
     await Creation.findByIdAndDelete(id);
+
+    // 2) Puis ses images Cloudinary, une fois la création supprimée : une image encore utilisée
+    // par une autre création (doublon né d'un double envoi du formulaire, par exemple) est gardée.
+    const context = deletionContext("creation-delete", session, req, id);
+    if (creation.imagePublicIds?.length) {
+      await destroyUnusedImages(creation.imagePublicIds, context);
+    } else {
+      // Anciennes créations sans imagePublicIds : public_id déduit de l'URL, sauf si une autre
+      // création affiche encore cette URL.
+      await destroyUnusedLegacyImages([creation.imageUrl, ...(creation.images ?? [])], context);
+    }
 
     // 🔄 Invalider le cache après suppression
     revalidateCatalog();
