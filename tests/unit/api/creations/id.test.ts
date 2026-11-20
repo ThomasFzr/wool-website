@@ -5,6 +5,7 @@ import { DELETE, GET, PATCH } from "@/app/api/creations/[id]/route";
 import { connectToDatabase } from "@/lib/db";
 import { cloudinary } from "@/lib/cloudinary";
 import Creation from "@/models/Creation";
+import ImageDeletion from "@/models/ImageDeletion";
 import Reservation from "@/models/Reservation";
 import { makeRequest, readJson, routeParams } from "../../../helpers/http";
 import { asAdmin, asAnonymous, asUser } from "../../../helpers/session";
@@ -147,6 +148,11 @@ describe("PATCH /api/creations/[id]", () => {
     asAdmin();
     expect((await patch(c._id.toString(), { imagePublicIds: ["b"], images: ["https://img/b.jpg"] })).status).toBe(200);
     expect(destroy.mock.calls.map((call) => call[0])).toEqual(["a"]);
+    const rows = await ImageDeletion.find().sort({ publicId: 1 }).lean<any[]>();
+    expect(rows.map((r) => [r.publicId, r.outcome, r.source, String(r.creationId)])).toEqual([
+      ["a", "deleted", "creation-update", c._id.toString()],
+      ["partagee", "kept", "creation-update", c._id.toString()],
+    ]);
   });
 
   it("ne supprime aucune image quand imagePublicIds n'est pas envoyé", async () => {
@@ -466,6 +472,13 @@ describe("DELETE /api/creations/[id]", () => {
 
     expect(destroy.mock.calls.map((call) => call[0])).toEqual(["img/propre"]);
     expect(await Creation.findById(restante._id)).not.toBeNull();
+
+    // Journal des suppressions : chemin, création, admin et issue de chaque image
+    const rows = await ImageDeletion.find().sort({ publicId: 1 }).lean<any[]>();
+    expect(rows.map((r) => [r.publicId, r.outcome, r.source, String(r.creationId), r.by])).toEqual([
+      ["img/partagee", "kept", "creation-delete", doublon._id.toString(), "admin@example.com"],
+      ["img/propre", "deleted", "creation-delete", doublon._id.toString(), "admin@example.com"],
+    ]);
   });
 
   it("garde l'image d'une ancienne création si une autre création affiche encore son URL", async () => {

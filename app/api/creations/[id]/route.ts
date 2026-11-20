@@ -4,17 +4,11 @@ import { connectToDatabase } from "@/lib/db";
 import Creation from "@/models/Creation";
 import Reservation from "@/models/Reservation";
 import { checkAdminAuth } from "@/lib/auth";
-import { cloudinary } from "@/lib/cloudinary";
-import { destroyUnusedImages } from "@/lib/cloudinary-images";
+import { deletionContext, destroyUnusedImages, destroyUnusedLegacyImages } from "@/lib/cloudinary-images";
 import { revalidateCatalog } from "@/lib/revalidate";
 import { generateUniqueSlug } from "@/lib/slug";
 import { sanitizeDescriptionHtml } from "@/lib/sanitize";
 import { isInvalidInput } from "@/lib/validation-error";
-
-async function checkAuth(req: NextRequest) {
-  const session = await checkAdminAuth();
-  return session !== null;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -78,8 +72,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ok = await checkAuth(req);
-    if (!ok) return new NextResponse("Unauthorized", { status: 401 });
+    const session = await checkAdminAuth();
+    if (!session) return new NextResponse("Unauthorized", { status: 401 });
 
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) return new NextResponse("Not found", { status: 404 });
@@ -244,7 +238,7 @@ export async function PATCH(
       const kept = new Set(body.imagePublicIds);
       // Tableau toujours présent sur un document Mongoose (vide par défaut)
       const removed = existingCreation.imagePublicIds.filter((pid: string) => !kept.has(pid));
-      await destroyUnusedImages(removed);
+      await destroyUnusedImages(removed, deletionContext("creation-update", session, req, id));
     }
 
     // 🔄 Invalider le cache après modification
@@ -261,7 +255,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -298,12 +292,13 @@ export async function DELETE(
 
     // 2) Puis ses images Cloudinary, une fois la création supprimée : une image encore utilisée
     // par une autre création (doublon né d'un double envoi du formulaire, par exemple) est gardée.
+    const context = deletionContext("creation-delete", session, req, id);
     if (creation.imagePublicIds?.length) {
-      await destroyUnusedImages(creation.imagePublicIds);
+      await destroyUnusedImages(creation.imagePublicIds, context);
     } else {
       // Anciennes créations sans imagePublicIds : public_id déduit de l'URL, sauf si une autre
       // création affiche encore cette URL.
-      await destroyLegacyImages([creation.imageUrl, ...(creation.images ?? [])]);
+      await destroyUnusedLegacyImages([creation.imageUrl, ...(creation.images ?? [])], context);
     }
 
     // 🔄 Invalider le cache après suppression
@@ -314,39 +309,4 @@ export async function DELETE(
     console.error(err);
     return new NextResponse("Server error", { status: 500 });
   }
-}
-/** public_id Cloudinary déduit d'une URL d'image (…/upload/v123/dossier/nom.jpg → dossier/nom). */
-function publicIdFromUrl(url: string): string | undefined {
-  return url.match(/upload\/(?:v\d+\/)?([^.]+)/)?.[1];
-}
-
-/**
- * Supprime les images d'une ancienne création sans imagePublicIds, en gardant celles dont l'URL
- * est encore affichée par une autre création. Les échecs sont journalisés sans bloquer.
- */
-async function destroyLegacyImages(urls: (string | undefined | null)[]) {
-  const candidates = [...new Set(urls.filter((url): url is string => Boolean(url)))];
-  if (candidates.length === 0) return;
-
-  const used = await Creation.find({
-    $or: [
-      { imageUrl: mongoose.trusted({ $in: candidates }) },
-      { images: mongoose.trusted({ $in: candidates }) },
-    ],
-  })
-    .select("imageUrl images")
-    .lean<{ imageUrl?: string; images?: string[] }[]>();
-  const usedUrls = new Set(used.flatMap((c) => [c.imageUrl, ...(c.images ?? [])]));
-
-  await Promise.allSettled(
-    candidates
-      .filter((url) => !usedUrls.has(url))
-      .map((url) => {
-        const publicId = publicIdFromUrl(url);
-        if (!publicId) return Promise.resolve();
-        return cloudinary.uploader
-          .destroy(publicId, { invalidate: true })
-          .catch((err: unknown) => console.error("Cloudinary destroy fallback error for", url, err));
-      })
-  );
 }
