@@ -64,3 +64,28 @@ test.describe("admin connecté", () => {
     await expect(page.getByText(E2E_CLIENT.email).first()).toBeVisible();
   });
 });
+
+test.describe("formulaire de création (admin)", () => {
+  test("un double clic sur « Créer » n'enregistre la création qu'une fois", async ({ page }) => {
+    // Un double envoi créait deux créations aux images partagées : supprimer l'une
+    // effaçait la photo de l'autre (ANO-2026-11-03).
+    await loginAsAdmin(page, "/admin/creations");
+    await expect(page).toHaveURL(/\/admin\/creations$/);
+
+    let posts = 0;
+    await page.route("**/api/creations", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      posts++;
+      // Réponse lente : le second clic arrive pendant l'enregistrement
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.continue();
+    });
+
+    // La duplication pré-remplit les champs obligatoires
+    await page.getByTitle("Dupliquer").first().click();
+    await page.getByRole("button", { name: /Créer$/ }).dblclick();
+
+    await expect(page.getByText("Création ajoutée ✔️")).toBeVisible();
+    expect(posts).toBe(1);
+  });
+});
