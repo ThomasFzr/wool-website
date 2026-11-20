@@ -80,6 +80,9 @@ function AdminCreationsContent() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
+  // Enregistrement du formulaire en cours : un double clic créait deux fois la même création
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [availableTypes, setAvailableTypes] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("tous");
@@ -356,11 +359,24 @@ function AdminCreationsContent() {
     const url = editingId ? `/api/creations/${editingId}` : "/api/creations";
     const method = editingId ? "PATCH" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    // Le ref bloque un second envoi avant même le nouveau rendu (bouton pas encore désactivé)
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      setMessage("Erreur lors de l'enregistrement.");
+      return;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
@@ -755,7 +771,7 @@ function AdminCreationsContent() {
         onFormChange={handleFormChange}
         onSubmit={handleSubmit}
         onCancel={handleCancelEdit}
-        uploading={false}
+        saving={saving}
         availableColors={availableColors}
         availableTypes={availableTypes}
         availableCreations={creations}
@@ -772,7 +788,7 @@ function AdminCreationsContent() {
         onFormChange={handleFormChange}
         onSubmit={handleSubmit}
         onCancel={handleCancelEdit}
-        uploading={false}
+        saving={saving}
         availableColors={availableColors}
         availableTypes={availableTypes}
         availableCreations={creations}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdminAuth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
-import { destroyUnusedImages } from "@/lib/cloudinary-images";
+import { deletionContext, destroyUnusedImages } from "@/lib/cloudinary-images";
 import { z } from "zod";
 import { parseBody } from "@/lib/validation";
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const { publicIds } = parsed.data;
 
     await connectToDatabase();
-    const deleted = await destroyUnusedImages(publicIds);
+    const deleted = await destroyUnusedImages(publicIds, deletionContext("form-cleanup", session, req));
     return NextResponse.json({ deleted });
   } catch (err) {
     console.error("[cloudinary-cleanup] Error:", err);

@@ -5,6 +5,7 @@ import { DELETE, GET, PATCH } from "@/app/api/creations/[id]/route";
 import { connectToDatabase } from "@/lib/db";
 import { cloudinary } from "@/lib/cloudinary";
 import Creation from "@/models/Creation";
+import ImageDeletion from "@/models/ImageDeletion";
 import Reservation from "@/models/Reservation";
 import { makeRequest, readJson, routeParams } from "../../../helpers/http";
 import { asAdmin, asAnonymous, asUser } from "../../../helpers/session";
@@ -149,6 +150,11 @@ describe("PATCH /api/creations/[id]", () => {
     asAdmin();
     expect((await patch(c._id.toString(), { imagePublicIds: ["b"], images: ["https://img/b.jpg"] })).status).toBe(200);
     expect(destroy.mock.calls.map((call) => call[0])).toEqual(["a"]);
+    const rows = await ImageDeletion.find().sort({ publicId: 1 }).lean<any[]>();
+    expect(rows.map((r) => [r.publicId, r.outcome, r.source, String(r.creationId)])).toEqual([
+      ["a", "deleted", "creation-update", c._id.toString()],
+      ["partagee", "kept", "creation-update", c._id.toString()],
+    ]);
   });
 
   it("ne supprime aucune image quand imagePublicIds n'est pas envoyé", async () => {
@@ -470,6 +476,41 @@ describe("DELETE /api/creations/[id]", () => {
     expect(await Reservation.countDocuments({ creationId: c._id })).toBe(0);
     expect(await Reservation.countDocuments({ creationId: other._id })).toBe(1);
     expect(revalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("garde les images encore utilisées par une autre création (doublon d'un double envoi)", async () => {
+    // Deux créations nées du même formulaire partagent leurs images : supprimer le doublon
+    // ne doit pas casser la photo de celle qui reste (ANO-2026-11-03).
+    const doublon = await createCreation({ imagePublicIds: ["img/partagee", "img/propre"] });
+    const restante = await createCreation({ imagePublicIds: ["img/partagee"] });
+    asAdmin();
+
+    expect((await del(doublon._id.toString())).status).toBe(204);
+
+    expect(destroy.mock.calls.map((call) => call[0])).toEqual(["img/propre"]);
+    expect(await Creation.findById(restante._id)).not.toBeNull();
+
+    // Journal des suppressions : chemin, création, admin et issue de chaque image
+    const rows = await ImageDeletion.find().sort({ publicId: 1 }).lean<any[]>();
+    expect(rows.map((r) => [r.publicId, r.outcome, r.source, String(r.creationId), r.by])).toEqual([
+      ["img/partagee", "kept", "creation-delete", doublon._id.toString(), "admin@example.com"],
+      ["img/propre", "deleted", "creation-delete", doublon._id.toString(), "admin@example.com"],
+    ]);
+  });
+
+  it("garde l'image d'une ancienne création si une autre création affiche encore son URL", async () => {
+    const url = "https://res.cloudinary.com/demo/image/upload/v1/partagee.jpg";
+    const ancienne = await createCreation({
+      imageUrl: url,
+      images: [url, "https://res.cloudinary.com/demo/image/upload/propre.jpg"],
+    });
+    await createCreation({ images: [url] });
+    // Très ancien document : images à null, seule imageUrl renseignée
+    await insertRawCreation({ title: "Vieux", price: 1, color: "Noir", type: "bonnet", imageUrl: url, images: null });
+    asAdmin();
+
+    expect((await del(ancienne._id.toString())).status).toBe(204);
+    expect(destroy.mock.calls.map((call) => call[0])).toEqual(["propre"]);
   });
 
   it("refuse de supprimer une création qui a des commandes payées (à masquer à la place)", async () => {
