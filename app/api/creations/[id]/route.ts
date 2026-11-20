@@ -292,53 +292,19 @@ export async function DELETE(
       );
     }
 
-    // 🔥 1) Supprimer les images Cloudinary par leurs public_id stockés (en parallèle)
-    if (Array.isArray(creation.imagePublicIds)) {
-      await Promise.allSettled(
-        creation.imagePublicIds
-          .filter(Boolean)
-          .map((publicId: string) =>
-            cloudinary.uploader
-              .destroy(publicId, { invalidate: true })
-              .catch((err: unknown) =>
-                console.error("Cloudinary destroy error for", publicId, err)
-              )
-          )
-      );
-    }
-
-    // 🔁 2) Fallback pour les anciennes créations sans imagePublicIds :
-    // on essaye de déduire le public_id depuis imageUrl/images.
-    if (
-      (!creation.imagePublicIds ||
-        creation.imagePublicIds.length === 0) &&
-      (creation.imageUrl || (creation.images && creation.images.length > 0))
-    ) {
-      const urls: string[] = [
-        creation.imageUrl,
-        ...(creation.images || []),
-      ].filter(Boolean) as string[];
-
-      await Promise.allSettled(
-        urls.map((url) => {
-          const match = url.match(/upload\/(?:v\d+\/)?([^\.]+)/);
-          const publicIdFromUrl = match?.[1]; // => "s6qunadqjbpmj6eeif2e"
-          if (!publicIdFromUrl) return Promise.resolve();
-
-          return cloudinary.uploader
-            .destroy(publicIdFromUrl, { invalidate: true })
-            .catch((err: unknown) =>
-              console.error("Cloudinary destroy fallback error for", url, err)
-            );
-        })
-      );
-    }
-
-    // 3) Supprimer les réservations liées (aucune n'est payée, cf. plus haut)
+    // 1) Supprimer les réservations liées (aucune n'est payée, cf. plus haut), puis la création
     await Reservation.deleteMany({ creationId: id });
-
-    // 4) Enfin, supprimer la création de la base
     await Creation.findByIdAndDelete(id);
+
+    // 2) Puis ses images Cloudinary, une fois la création supprimée : une image encore utilisée
+    // par une autre création (doublon né d'un double envoi du formulaire, par exemple) est gardée.
+    if (creation.imagePublicIds?.length) {
+      await destroyUnusedImages(creation.imagePublicIds);
+    } else {
+      // Anciennes créations sans imagePublicIds : public_id déduit de l'URL, sauf si une autre
+      // création affiche encore cette URL.
+      await destroyLegacyImages([creation.imageUrl, ...(creation.images ?? [])]);
+    }
 
     // 🔄 Invalider le cache après suppression
     revalidateCatalog();
@@ -348,4 +314,39 @@ export async function DELETE(
     console.error(err);
     return new NextResponse("Server error", { status: 500 });
   }
+}
+/** public_id Cloudinary déduit d'une URL d'image (…/upload/v123/dossier/nom.jpg → dossier/nom). */
+function publicIdFromUrl(url: string): string | undefined {
+  return url.match(/upload\/(?:v\d+\/)?([^.]+)/)?.[1];
+}
+
+/**
+ * Supprime les images d'une ancienne création sans imagePublicIds, en gardant celles dont l'URL
+ * est encore affichée par une autre création. Les échecs sont journalisés sans bloquer.
+ */
+async function destroyLegacyImages(urls: (string | undefined | null)[]) {
+  const candidates = [...new Set(urls.filter((url): url is string => Boolean(url)))];
+  if (candidates.length === 0) return;
+
+  const used = await Creation.find({
+    $or: [
+      { imageUrl: mongoose.trusted({ $in: candidates }) },
+      { images: mongoose.trusted({ $in: candidates }) },
+    ],
+  })
+    .select("imageUrl images")
+    .lean<{ imageUrl?: string; images?: string[] }[]>();
+  const usedUrls = new Set(used.flatMap((c) => [c.imageUrl, ...(c.images ?? [])]));
+
+  await Promise.allSettled(
+    candidates
+      .filter((url) => !usedUrls.has(url))
+      .map((url) => {
+        const publicId = publicIdFromUrl(url);
+        if (!publicId) return Promise.resolve();
+        return cloudinary.uploader
+          .destroy(publicId, { invalidate: true })
+          .catch((err: unknown) => console.error("Cloudinary destroy fallback error for", url, err));
+      })
+  );
 }

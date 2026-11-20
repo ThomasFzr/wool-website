@@ -455,6 +455,34 @@ describe("DELETE /api/creations/[id]", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/");
   });
 
+  it("garde les images encore utilisées par une autre création (doublon d'un double envoi)", async () => {
+    // Deux créations nées du même formulaire partagent leurs images : supprimer le doublon
+    // ne doit pas casser la photo de celle qui reste (ANO-2026-11-03).
+    const doublon = await createCreation({ imagePublicIds: ["img/partagee", "img/propre"] });
+    const restante = await createCreation({ imagePublicIds: ["img/partagee"] });
+    asAdmin();
+
+    expect((await del(doublon._id.toString())).status).toBe(204);
+
+    expect(destroy.mock.calls.map((call) => call[0])).toEqual(["img/propre"]);
+    expect(await Creation.findById(restante._id)).not.toBeNull();
+  });
+
+  it("garde l'image d'une ancienne création si une autre création affiche encore son URL", async () => {
+    const url = "https://res.cloudinary.com/demo/image/upload/v1/partagee.jpg";
+    const ancienne = await createCreation({
+      imageUrl: url,
+      images: [url, "https://res.cloudinary.com/demo/image/upload/propre.jpg"],
+    });
+    await createCreation({ images: [url] });
+    // Très ancien document : images à null, seule imageUrl renseignée
+    await insertRawCreation({ title: "Vieux", price: 1, color: "Noir", type: "bonnet", imageUrl: url, images: null });
+    asAdmin();
+
+    expect((await del(ancienne._id.toString())).status).toBe(204);
+    expect(destroy.mock.calls.map((call) => call[0])).toEqual(["propre"]);
+  });
+
   it("refuse de supprimer une création qui a des commandes payées (à masquer à la place)", async () => {
     const c = await createCreation({ sold: true, imagePublicIds: ["img/a"] });
     await Reservation.create({ creationId: c._id, paymentStatus: "paid", status: "delivered" });
